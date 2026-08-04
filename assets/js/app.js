@@ -341,6 +341,11 @@ function setupDropdownListeners() {
 }
 
 async function initApp() {
+    // If we are on the watch page or a watch URL path, DO NOT run homepage init logic
+    if (window.location.pathname.startsWith('/watch/') || document.getElementById('main-video-player')) {
+        return;
+    }
+
     if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') {
         window.history.replaceState(null, '', '/home' + window.location.search);
     }
