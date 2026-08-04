@@ -11,18 +11,21 @@ async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
         targetDataUrl = "https://anikototv.to";
     }
 
+    const isPost = !!bodyPayload;
+
     const fetchOptions = {
-        method: bodyPayload ? 'POST' : 'GET',
+        method: isPost ? 'POST' : 'GET',
         headers: {
             'Accept': 'application/json'
         }
     };
-    if (bodyPayload) {
+    if (isPost) {
         fetchOptions.headers['Content-Type'] = 'application/json';
         fetchOptions.body = JSON.stringify(bodyPayload);
     }
 
-    const queryConnector = urlParams ? `&${urlParams}` : '';
+    // Do not append any query params to GraphQL POST requests
+    const queryConnector = (urlParams && !isPost) ? `&${urlParams}` : '';
 
     // If CLUSTER_MODE is false: exclusively route requests through NODE_REGISTRY[0]
     if (!CLUSTER_MODE) {
