@@ -409,11 +409,17 @@ function slugify(text) {
 function watchShowProgress(show, epNum) {
     const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     localStorage.setItem('activeShowData', JSON.stringify(show));
-    window.location.href = `/watch/anime/${slug}-${show.id}?ep=${epNum}`;
+    window.history.pushState({}, '', `/watch/anime/${slug}-${show.id}?ep=${epNum}`);
+    if (typeof window.renderWatchView === 'function') {
+        window.renderWatchView();
+    }
 }
 
 function watchShow(show) {
     const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     localStorage.setItem('activeShowData', JSON.stringify(show));
-    window.location.href = `/watch/anime/${slug}-${show.id}?ep=1`;
+    window.history.pushState({}, '', `/watch/anime/${slug}-${show.id}?ep=1`);
+    if (typeof window.renderWatchView === 'function') {
+        window.renderWatchView();
+    }
 }
