@@ -599,6 +599,8 @@ async function renderWatchView() {
         showData = JSON.parse(localStorage.getItem('activeShowData'));
     } catch (e) {}
 
+    setupWatchGlobalFunctions();
+
     if (showData && parseInt(showData.id, 10) === anilistId) {
         window.showData = showData;
         hydrateWatchUI();
@@ -654,7 +656,6 @@ async function renderWatchView() {
         }
     }
 
-    setupWatchGlobalFunctions();
     window.loadEpisodeStream(window.currentEp);
 }
 
