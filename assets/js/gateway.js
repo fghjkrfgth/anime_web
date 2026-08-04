@@ -107,3 +107,36 @@ async function fetchAniListGraphQL(payload) {
     // Send GraphQL requests through the worker gateway proxy via POST request with a JSON body
     return await fetchClusterNode({}, payload);
 }
+
+async function fetchHomeCatalog() {
+    const query = `
+      query {
+        trending: Page(page: 1, perPage: 12) {
+          media(sort: TRENDING_DESC, type: ANIME) {
+            id
+            title { romaji english native userPreferred }
+            coverImage { large extraLarge }
+            bannerImage
+            description
+            meanScore
+            format
+            status
+            nextAiringEpisode { episode }
+          }
+        }
+        popular: Page(page: 1, perPage: 12) {
+          media(sort: POPULARITY_DESC, type: ANIME) {
+            id
+            title { romaji english native userPreferred }
+            coverImage { large extraLarge }
+            bannerImage
+            description
+            meanScore
+            format
+            status
+          }
+        }
+      }
+    `;
+    return await fetchAniListGraphQL({ query });
+}
