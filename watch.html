@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlackLeg - Playback Screen</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Hls.js Engine Script -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        themeBlack: '#08080c',
+                        themeGlass: 'rgba(18, 18, 24, 0.45)',
+                        themeCyan: '#00ffcc',
+                        themeCrimson: '#ff0055',
+                        steelGray: '#a0a5b5'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #08080c;
+            color: #ffffff;
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Zenith Glass Style Rules */
+        .glass-panel {
+            background: rgba(18, 18, 24, 0.45);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        /* Scrollbars */
+        .scrollbar-thin::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 204, 0.25);
+            border-radius: 10px;
+        }
+
+        /* Glowing accents */
+        .cyan-glow-focus {
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+            border-color: rgba(0, 255, 204, 0.5);
+        }
+
+        #skip-intro-btn,
+        #skip-outro-btn {
+            display: none !important;
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body class="h-full flex flex-col scrollbar-thin relative">
+
+    <!-- Blurred background poster overlay -->
+    <div id="banner-backdrop"
+        class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.06] blur-2xl pointer-events-none z-0"></div>
+
+    <!-- Header bar -->
+    <header
+        class="sticky top-0 z-50 w-full bg-[#08080c]/85 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-4 flex items-center justify-between z-10">
+        <a href="index.html"
+            class="flex items-center gap-1.5 text-white font-extrabold text-xl md:text-2xl tracking-wider">
+            &larr; BLACK<span class="text-themeCyan drop-shadow-[0_0_8px_rgba(0,255,204,0.4)]">LEG</span>
+        </a>
+        <div class="flex items-center gap-2">
+            <span class="text-steelGray text-xs hidden md:inline">Locked Node:</span>
+            <span id="locked-node-display"
+                class="font-mono text-xs text-themeCyan bg-slate-900/60 px-2 py-0.5 rounded border border-white/5">Unshuffled</span>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="flex-grow max-w-7xl mx-auto w-full px-4 md:px-8 py-6 z-10 grid grid-cols-12 gap-6">
+
+        <!-- Left Side: Player Container & Details Layout (9/12 cols on large screen) -->
+        <div class="col-span-12 lg:col-span-9 flex flex-col gap-6">
+
+            <!-- Video Player Widescreen Container -->
+            <div
+                class="relative w-full aspect-video rounded-2xl overflow-hidden glass-panel border border-white/5 shadow-2xl group">
+                <!-- Native HTML5 Video Element -->
+                <video id="main-video-player" class="w-full h-full object-contain" controls playsinline></video>
+
+                <!-- Glassmorphic Autoplay Permission Handshake Card -->
+                <div id="autoplay-handshake-overlay"
+                    class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-opacity duration-500">
+                    <div
+                        class="glass-panel p-6 md:p-10 rounded-2xl border border-white/10 max-w-md text-center flex flex-col items-center gap-6 shadow-2xl">
+                        <div
+                            class="w-16 h-16 rounded-full border-2 border-themeCyan flex items-center justify-center animate-pulse">
+                            <svg class="w-8 h-8 text-themeCyan fill-current translate-x-0.5" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg md:text-xl font-extrabold tracking-wider text-white uppercase">BlackLeg
+                                Cinema System</h2>
+                            <p class="text-steelGray text-xs md:text-sm font-light mt-2 leading-relaxed">
+                                Desktop browsers require an interactive trigger to permit high-fidelity unmuted audio
+                                streams.
+                            </p>
+                        </div>
+                        <button onclick="initializeCinemaMatrix()"
+                            class="px-6 py-3 bg-themeCyan hover:bg-themeCyan/80 text-themeBlack font-bold text-sm tracking-widest rounded-lg shadow-lg hover:shadow-themeCyan/30 transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase">
+                            Initialize Cinema Matrix
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Skip Buttons Container -->
+                <div id="skip-buttons-container" style="display: none !important;"
+                    class="absolute bottom-6 right-6 z-20 flex flex-col gap-2">
+                    <!-- Floating Skip Intro Action Widget -->
+                    <button id="skip-intro-btn"
+                        class="px-4 py-2 bg-[#121218]/80 backdrop-blur-md border border-themeCyan/30 text-themeCyan text-xs md:text-sm font-bold tracking-widest uppercase rounded-lg shadow-lg opacity-0 pointer-events-none transition-all duration-300 transform hover:scale-105 active:scale-95"
+                        style="display: none !important;">
+                        Skip Intro &rarr;
+                    </button>
+
+                    <!-- Floating Skip Outro Action Widget -->
+                    <button id="skip-outro-btn"
+                        class="px-4 py-2 bg-[#121218]/80 backdrop-blur-md border border-themeCyan/30 text-themeCyan text-xs md:text-sm font-bold tracking-widest uppercase rounded-lg shadow-lg opacity-0 pointer-events-none transition-all duration-300 transform hover:scale-105 active:scale-95"
+                        style="display: none !important;">
+                        Skip Outro &rarr;
+                    </button>
+                </div>
+
+                <!-- Custom inline status spinner overlay -->
+                <div id="player-loading-spinner"
+                    class="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-20 hidden">
+                    <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-themeCyan"></div>
+                </div>
+            </div>
+
+            <!-- Profile Details Section (Strictly BELOW the streaming player) -->
+            <div class="glass-panel p-5 md:p-8 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <h1 id="show-title"
+                        class="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">
+                        Loading Title...
+                    </h1>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span id="badge-episodes"
+                            class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md">
+                            -- Episodes
+                        </span>
+                        <span id="badge-rating"
+                            class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md">
+                            ★ N/A
+                        </span>
+                        <span id="badge-language"
+                            class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md uppercase">
+                            SUB
+                        </span>
+                    </div>
+                </div>
+
+                <hr class="border-white/5 my-1">
+
+                <!-- Synopsis Expansion Component -->
+                <div class="flex flex-col gap-2 relative">
+                    <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Synopsis</h3>
+                    <div id="synopsis-wrapper"
+                        class="text-steelGray text-xs md:text-sm font-light leading-relaxed max-h-12 overflow-hidden transition-all duration-500 ease-in-out">
+                        <p id="show-synopsis">Loading show details...</p>
+                    </div>
+                    <button id="read-more-btn" onclick="toggleSynopsis()"
+                        class="text-themeCyan hover:text-white text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase">
+                        + Read More
+                    </button>
+                </div>
+
+                <!-- Info Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                    <div>
+                        <span class="text-steelGray text-[10px] uppercase tracking-wider block">Format</span>
+                        <span id="meta-format" class="text-white text-xs md:text-sm font-semibold">N/A</span>
+                    </div>
+                    <div>
+                        <span class="text-steelGray text-[10px] uppercase tracking-wider block">Status</span>
+                        <span id="meta-status" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
+                    </div>
+                    <div>
+                        <span class="text-steelGray text-[10px] uppercase tracking-wider block">Aired Season</span>
+                        <span id="meta-season" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
+                    </div>
+                    <div>
+                        <span class="text-steelGray text-[10px] uppercase tracking-wider block">Studio</span>
+                        <span id="meta-studio" class="text-white text-xs md:text-sm font-semibold">N/A</span>
+                    </div>
+                </div>
+
+                <!-- Related Adaptations section -->
+                <div id="related-section" class="mt-4 flex flex-col gap-3 hidden">
+                    <h3
+                        class="text-sm font-semibold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">
+                        Related Adaptations
+                    </h3>
+                    <div id="related-row" class="flex gap-4 overflow-x-auto pb-3 scrollbar-thin">
+                        <!-- Dynamic related items -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Side: Interactive Episode Picker Sidebar (3/12 cols) -->
+        <div class="col-span-12 lg:col-span-3 flex flex-col gap-6">
+
+            <!-- Sidebar Glass Panel container -->
+            <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-5 h-fit lg:max-h-[600px]">
+
+                <div class="flex items-center justify-between">
+                    <h2
+                        class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-2.5">
+                        Episodes
+                    </h2>
+
+                    <!-- Language Sub/Dub Selector Button -->
+                    <button id="lang-toggle-btn" onclick="toggleLanguage()"
+                        class="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold rounded-md text-themeCyan tracking-widest uppercase transition-all duration-300">
+                        Language: SUB
+                    </button>
+                </div>
+
+                <hr class="border-white/5">
+
+                <!-- Episode Batch Selector Dropdown -->
+                <select id="batch-selector"
+                    class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
+
+                <!-- Interactive Grid-Based Vertical Picker layout -->
+                <div id="episodes-grid"
+                    class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-4 gap-2 overflow-y-auto pr-1 max-h-[420px] scrollbar-thin">
+                    <!-- Dynamic rendering -->
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Page Footer -->
+    <footer
+        class="mt-auto w-full bg-[#08080c] border-t border-white/5 py-8 text-center text-steelGray text-xs md:text-sm z-10">
+        <p>&copy; 2026 BlackLeg Platform. Direct-to-CDN unpadded adaptive manifest player.</p>
+    </footer>
+
+    <!-- Video playback logic script -->
+    <script>
+        // -------------------------------------------------------------------------
+        // 1. DOMAIN CONFIGS & DECRYPTION Handshake
+        // -------------------------------------------------------------------------
+        const CLUSTER_MODE = false;
+
+        const NODE_REGISTRY = [
+            "aHR0cHM6Ly9hbmltZXgtcHJveHkuc2FoaWxtYWFuMDMwNi53b3JrZXJzLmRldg==",
+            "aHR0cHM6Ly9ub2RlMS5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlMi5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlMy5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlNC5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlNS5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlNi5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlNy5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlOC5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlOS5ibGFja2xlZy50bw==",
+            "aHR0cHM6Ly9ub2RlMTAuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTEuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTIuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTMuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTQuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTUuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTYuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTcuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTguYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMTkuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjAuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjEuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjIuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjMuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjQuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjUuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjYuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjcuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjguYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMjkuYmxhY2tsZWcudG8=",
+            "aHR0cHM6Ly9ub2RlMzAuYmxhY2tsZWcudG8="
+        ];
+
+        let lockedNodeIndex = sessionStorage.getItem('lockedNodeIndex');
+
+        function decodeRegistryUrl(encodedStr) {
+            return atob(encodedStr);
+        }
+
+        function getActiveWorkerUrl() {
+            if (CLUSTER_MODE && lockedNodeIndex !== null) {
+                return decodeRegistryUrl(NODE_REGISTRY[parseInt(lockedNodeIndex, 10)]);
+            }
+            return decodeRegistryUrl(NODE_REGISTRY[0]);
+        }
+
+        // Thread-Safe Shuffler and Silent Failover Engine
+        async function fetchClusterNode(syncParams = {}) {
+            const urlParams = new URLSearchParams(syncParams).toString();
+
+            let targetDataUrl = "https://graphql.anilist.co";
+            if (syncParams.anilist_id && (syncParams.ep_num || syncParams.ep)) {
+                targetDataUrl = "https://megaplay.buzz";
+            } else if (syncParams.vtt_url) {
+                targetDataUrl = syncParams.vtt_url;
+            }
+
+            // If CLUSTER_MODE is false: exclusively route requests through NODE_REGISTRY[0]
+            if (!CLUSTER_MODE) {
+                const activeWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
+                updateLockedNodeDisplay(new URL(activeWorkerUrl).hostname);
+
+                const targetUrl = `${activeWorkerUrl}/?src=${encodeURIComponent(targetDataUrl)}&${urlParams}`;
+                const response = await fetch(targetUrl);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return await response.json();
+            }
+
+            // Handshake Lock Rule: Use existing locked node if set
+            if (lockedNodeIndex !== null) {
+                const nodeIdx = parseInt(lockedNodeIndex, 10);
+                const activeWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[nodeIdx]);
+                const targetUrl = `${activeWorkerUrl}/?src=${encodeURIComponent(targetDataUrl)}&${urlParams}`;
+
+                try {
+                    const host = new URL(activeWorkerUrl).hostname;
+                    updateLockedNodeDisplay(host + " [LOCKED]");
+
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                    const response = await fetch(targetUrl, {
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok || response.status >= 400) {
+                        throw new Error(`Locked node status ${response.status}`);
+                    }
+
+                    return await response.json();
+                } catch (err) {
+                    console.warn(`[Lock Broken] Locked node ${nodeIdx} (${activeWorkerUrl}) failed: ${err.message}. Re-shuffling...`);
+                    sessionStorage.removeItem('lockedNodeIndex');
+                    lockedNodeIndex = null;
+                }
+            }
+
+            let attempts = 0;
+            const maxAttempts = NODE_REGISTRY.length;
+            const blacklistedIndices = new Set();
+
+            while (attempts < maxAttempts) {
+                const idx = Math.floor(Math.random() * NODE_REGISTRY.length);
+                if (blacklistedIndices.has(idx)) {
+                    continue;
+                }
+
+                const activeWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[idx]);
+                const targetUrl = `${activeWorkerUrl}/?src=${encodeURIComponent(targetDataUrl)}&${urlParams}`;
+
+                attempts++;
+                const host = new URL(activeWorkerUrl).hostname;
+                updateLockedNodeDisplay(host + " [SHUFFLING]");
+
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                    const response = await fetch(targetUrl, {
+                        signal: controller.signal,
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok || response.status >= 400) {
+                        throw new Error(`Server returned code ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    // LOCK HANDSHAKE: Save host index to lock subsequent segment tracks
+                    sessionStorage.setItem('lockedNodeIndex', idx.toString());
+                    lockedNodeIndex = idx.toString();
+                    updateLockedNodeDisplay(host + " [LOCKED]");
+
+                    return data;
+                } catch (err) {
+                    console.warn(`[Failover] Node ${idx} (${activeWorkerUrl}) failed: ${err.message}. Trying another...`);
+                    blacklistedIndices.add(idx);
+                }
+            }
+
+            // Last-resort fallback to primary worker node
+            updateLockedNodeDisplay("Fallback Node");
+            const primaryWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
+            const fallbackUrl = `${primaryWorkerUrl}/?src=${encodeURIComponent(targetDataUrl)}&${urlParams}`;
+            const fallbackResponse = await fetch(fallbackUrl);
+            if (!fallbackResponse.ok) throw new Error(`Gateway fallback error: ${fallbackResponse.status}`);
+            return await fallbackResponse.json();
+        }
+
+        function updateLockedNodeDisplay(hostText) {
+            document.getElementById('locked-node-display').innerText = hostText;
+        }
+
+        async function fetchStreamDetails(anilistId, epNum, language) {
+            return await fetchClusterNode({
+                anilist_id: anilistId,
+                ep_num: epNum,
+                language: language
+            });
+        }
+
+        // -------------------------------------------------------------------------
+        // 2. BOOTSTRAP HANDSHAKE & PLAYER INITIALIZATION
+        // -------------------------------------------------------------------------
+
+        let showData = null;
+        let currentEp = 1;
+        let currentLang = 'sub';
+
+        let hlsInstance = null;
+        const video = document.getElementById('main-video-player');
+
+        let introTimes = null;
+        let outroTimes = null;
+        let lastSavedTime = 0;
+
+        const skipIntroBtn = document.getElementById('skip-intro-btn');
+        const skipOutroBtn = document.getElementById('skip-outro-btn');
+        const skipBtnsContainer = document.getElementById('skip-buttons-container');
+
+        // Programmatically initialize display properties to hidden state on document load
+        if (skipBtnsContainer) {
+            skipBtnsContainer.style.setProperty('display', 'none', 'important');
+        }
+        if (skipIntroBtn) {
+            skipIntroBtn.style.setProperty('display', 'none', 'important');
+            skipIntroBtn.style.opacity = '0';
+            skipIntroBtn.style.pointerEvents = 'none';
+        }
+        if (skipOutroBtn) {
+            skipOutroBtn.style.setProperty('display', 'none', 'important');
+            skipOutroBtn.style.opacity = '0';
+            skipOutroBtn.style.pointerEvents = 'none';
+        }
+
+        function slugify(text) {
+            if (!text) return 'show';
+            return text.toString().toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^\w\-]+/g, '')
+                .replace(/\-\-+/g, '-')
+                .replace(/^-+/, '')
+                .replace(/-+$/, '');
+        }
+
+        function parseRoutingState() {
+            const pathname = window.location.pathname;
+            const urlParams = new URLSearchParams(window.location.search);
+            const epNum = parseInt(urlParams.get('ep') || '1', 10);
+
+            // Match /watch/anime/{slug}-{id}
+            const match = pathname.match(/\/watch\/anime\/([a-z0-9\-]+)-(\d+)/i);
+
+            if (match) {
+                return {
+                    slug: match[1],
+                    anilistId: parseInt(match[2], 10),
+                    epNum: epNum
+                };
+            }
+
+            // Fallback: Check standard query parameters in case URL rewriting isn't working
+            const queryId = urlParams.get('anilist_id') || urlParams.get('id');
+            if (queryId) {
+                return {
+                    slug: 'show',
+                    anilistId: parseInt(queryId, 10),
+                    epNum: epNum
+                };
+            }
+
+            return null;
+        }
+
+        // Lightspeed Load Handshake
+        async function initWatch() {
+            const route = parseRoutingState();
+
+            if (!route) {
+                window.location.href = '/home';
+                return;
+            }
+
+            currentEp = route.epNum;
+
+            try {
+                showData = JSON.parse(localStorage.getItem('activeShowData'));
+            } catch (e) {
+                showData = null;
+            }
+
+            // Hydrate instantly if cached ID matches requested route ID
+            if (showData && parseInt(showData.id, 10) === route.anilistId) {
+                console.log("[Lightspeed Bootstrap] Cache hit. Hydrating UI instantly.");
+                hydrateUI();
+            } else {
+                console.log("[Lightspeed Bootstrap] Cache miss/direct access. Querying node details.");
+                document.getElementById('player-loading-spinner').classList.remove('hidden');
+                try {
+                    let fetchedData = await fetchClusterNode({ anilist_id: route.anilistId });
+
+                    if (!fetchedData) throw new Error("Null data resolved");
+
+                    showData = fetchedData;
+                    localStorage.setItem('activeShowData', JSON.stringify(showData));
+                    hydrateUI();
+                } catch (err) {
+                    console.error("[Bootstrap Handshake] Direct lookup failed:", err);
+                    alert("Failed to load show details. Redirecting to homepage.");
+                    window.location.href = '/home';
+                    return;
+                }
+            }
+
+            currentLang = localStorage.getItem(`lang_${showData.id}`) || 'sub';
+            updateLanguageDisplay();
+            renderEpisodePicker();
+            renderRelatedAdaptations();
+            loadEpisodeStream(currentEp);
+        }
+
+        function hydrateUI() {
+            document.getElementById('player-loading-spinner').classList.add('hidden');
+            document.getElementById('banner-backdrop').style.backgroundImage = `url('${showData.banner || showData.bannerImage || showData.coverImage?.extraLarge || showData.coverImage?.large}')`;
+
+            const pref = localStorage.getItem('userLanguagePref') || 'romaji';
+            let title = showData.title.romaji || showData.title.english || showData.title.userPreferred;
+            if (pref === 'english') {
+                title = showData.title.english || showData.title.romaji || showData.title.userPreferred;
+            } else if (pref === 'native') {
+                title = showData.title.native || showData.title.romaji || showData.title.userPreferred;
+            }
+            document.getElementById('show-title').innerText = title;
+            document.getElementById('show-synopsis').innerHTML = showData.description || 'No description available.';
+            document.getElementById('badge-episodes').innerText = `${showData.episodes || showData.episodeCount || 'Ongoing'} Episodes`;
+            document.getElementById('badge-rating').innerText = `★ ${showData.meanScore || showData.averageScore || 'N/A'}%`;
+
+            // Map Extended Metadata Grid
+            document.getElementById('meta-format').innerText = showData.format || showData.type || 'TV';
+            document.getElementById('meta-status').innerText = showData.status || 'FINISHED';
+
+            const seasonStr = showData.season ? `${showData.season} ${showData.seasonYear || ''}` : 'N/A';
+            document.getElementById('meta-season').innerText = seasonStr;
+
+            // Resolve studio names safely
+            const studio = showData.studios?.nodes?.[0]?.name || showData.studio || 'N/A';
+            document.getElementById('meta-studio').innerText = studio;
+        }
+
+        function updateLanguageDisplay() {
+            document.getElementById('badge-language').innerText = currentLang;
+            document.getElementById('lang-toggle-btn').innerText = `Language: ${currentLang.toUpperCase()}`;
+        }
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'sub' ? 'dub' : 'sub';
+            localStorage.setItem(`lang_${showData.id}`, currentLang);
+            updateLanguageDisplay();
+            loadEpisodeStream(currentEp);
+        }
+
+        // Episode picker layout with batch selection menus
+        function renderEpisodePicker() {
+            const selector = document.getElementById('batch-selector');
+            const totalEps = showData.episodes || showData.episodeCount || 12;
+
+            const batchSize = 100;
+            const numBatches = Math.ceil(totalEps / batchSize);
+
+            if (numBatches > 1) {
+                selector.classList.remove('hidden');
+                let selectorHtml = '';
+                for (let b = 0; b < numBatches; b++) {
+                    const start = b * batchSize + 1;
+                    const end = Math.min((b + 1) * batchSize, totalEps);
+                    selectorHtml += `<option value="${b}">Episodes ${start} - ${end}</option>`;
+                }
+                selector.innerHTML = selectorHtml;
+
+                const currentBatch = Math.floor((currentEp - 1) / batchSize);
+                selector.value = currentBatch;
+
+                selector.onchange = (e) => {
+                    const selectedBatch = parseInt(e.target.value, 10);
+                    renderEpisodesGridForBatch(selectedBatch, totalEps);
+                };
+
+                renderEpisodesGridForBatch(currentBatch, totalEps);
+            } else {
+                selector.classList.add('hidden');
+                renderEpisodesGridForBatch(0, totalEps);
+            }
+        }
+
+        function renderEpisodesGridForBatch(batchIdx, totalEps) {
+            const container = document.getElementById('episodes-grid');
+            const batchSize = 100;
+            const start = batchIdx * batchSize + 1;
+            const end = Math.min((batchIdx + 1) * batchSize, totalEps);
+
+            let html = '';
+            for (let i = start; i <= end; i++) {
+                const isWatched = localStorage.getItem(`watched_${showData.id}_${i}`) === 'true';
+                const isActive = (i === currentEp);
+
+                let btnClasses = "episode-btn glass-panel aspect-square rounded-lg flex items-center justify-center font-bold text-xs md:text-sm cursor-pointer ";
+
+                if (isActive) {
+                    btnClasses += "bg-themeCyan text-themeBlack shadow-[0_0_12px_rgba(0,255,204,0.5)] border-themeCyan ";
+                } else if (isWatched) {
+                    btnClasses += "text-themeCyan hover:text-white border border-themeCyan/30 bg-[#121218]/70 ";
+                } else {
+                    btnClasses += "text-steelGray hover:text-white border border-white/5 hover:border-white/20 bg-[#121218]/40 ";
+                }
+
+                html += `
+                    <button class="${btnClasses}" onclick="changeEpisode(${i})">
+                        ${i}
+                    </button>
+                `;
+            }
+            container.innerHTML = html;
+        }
+
+        function changeEpisode(epNum) {
+            if (epNum === currentEp) return;
+            currentEp = epNum;
+
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.set('ep', epNum);
+            window.history.pushState(null, '', newUrl.toString());
+
+            renderEpisodePicker();
+            loadEpisodeStream(epNum);
+        }
+
+        // Synopsis Expansion Toggle
+        function toggleSynopsis() {
+            const wrapper = document.getElementById('synopsis-wrapper');
+            const btn = document.getElementById('read-more-btn');
+
+            if (wrapper.classList.contains('max-h-12')) {
+                wrapper.classList.remove('max-h-12');
+                wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
+                btn.innerText = "- Show Less";
+            } else {
+                wrapper.style.maxHeight = '3rem';
+                wrapper.classList.add('max-h-12');
+                btn.innerText = "+ Read More";
+            }
+        }
+
+        // Render Related Adaptations Row
+        function renderRelatedAdaptations() {
+            const relations = showData.relations?.edges || showData.relations || [];
+            const row = document.getElementById('related-row');
+            const section = document.getElementById('related-section');
+
+            if (!relations || relations.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+            let html = '';
+
+            relations.forEach(item => {
+                const node = item.node || item;
+                if (!node.id) return;
+
+                const rTitle = node.title?.english || node.title?.romaji || node.title?.userPreferred || 'Related';
+                const rCover = node.coverImage?.large || node.coverImage?.extraLarge || node.coverImage || '';
+                const relationType = item.relationType || 'Alternative';
+
+                html += `
+                    <div class="flex-shrink-0 w-28 md:w-32 group cursor-pointer" onclick="viewRelatedShow(${node.id})">
+                        <div class="relative aspect-[3/4] rounded-lg overflow-hidden border border-white/5 group-hover:border-themeCyan/40 transition-all duration-300">
+                            <img src="${rCover}" alt="${rTitle}" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
+                            <span class="absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 bg-black/70 border border-white/10 rounded uppercase text-themeCyan">
+                                ${relationType}
+                            </span>
+                        </div>
+                        <h4 class="text-white text-[11px] md:text-xs font-semibold truncate mt-1.5 group-hover:text-themeCyan transition-all duration-300">
+                            ${rTitle}
+                        </h4>
+                        <span class="text-steelGray text-[10px] block">
+                            ${node.type || 'ANIME'} • ${node.status || 'FINISHED'}
+                        </span>
+                    </div>
+                `;
+            });
+
+            row.innerHTML = html;
+        }
+
+        // View details for a related adaptation
+        async function viewRelatedShow(relatedId) {
+            document.getElementById('player-loading-spinner').classList.remove('hidden');
+            try {
+                const data = await fetchClusterNode({ anilist_id: relatedId });
+
+                // Save and refresh play details using premium path
+                localStorage.setItem('activeShowData', JSON.stringify(data));
+                sessionStorage.removeItem('lockedNodeIndex');
+
+                const slug = slugify(data.title.english || data.title.romaji || data.title.userPreferred);
+                window.location.href = `/watch/anime/${slug}-${data.id}?ep=1`;
+            } catch (err) {
+                console.error("Failed to load related show:", err);
+                alert("Could not load details for this related show.");
+                document.getElementById('player-loading-spinner').classList.add('hidden');
+            }
+        }
+
+        // -------------------------------------------------------------------------
+        // 3. SECURE HLS ORCHESTRATION PIPELINE
+        // -------------------------------------------------------------------------
+
+        async function loadEpisodeStream(epNum) {
+            document.getElementById('player-loading-spinner').classList.remove('hidden');
+
+            // Mark episode as watched
+            localStorage.setItem(`watched_${showData.id}_${epNum}`, 'true');
+            renderEpisodePicker();
+
+            // Clear skips
+            introTimes = null;
+            outroTimes = null;
+            skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+            skipOutroBtn.classList.add('opacity-100');
+
+            try {
+                const data = await fetchStreamDetails(showData.id, epNum, currentLang);
+
+                if (!data || !data.success || !data.manifest) {
+                    throw new Error(data ? data.error : "Unknown streams response error");
+                }
+
+                // Parse skip clocks
+                introTimes = data.intro;
+                outroTimes = data.outro;
+
+                // Load subtitles using direct proxy Blob engine
+                await loadSubtitles(data.subtitles || []);
+
+                // Load manifest Blob URL into Hls.js
+                const manifestText = data.manifest;
+                const blob = new Blob([manifestText], { type: 'application/x-mpegURL' });
+                const manifestBlobUrl = URL.createObjectURL(blob);
+
+                if (hlsInstance) {
+                    hlsInstance.destroy();
+                }
+
+                if (Hls.isSupported()) {
+                    hlsInstance = new Hls({
+                        maxBufferLength: 10, // Max length in seconds
+                        maxMaxBufferLength: 15,
+                        maxBufferSize: 5 * 1024 * 1024, // Keep buffer footprint tiny
+                        enableWorker: true,
+                        lowLatencyMode: true
+                    });
+                    hlsInstance.loadSource(manifestBlobUrl);
+                    hlsInstance.attachMedia(video);
+
+                    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                        document.getElementById('player-loading-spinner').classList.add('hidden');
+                        showCinemaHandshake();
+                    });
+
+                    hlsInstance.on(Hls.Events.ERROR, (event, errorData) => {
+                        if (errorData.fatal) {
+                            switch (errorData.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    console.warn("Network HLS error, attempting to recover...");
+                                    hlsInstance.startLoad();
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    console.warn("Media HLS error, attempting to recover...");
+                                    hlsInstance.recoverMediaError();
+                                    break;
+                                default:
+                                    console.error("Fatal HLS playback crash. Re-initiating stream.");
+                                    loadEpisodeStream(epNum);
+                                    break;
+                            }
+                        }
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    // Apple native HLS fallback
+                    video.src = manifestBlobUrl;
+                    video.addEventListener('loadedmetadata', () => {
+                        document.getElementById('player-loading-spinner').classList.add('hidden');
+                        showCinemaHandshake();
+                    });
+                } else {
+                    alert("This browser does not support HLS streaming.");
+                }
+
+            } catch (err) {
+                console.error('[Stream Launch] Failed to load stream:', err);
+                document.getElementById('player-loading-spinner').classList.add('hidden');
+                alert(`Playback Error: Failed to resolve streaming source. (${err.message})`);
+            }
+        }
+
+        // Subtitle bypass track loader using base64 Data URL converter
+        async function loadSubtitles(trackList) {
+            const existingTracks = video.querySelectorAll('track');
+            existingTracks.forEach(t => t.remove());
+
+            if (!trackList || trackList.length === 0) return;
+
+            for (let track of trackList) {
+                if (!track.file) continue;
+
+                try {
+                    const activeUrl = getActiveWorkerUrl();
+                    const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}`;
+                    
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) throw new Error("Sandbox load error");
+
+                    const vttText = await response.text();
+
+                    // Convert into an internal base64 dynamic object URL stream
+                    const base64Vtt = btoa(unescape(encodeURIComponent(vttText)));
+                    const dataUrl = 'data:text/vtt;base64,' + base64Vtt;
+
+                    const trackEl = document.createElement('track');
+                    trackEl.kind = track.kind || 'captions';
+                    trackEl.label = track.label || 'Subtitles';
+                    trackEl.srclang = track.label ? track.label.toLowerCase().slice(0, 2) : 'en';
+                    trackEl.src = dataUrl;
+
+                    if (track.default || trackEl.label.toLowerCase().includes('eng') || trackEl.label.toLowerCase().includes('en')) {
+                        trackEl.default = true;
+                    }
+
+                    video.appendChild(trackEl);
+                    console.log(`[Subtitles Bypass] Track ${track.label} resolved successfully as base64 Data URL.`);
+                } catch (err) {
+                    console.warn(`[Subtitles Fallback] CORS track fetch failure: ${track.label}. Loading via proxy directly.`);
+                    const activeUrl = getActiveWorkerUrl();
+                    const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}`;
+                    const trackEl = document.createElement('track');
+                    trackEl.kind = track.kind || 'captions';
+                    trackEl.label = track.label || 'Subtitles';
+                    trackEl.srclang = 'en';
+                    trackEl.src = proxyUrl;
+                    video.appendChild(trackEl);
+                }
+            }
+
+            // Enable default English track instantly for smooth presentation transitions
+            enableDefaultTextTrack();
+        }
+
+        function enableDefaultTextTrack() {
+            setTimeout(() => {
+                const textTracks = video.textTracks;
+                if (!textTracks || textTracks.length === 0) return;
+
+                let defaultIndex = -1;
+                for (let i = 0; i < textTracks.length; i++) {
+                    const track = textTracks[i];
+                    if (track.language.includes('en') || track.label.toLowerCase().includes('eng') || track.label.toLowerCase().includes('en')) {
+                        defaultIndex = i;
+                        break;
+                    }
+                }
+
+                // Fire default track instantly
+                if (defaultIndex !== -1) {
+                    for (let i = 0; i < textTracks.length; i++) {
+                        if (i === defaultIndex) {
+                            textTracks[i].mode = 'showing';
+                            console.log(`[Text Track Engine] Default track activated: ${textTracks[i].label}`);
+                        } else {
+                            textTracks[i].mode = 'hidden';
+                        }
+                    }
+                }
+            }, 100);
+        }
+
+        // -------------------------------------------------------------------------
+        // 4. AUTOPLAY & CLOCK METRICS HANDLER
+        // -------------------------------------------------------------------------
+
+        function showCinemaHandshake() {
+            document.getElementById('autoplay-handshake-overlay').classList.remove('opacity-0', 'pointer-events-none');
+            document.getElementById('autoplay-handshake-overlay').classList.add('opacity-100');
+        }
+
+        // Glassmorphic Autoplay Permission handshaker
+        function initializeCinemaMatrix() {
+            document.getElementById('autoplay-handshake-overlay').classList.remove('opacity-100');
+            document.getElementById('autoplay-handshake-overlay').classList.add('opacity-0', 'pointer-events-none');
+
+            video.play()
+                .then(() => {
+                    console.log("[Autoplay Matrix] Playback launched unmuted successfully.");
+                })
+                .catch(err => {
+                    console.warn("[Autoplay Matrix] Playback blocked, trying muted...", err);
+                    video.muted = true;
+                    video.play();
+                });
+        }
+
+        // Track runtime clocks for skip widgets
+        video.addEventListener('timeupdate', () => {
+            const currentTime = video.currentTime;
+
+            // Save watched progress for Continue Watching row on homepage (Throttle save logic)
+            if (video.duration && Math.abs(currentTime - lastSavedTime) > 8) {
+                const percentage = (currentTime / video.duration) * 100;
+                updateContinueWatchingHistory(percentage);
+                lastSavedTime = currentTime;
+            }
+
+            // ONLY execute overlay checks if video is active and playing and playback has begun
+            if (!video.paused && video.duration > 0 && currentTime > 0) {
+                // Ensure container is visible
+                if (skipBtnsContainer) {
+                    skipBtnsContainer.style.setProperty('display', 'flex', 'important');
+                }
+
+                // Intro Skip widget fading
+                if (introTimes && introTimes.start > 0 && currentTime >= introTimes.start && currentTime <= introTimes.end) {
+                    skipIntroBtn.style.setProperty('display', 'block', 'important');
+                    setTimeout(() => {
+                        skipIntroBtn.classList.remove('opacity-0', 'pointer-events-none');
+                        skipIntroBtn.classList.add('opacity-100');
+                    }, 10);
+                } else {
+                    skipIntroBtn.classList.remove('opacity-100');
+                    skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+                    setTimeout(() => {
+                        if (skipIntroBtn.classList.contains('opacity-0')) {
+                            skipIntroBtn.style.setProperty('display', 'none', 'important');
+                        }
+                    }, 300);
+                }
+
+                // Outro Skip widget fading
+                if (outroTimes && outroTimes.start > 0 && currentTime >= outroTimes.start && currentTime <= outroTimes.end) {
+                    skipOutroBtn.style.setProperty('display', 'block', 'important');
+                    setTimeout(() => {
+                        skipOutroBtn.classList.remove('opacity-0', 'pointer-events-none');
+                        skipOutroBtn.classList.add('opacity-100');
+                    }, 10);
+                } else {
+                    skipOutroBtn.classList.remove('opacity-100');
+                    skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
+                    setTimeout(() => {
+                        if (skipOutroBtn.classList.contains('opacity-0')) {
+                            skipOutroBtn.style.setProperty('display', 'none', 'important');
+                        }
+                    }, 300);
+                }
+            } else {
+                // Keep them completely hidden if video is paused/idle
+                if (skipBtnsContainer) {
+                    skipBtnsContainer.style.setProperty('display', 'none', 'important');
+                }
+                skipIntroBtn.classList.remove('opacity-100');
+                skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+                skipIntroBtn.style.setProperty('display', 'none', 'important');
+
+                skipOutroBtn.classList.remove('opacity-100');
+                skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
+                skipOutroBtn.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        // Floating action buttons click jumps
+        skipIntroBtn.addEventListener('click', () => {
+            if (introTimes) {
+                video.currentTime = introTimes.end;
+                skipIntroBtn.classList.remove('opacity-100');
+                skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+                skipIntroBtn.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        skipOutroBtn.addEventListener('click', () => {
+            if (outroTimes) {
+                video.currentTime = outroTimes.end;
+                skipOutroBtn.classList.remove('opacity-100');
+                skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
+                skipOutroBtn.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        // Save watched history state
+        function updateContinueWatchingHistory(percentage) {
+            let history = [];
+            try {
+                history = JSON.parse(localStorage.getItem('continueWatching')) || [];
+            } catch (e) {
+                history = [];
+            }
+
+            // Remove existing record for the same show
+            history = history.filter(item => item && item.show && item.show.id !== showData.id);
+
+            // Add new progress trace at the beginning
+            history.unshift({
+                show: showData,
+                epNum: currentEp,
+                percentage: percentage
+            });
+
+            // Keep max 10 records
+            history = history.slice(0, 10);
+            localStorage.setItem('continueWatching', JSON.stringify(history));
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', initWatch);
+    </script>
+
+</body>
+
+</html>
