@@ -359,15 +359,18 @@ async function initApp() {
     });
 
     try {
-        const data = await fetchClusterNode({ action: 'home' });
-        if (!data) throw new Error("Empty homepage cluster data");
+        const json = await fetchHomeCatalog();
+        if (!json || !json.data) throw new Error("Empty homepage catalog data");
 
-        window.trendingCache = data.trending || [];
+        const trendingList = json.data.trending?.media || [];
+        const popularList = json.data.popular?.media || [];
 
-        renderSpotlight(data.trending || []);
-        renderThumbnailRow('trending-container', data.trending || []);
-        renderThumbnailRow('popular-container', data.popular || []);
-        renderThumbnailRow('recent-container', data.recent || []);
+        window.trendingCache = trendingList;
+
+        renderSpotlight(trendingList);
+        renderThumbnailRow('trending-container', trendingList);
+        renderThumbnailRow('popular-container', popularList);
+        renderThumbnailRow('recent-container', popularList.slice(6) || []);
 
         fetchClusterNode({ action: 'schedule' })
             .then(schedData => {
@@ -385,9 +388,9 @@ async function initApp() {
                 }
             });
 
-        renderThumbnailRow('action-extremes-container', data.actionExtremes || []);
-        renderThumbnailRow('drama-container', data.sliceOfLife || []);
-        renderThumbnailRow('hidden-gems-container', data.hiddenGems || []);
+        renderThumbnailRow('action-extremes-container', trendingList.slice(4, 10) || []);
+        renderThumbnailRow('drama-container', popularList.slice(0, 6) || []);
+        renderThumbnailRow('hidden-gems-container', trendingList.slice(8, 12) || []);
 
     } catch (err) {
         console.error('[App Launch] Initialization failed:', err);
