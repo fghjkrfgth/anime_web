@@ -1,1 +1,119 @@
+body {
+    background-color: #08080c;
+    color: #ffffff;
+    font-family: 'Outfit', sans-serif;
+    overflow-x: hidden;
+}
 
+/* Zenith Glass Panels */
+.glass-panel {
+    background: rgba(18, 18, 24, 0.45);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Custom Scrollbars */
+.scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 204, 0.25);
+    border-radius: 10px;
+    transition: background 0.3s;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 204, 0.6);
+}
+
+/* Kinetic Fluidity & Component Animations */
+.anime-card {
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: transform, box-shadow;
+}
+
+.anime-card img {
+    transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: transform;
+}
+
+.anime-card:hover {
+    transform: scale(1.05) translateY(-4px);
+    box-shadow: 0 0 25px rgba(0, 245, 255, 0.35);
+    border-color: #00f5ff !important;
+    z-index: 10;
+}
+
+.anime-card:hover img {
+    transform: scale(1.08);
+}
+
+/* Surrounding nodes slide back slightly */
+#trending-container:hover .anime-card:not(:hover),
+#popular-container:hover .anime-card:not(:hover) {
+    transform: scale(0.96);
+    opacity: 0.75;
+}
+
+/* Mobile Touch-Swipe Momentum snap physics */
+.snap-track {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+}
+
+.snap-item {
+    scroll-snap-align: start;
+}
+
+/* Mobile Performance Optimization & Smooth Rendering */
+@media (max-width: 768px) {
+    .glass-panel {
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+    }
+
+    .anime-card {
+        transform: none !important;
+        box-shadow: none !important;
+        transition: none !important;
+    }
+
+    .anime-card img {
+        transform: none !important;
+        transition: none !important;
+    }
+
+    .anime-card:hover {
+        transform: none !important;
+        box-shadow: none !important;
+        border-color: rgba(189, 0, 255, 0.2) !important;
+    }
+
+    .anime-card:hover img {
+        transform: none !important;
+    }
+
+    #spotlight-outer-container {
+        box-shadow: none !important;
+        background: linear-gradient(135deg, rgba(0, 245, 255, 0.25), rgba(189, 0, 255, 0.25)) !important;
+    }
+
+    /* Hide non-interactive background decorations/glows/spark overlays to reclaim draw call threads */
+    .particle-overlay,
+    .background-glow,
+    .glow-layer,
+    .spark-overlay,
+    .bg-sparks {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
