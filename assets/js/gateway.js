@@ -104,8 +104,20 @@ function updateActiveNodeDisplay() {
 }
 
 async function fetchAniListGraphQL(payload) {
-    // Send GraphQL requests through the worker gateway proxy via POST request with a JSON body
-    return await fetchClusterNode({}, payload);
+    const response = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error(`AniList GraphQL Error: ${response.status}`);
+    }
+
+    return await response.json();
 }
 
 async function fetchHomeCatalog() {
