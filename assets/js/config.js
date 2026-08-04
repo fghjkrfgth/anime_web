@@ -6,7 +6,7 @@ const CLUSTER_MODE = false;
 
 // Base64-encoded URL array (NODE_REGISTRY[0] is the primary Cloudflare Worker proxy)
 const NODE_REGISTRY = [
-    "aHR0cHM6Ly9hbmltZXgtcHJveHkuc2FoaWxtYWFuMDMwNi53b3JrZXJzLmRldg==",
+    "aHR0cHM6Ly9hbmltZS1wcm94eS5kYW1uLWRhbW4tZGFtbml0LndvcmtlcnMuZGV2",
     "aHR0cHM6Ly9ub2RlMS5ibGFja2xlZy50bw==",
     "aHR0cHM6Ly9ub2RlMi5ibGFja2xlZy50bw==",
     "aHR0cHM6Ly9ub2RlMy5ibGFja2xlZy50bw==",
