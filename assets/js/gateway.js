@@ -144,38 +144,39 @@ function updateActiveNodeDisplay() {
     }
 }
 
-// 4. FILLER EPISODE DATA FETCHING & CACHING (JIKAN PAGINATED)
+// 4. FILLER EPISODE DATA FETCHING & CACHING (STRICT JIKAN PAGINATION)
 const fillerCache = new Map();
 
-async function fetchFillerEpisodes(malId) {
-    if (!malId) return new Set();
+async function fetchFillerEpisodes(anilistId, malId = null) {
+    if (!anilistId) return new Set();
 
-    const sessionKey = `fillers_${malId}`;
+    const sessionKey = `fillers_${anilistId}`;
     try {
         const stored = sessionStorage.getItem(sessionKey);
         if (stored) {
             const arr = JSON.parse(stored);
             const cachedSet = new Set(arr);
-            fillerCache.set(malId, cachedSet);
+            fillerCache.set(anilistId, cachedSet);
             return cachedSet;
         }
     } catch (e) {}
 
-    if (fillerCache.has(malId)) return fillerCache.get(malId);
+    if (fillerCache.has(anilistId)) return fillerCache.get(anilistId);
 
     const fillerSet = new Set();
+    const targetMalId = malId || anilistId;
 
     try {
         let page = 1;
         let hasNextPage = true;
-        while (hasNextPage && page <= 25) {
-            const res = await fetch(`https://api.jikan.moe/v4/anime/${malId}/episodes?page=${page}`);
+        while (hasNextPage && page <= 50) {
+            const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes?page=${page}`);
             if (res.ok) {
                 const data = await res.json();
                 if (data && Array.isArray(data.data)) {
-                    data.data.forEach(item => {
+                    data.data.forEach((item, idx) => {
                         if (item.filler === true) {
-                            const epNum = item.mal_id || item.episode_id;
+                            const epNum = item.mal_id || item.episode_id || (idx + 1 + (page - 1) * 100);
                             if (epNum) fillerSet.add(parseInt(epNum, 10));
                         }
                     });
@@ -187,18 +188,73 @@ async function fetchFillerEpisodes(malId) {
             }
         }
     } catch (err) {
-        console.warn("[Filler API] Warning fetching filler info from Jikan (Paginated):", err);
+        console.warn("[Filler API] Jikan paginated fetch error:", err);
     }
 
     try {
         sessionStorage.setItem(sessionKey, JSON.stringify(Array.from(fillerSet)));
     } catch (e) {}
 
-    fillerCache.set(malId, fillerSet);
+    fillerCache.set(anilistId, fillerSet);
     return fillerSet;
 }
 
 window.fetchFillerEpisodes = fetchFillerEpisodes;
+
+// 5. ANIMEX FRANCHISE TREE FETCHING
+const animexCache = new Map();
+
+async function fetchAnimexFranchiseData(slug, anilistId) {
+    const key = `${slug}-${anilistId}`;
+    if (animexCache.has(key)) return animexCache.get(key);
+
+    const animexUrl = `https://animex.one/anime/${slug}-${anilistId}/__data.json?x-sveltekit-invalidated=01`;
+
+    try {
+        let response = null;
+        try {
+            response = await fetch(animexUrl, { headers: { 'Accept': 'application/json' } });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        } catch (corsErr) {
+            response = await fetchClusterNode({ target: animexUrl });
+        }
+
+        if (response) {
+            const json = typeof response.json === 'function' ? await response.json() : response;
+            let seasons = [];
+
+            if (json) {
+                if (Array.isArray(json.seasons)) {
+                    seasons = json.seasons;
+                } else if (json.nodes && Array.isArray(json.nodes)) {
+                    for (const node of json.nodes) {
+                        if (node && node.data && Array.isArray(node.data.seasons)) {
+                            seasons = node.data.seasons;
+                            break;
+                        } else if (node && Array.isArray(node.seasons)) {
+                            seasons = node.seasons;
+                            break;
+                        }
+                    }
+                } else if (json.data && Array.isArray(json.data.seasons)) {
+                    seasons = json.data.seasons;
+                }
+            }
+
+            if (seasons && seasons.length > 0) {
+                animexCache.set(key, seasons);
+                return seasons;
+            }
+        }
+    } catch (err) {
+        console.warn("[Animex Franchise] Fetch failed, falling back to AniList relations:", err);
+    }
+
+    animexCache.set(key, []);
+    return [];
+}
+
+window.fetchAnimexFranchiseData = fetchAnimexFranchiseData;
 
 // 5. ACCURATE SUB / DUB EPISODE COUNTS & METADATA FETCHING
 const subDubCache = new Map();
