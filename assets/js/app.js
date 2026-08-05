@@ -1724,9 +1724,9 @@ async function renderAnimeDetailsView() {
     if (scoreDist.length > 0) {
         const maxAmount = Math.max(...scoreDist.map(d => d.amount)) || 1;
         scoreDistHtml = `
-            <div class="mt-2 pt-2 border-t border-white/5">
-                <span class="text-[10px] text-steelGray uppercase tracking-wider block mb-1.5">Score Distribution</span>
-                <div class="flex items-end gap-1 h-12 bg-white/[0.02] border border-white/5 rounded-lg p-2">
+            <div class="mt-2 pt-4 border-t border-white/5">
+                <span class="text-[10px] text-steelGray uppercase tracking-wider block mb-2">Score Distribution</span>
+                <div class="flex items-end gap-1.5 h-14 bg-white/[0.02] border border-white/5 rounded-xl p-2.5">
                     ${scoreDist.map(d => {
                         const heightPct = Math.round((d.amount / maxAmount) * 100);
                         return `
@@ -1734,7 +1734,7 @@ async function renderAnimeDetailsView() {
                         `;
                     }).join('')}
                 </div>
-                <div class="flex justify-between text-[8px] text-steelGray mt-1">
+                <div class="flex justify-between text-[9px] text-steelGray mt-1 px-1">
                     <span>10%</span>
                     <span>100%</span>
                 </div>
@@ -1747,54 +1747,25 @@ async function renderAnimeDetailsView() {
         <div class="absolute inset-x-0 top-0 h-[450px] bg-gradient-to-b from-transparent to-themeBlack pointer-events-none z-0"></div>
 
         <div class="relative z-10 grid grid-cols-12 gap-8 mt-6">
-            <!-- Left Column: Poster & Metadata Metrics -->
+            <!-- Left Column: Poster & Episodes -->
             <div class="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-6">
                 <div class="w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                     <img class="w-full h-full object-cover" src="${posterImg}" alt="${title}">
                 </div>
-                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Format</span>
-                        <span class="text-white text-sm font-semibold">${showData.format || 'N/A'}</span>
+                <!-- Episode Grid & Selector -->
+                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 max-h-[500px] overflow-y-auto scrollbar-thin">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">Episodes</h3>
+                        <span class="text-xs text-steelGray font-semibold">${totalEpisodes} total</span>
                     </div>
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Status</span>
-                        <span class="text-white text-sm font-semibold uppercase">${showData.status || 'N/A'}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Studio</span>
-                        <span class="text-white text-sm font-semibold">${studios}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Season</span>
-                        <span class="text-white text-sm font-semibold uppercase">${showData.season || 'N/A'} ${showData.seasonYear || ''}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Source Material</span>
-                        <span class="text-white text-sm font-semibold uppercase">${showData.source || 'N/A'}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Episode Duration</span>
-                        <span class="text-white text-sm font-semibold">${showData.duration ? showData.duration + ' mins' : 'N/A'}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Popularity Rank</span>
-                        <span class="text-white text-sm font-semibold">#${showData.popularity ? showData.popularity.toLocaleString() : 'N/A'}</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Total Watch Count</span>
-                        <span class="text-white text-sm font-semibold">${showData.popularity ? showData.popularity.toLocaleString() : 'N/A'} Users</span>
-                    </div>
-                    <div>
-                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Favorites</span>
-                        <span class="text-white text-sm font-semibold">${showData.favourites ? showData.favourites.toLocaleString() : 'N/A'}</span>
-                    </div>
-                    ${scoreDistHtml}
+                    <hr class="border-white/5">
+                    <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
+                    <div id="details-episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
             </div>
 
-            <!-- Middle Column: Main Details & Media -->
-            <div class="col-span-12 md:col-span-8 lg:col-span-6 flex flex-col gap-6">
+            <!-- Main Column: Title & Metadata -->
+            <div class="col-span-12 md:col-span-8 lg:col-span-9 flex flex-col gap-6">
                 <div class="flex flex-col gap-4">
                     <div class="flex items-center gap-3">
                         <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">${showData.format || 'ANIME'}</span>
@@ -1813,24 +1784,54 @@ async function renderAnimeDetailsView() {
                     </button>
                 </div>
 
+                <!-- New Top Metadata Container -->
+                <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-6">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Format</span>
+                            <span class="text-white text-sm font-semibold">${showData.format || 'N/A'}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Status</span>
+                            <span class="text-white text-sm font-semibold uppercase">${showData.status || 'N/A'}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Studio</span>
+                            <span class="text-white text-sm font-semibold">${studios}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Season</span>
+                            <span class="text-white text-sm font-semibold uppercase">${showData.season || 'N/A'} ${showData.seasonYear || ''}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Source Material</span>
+                            <span class="text-white text-sm font-semibold uppercase">${showData.source || 'N/A'}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Episode Duration</span>
+                            <span class="text-white text-sm font-semibold">${showData.duration ? showData.duration + ' mins' : 'N/A'}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Popularity Rank</span>
+                            <span class="text-white text-sm font-semibold">#${showData.popularity ? showData.popularity.toLocaleString() : 'N/A'}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Total Watch Count</span>
+                            <span class="text-white text-sm font-semibold">${showData.popularity ? showData.popularity.toLocaleString() : 'N/A'} Users</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-steelGray uppercase tracking-wider block">Favorites</span>
+                            <span class="text-white text-sm font-semibold">${showData.favourites ? showData.favourites.toLocaleString() : 'N/A'}</span>
+                        </div>
+                    </div>
+                    ${scoreDistHtml}
+                </div>
+
                 ${synopsisHtml}
                 ${trailerHtml}
                 ${charactersHtml}
                 ${reviewsHtml}
                 ${categorizedHtml}
-            </div>
-
-            <!-- Right Column: Episode Grid & Selector -->
-            <div class="col-span-12 lg:col-span-3 flex flex-col gap-6">
-                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 sticky top-[100px] max-h-[calc(100vh-140px)] overflow-y-auto scrollbar-thin">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">Episodes</h3>
-                        <span class="text-xs text-steelGray font-semibold">${totalEpisodes} total</span>
-                    </div>
-                    <hr class="border-white/5">
-                    <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
-                    <div id="details-episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
-                </div>
             </div>
         </div>
     `;
