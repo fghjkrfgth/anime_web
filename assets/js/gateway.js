@@ -143,3 +143,54 @@ function updateActiveNodeDisplay() {
         el.innerText = currentHost;
     }
 }
+
+// 4. FILLER EPISODE DATA FETCHING & CACHING
+const fillerCache = new Map();
+
+async function fetchFillerEpisodes(id, malId = null) {
+    const cacheKey = id || malId;
+    if (!cacheKey) return new Set();
+    if (fillerCache.has(cacheKey)) return fillerCache.get(cacheKey);
+
+    const fillerSet = new Set();
+    try {
+        if (id) {
+            const res = await fetch(`https://api.ani.zip/mappings?anilist_id=${id}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.episodes) {
+                    for (const epNum in data.episodes) {
+                        const ep = data.episodes[epNum];
+                        if (ep.isFiller || ep.filler) {
+                            fillerSet.add(parseInt(epNum, 10));
+                        }
+                    }
+                    fillerCache.set(cacheKey, fillerSet);
+                    return fillerSet;
+                }
+            }
+        }
+        
+        const targetMalId = malId || id;
+        if (targetMalId) {
+            const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && Array.isArray(data.data)) {
+                    for (const item of data.data) {
+                        if (item.filler) {
+                            fillerSet.add(item.mal_id || item.episode_id);
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("[Filler API] Warning fetching filler info:", e);
+    }
+
+    fillerCache.set(cacheKey, fillerSet);
+    return fillerSet;
+}
+
+window.fetchFillerEpisodes = fetchFillerEpisodes;
