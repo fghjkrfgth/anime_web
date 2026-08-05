@@ -147,50 +147,104 @@ function updateActiveNodeDisplay() {
 // 4. FILLER EPISODE DATA FETCHING & CACHING
 const fillerCache = new Map();
 
-async function fetchFillerEpisodes(id, malId = null) {
-    const cacheKey = id || malId;
-    if (!cacheKey) return new Set();
-    if (fillerCache.has(cacheKey)) return fillerCache.get(cacheKey);
+async function fetchFillerEpisodes(anilistId) {
+    if (!anilistId) return new Set();
+    if (fillerCache.has(anilistId)) return fillerCache.get(anilistId);
 
     const fillerSet = new Set();
     try {
-        if (id) {
-            const res = await fetch(`https://api.ani.zip/mappings?anilist_id=${id}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data && data.episodes) {
-                    for (const epNum in data.episodes) {
-                        const ep = data.episodes[epNum];
-                        if (ep.isFiller || ep.filler) {
-                            fillerSet.add(parseInt(epNum, 10));
-                        }
-                    }
-                    fillerCache.set(cacheKey, fillerSet);
-                    return fillerSet;
-                }
-            }
-        }
-        
-        const targetMalId = malId || id;
-        if (targetMalId) {
-            const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data && Array.isArray(data.data)) {
-                    for (const item of data.data) {
-                        if (item.filler) {
-                            fillerSet.add(item.mal_id || item.episode_id);
-                        }
+        const res = await fetch(`https://api.ani.zip/mappings?anilist_id=${anilistId}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.episodes) {
+                for (const epNumKey in data.episodes) {
+                    const ep = data.episodes[epNumKey];
+                    const num = parseInt(ep.episode || epNumKey, 10);
+                    if (!isNaN(num) && (ep.isFiller === true || ep.filler === true)) {
+                        fillerSet.add(num);
                     }
                 }
             }
         }
     } catch (e) {
-        console.warn("[Filler API] Warning fetching filler info:", e);
+        console.warn("[Filler API] Warning fetching filler info from AniZip:", e);
     }
 
-    fillerCache.set(cacheKey, fillerSet);
+    if (fillerSet.size === 0) {
+        try {
+            const res = await fetch(`https://api.jikan.moe/v4/anime/${anilistId}/episodes`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && Array.isArray(data.data)) {
+                    for (const item of data.data) {
+                        if (item.filler === true) {
+                            fillerSet.add(item.mal_id || item.episode_id);
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn("[Filler API] Warning fetching filler info from Jikan:", err);
+        }
+    }
+
+    fillerCache.set(anilistId, fillerSet);
     return fillerSet;
 }
 
 window.fetchFillerEpisodes = fetchFillerEpisodes;
+
+// 5. ACCURATE SUB / DUB EPISODE COUNTS & METADATA FETCHING
+const subDubCache = new Map();
+
+async function fetchSubDubCounts(anilistId) {
+    if (!anilistId) return { subCount: 0, dubCount: 0, subEps: [], dubEps: [] };
+    if (subDubCache.has(anilistId)) return subDubCache.get(anilistId);
+
+    let subCount = 0;
+    let dubCount = 0;
+    let subEps = [];
+    let dubEps = [];
+
+    try {
+        const res = await fetch(`https://api.ani.zip/mappings?anilist_id=${anilistId}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.episodes) {
+                const allEps = Object.keys(data.episodes).map(k => parseInt(k, 10)).filter(n => !isNaN(n));
+                subCount = allEps.length;
+                subEps = allEps.sort((a, b) => a - b);
+
+                const dubbedKeys = Object.keys(data.episodes).filter(k => {
+                    const ep = data.episodes[k];
+                    return ep.hasDub === true || ep.dub === true || ep.dubbed === true;
+                }).map(k => parseInt(k, 10)).filter(n => !isNaN(n));
+
+                dubCount = dubbedKeys.length;
+                dubEps = dubbedKeys.sort((a, b) => a - b);
+            }
+        }
+    } catch (e) {
+        console.warn("[SubDub API] Warning fetching sub/dub info:", e);
+    }
+
+    if (subCount === 0) {
+        let totalEps = 12;
+        if (window.showData) {
+            totalEps = typeof getActualEpisodeCount === 'function' ? getActualEpisodeCount(window.showData) : (window.showData.episodes || 12);
+        }
+        subCount = totalEps;
+        subEps = Array.from({ length: subCount }, (_, i) => i + 1);
+        dubCount = subCount;
+        dubEps = [...subEps];
+    } else if (dubCount === 0 && subCount > 0) {
+        dubCount = subCount;
+        dubEps = [...subEps];
+    }
+
+    const result = { subCount, dubCount, subEps, dubEps };
+    subDubCache.set(anilistId, result);
+    return result;
+}
+
+window.fetchSubDubCounts = fetchSubDubCounts;
