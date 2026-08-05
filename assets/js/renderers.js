@@ -444,16 +444,16 @@ function getWatchEpisodeBtnClasses(isActive, isFiller, isWatched) {
 
 window.getWatchEpisodeBtnClasses = getWatchEpisodeBtnClasses;
 
-// FRANCHISE CATEGORIZATION & RENDERING (MAIN SEASONS, MOVIES, OVAS/SPECIALS)
-function categorizeFranchiseItems(animexSeasons, fallbackRelations) {
+// FRANCHISE CATEGORIZATION & RENDERING (MAIN SERIES / SEASONS, MOVIES, OVAS & SPECIALS)
+function categorizeFranchiseItems(franchiseSeasons, fallbackRelations) {
     const mainSeasons = [];
     const movies = [];
     const ovasSpecials = [];
 
     const seenIds = new Set();
 
-    if (Array.isArray(animexSeasons) && animexSeasons.length > 0) {
-        animexSeasons.forEach(item => {
+    if (Array.isArray(franchiseSeasons) && franchiseSeasons.length > 0) {
+        franchiseSeasons.forEach(item => {
             if (!item) return;
             const id = item.anilistId || item.id;
             if (id && seenIds.has(id)) return;
@@ -461,21 +461,21 @@ function categorizeFranchiseItems(animexSeasons, fallbackRelations) {
 
             const titleStr = typeof item.title === 'string' ? item.title : (item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Anime');
             const typeStr = (item.type || item.format || '').toUpperCase();
+            const lowerTitle = titleStr.toLowerCase();
 
             const entry = {
-                id: id,
+                anilistId: id,
                 title: titleStr,
-                coverImage: item.poster || item.coverImage || item.image,
-                format: typeStr || 'TV',
-                rawItem: item
+                image: item.image || item.poster || item.coverImage || '',
+                type: typeStr || 'TV'
             };
 
             if (typeStr === 'MOVIE' || typeStr.includes('MOVIE')) {
                 movies.push(entry);
-            } else if (typeStr === 'SPECIAL' || typeStr === 'OVA' || typeStr.includes('SPECIAL') || typeStr.includes('OVA')) {
-                ovasSpecials.push(entry);
-            } else {
+            } else if (typeStr === 'TV' || lowerTitle.includes('season')) {
                 mainSeasons.push(entry);
+            } else {
+                ovasSpecials.push(entry);
             }
         });
     } else if (Array.isArray(fallbackRelations)) {
@@ -487,21 +487,21 @@ function categorizeFranchiseItems(animexSeasons, fallbackRelations) {
             const titleStr = node.title?.english || node.title?.romaji || node.title?.userPreferred || 'Anime';
             const fmt = (node.format || '').toUpperCase();
             const relType = (r.relationType || '').toUpperCase();
+            const lowerTitle = titleStr.toLowerCase();
 
             const entry = {
-                id: node.id,
+                anilistId: node.id,
                 title: titleStr,
-                coverImage: node.coverImage?.large || node.coverImage?.extraLarge || '',
-                format: fmt || 'TV',
-                rawItem: node
+                image: node.coverImage?.large || node.coverImage?.extraLarge || '',
+                type: fmt || 'TV'
             };
 
             if (fmt === 'MOVIE' || relType.includes('MOVIE')) {
                 movies.push(entry);
-            } else if (fmt === 'SPECIAL' || fmt === 'OVA' || relType.includes('SPECIAL') || relType.includes('OVA')) {
-                ovasSpecials.push(entry);
-            } else {
+            } else if (fmt === 'TV' || lowerTitle.includes('season')) {
                 mainSeasons.push(entry);
+            } else {
+                ovasSpecials.push(entry);
             }
         });
     }
@@ -511,7 +511,7 @@ function categorizeFranchiseItems(animexSeasons, fallbackRelations) {
 
 function renderFranchiseSectionsHTML(categories) {
     const sections = [
-        { title: 'Main Seasons & Series', items: categories.mainSeasons },
+        { title: 'Main Series / Seasons', items: categories.mainSeasons },
         { title: 'Movies', items: categories.movies },
         { title: 'OVAs & Specials', items: categories.ovasSpecials }
     ];
@@ -525,17 +525,17 @@ function renderFranchiseSectionsHTML(categories) {
                 <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">${sec.title}</h3>
                 <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
                     ${sec.items.map(item => {
-                        const posterUrl = typeof item.coverImage === 'string' ? item.coverImage : (item.coverImage?.large || item.coverImage?.extraLarge || '');
+                        const posterUrl = item.image || '';
                         return `
-                            <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.id})">
+                            <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow('${item.anilistId}')">
                                 <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
                                     <img class="w-full h-full object-cover" src="${posterUrl}" alt="${item.title}" loading="lazy">
                                     <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
-                                        ${item.format}
+                                        ${item.type}
                                     </span>
                                 </div>
                                 <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${item.title}</div>
-                                <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.format}</div>
+                                <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.type}</div>
                             </div>
                         `;
                     }).join('')}
