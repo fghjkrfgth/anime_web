@@ -1718,6 +1718,30 @@ async function renderAnimeDetailsView() {
 
     const totalEpisodes = getActualEpisodeCount(showData);
 
+    // Score Distribution Visual Builder
+    const scoreDist = showData.stats?.scoreDistribution || [];
+    let scoreDistHtml = '';
+    if (scoreDist.length > 0) {
+        const maxAmount = Math.max(...scoreDist.map(d => d.amount)) || 1;
+        scoreDistHtml = `
+            <div class="mt-2 pt-2 border-t border-white/5">
+                <span class="text-[10px] text-steelGray uppercase tracking-wider block mb-1.5">Score Distribution</span>
+                <div class="flex items-end gap-1 h-12 bg-white/[0.02] border border-white/5 rounded-lg p-2">
+                    ${scoreDist.map(d => {
+                        const heightPct = Math.round((d.amount / maxAmount) * 100);
+                        return `
+                            <div class="flex-grow bg-themeCyan/20 hover:bg-themeCyan transition-all duration-300 rounded-t" style="height: ${heightPct}%" title="Score ${d.score}: ${d.amount.toLocaleString()} users"></div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="flex justify-between text-[8px] text-steelGray mt-1">
+                    <span>10%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+        `;
+    }
+
     detailsLayout.innerHTML = `
         <div class="absolute inset-x-0 top-0 h-[450px] bg-cover bg-center bg-no-repeat opacity-[0.12] blur-xl pointer-events-none z-0" style="background-image: url('${bannerImg}')"></div>
         <div class="absolute inset-x-0 top-0 h-[450px] bg-gradient-to-b from-transparent to-themeBlack pointer-events-none z-0"></div>
@@ -1758,9 +1782,14 @@ async function renderAnimeDetailsView() {
                         <span class="text-white text-sm font-semibold">#${showData.popularity ? showData.popularity.toLocaleString() : 'N/A'}</span>
                     </div>
                     <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Total Watch Count</span>
+                        <span class="text-white text-sm font-semibold">${showData.popularity ? showData.popularity.toLocaleString() : 'N/A'} Users</span>
+                    </div>
+                    <div>
                         <span class="text-[10px] text-steelGray uppercase tracking-wider block">Favorites</span>
                         <span class="text-white text-sm font-semibold">${showData.favourites ? showData.favourites.toLocaleString() : 'N/A'}</span>
                     </div>
+                    ${scoreDistHtml}
                 </div>
             </div>
 
