@@ -443,3 +443,61 @@ function getWatchEpisodeBtnClasses(isActive, isFiller, isWatched) {
 }
 
 window.getWatchEpisodeBtnClasses = getWatchEpisodeBtnClasses;
+
+// Franchise Tree Categorization Helper
+function getFranchiseTree(showData) {
+    if (!showData) return { mainSeries: [], movies: [], ovasSpecials: [] };
+
+    let items = [];
+    const seenIds = new Set();
+
+    if (showData.seasons && Array.isArray(showData.seasons) && showData.seasons.length > 0) {
+        showData.seasons.forEach(season => {
+            const id = season.id || season.anilistId;
+            if (season && id && !seenIds.has(id)) {
+                seenIds.add(id);
+                items.push({
+                    id: id,
+                    title: season.title?.english || season.title?.romaji || season.title?.userPreferred || season.name || 'Anime',
+                    coverImage: season.coverImage?.large || season.poster || season.bannerImage || '',
+                    format: (season.format || 'TV').toUpperCase(),
+                    status: season.status || 'N/A'
+                });
+            }
+        });
+    } else if (showData.relations?.edges) {
+        showData.relations.edges.forEach(edge => {
+            const node = edge.node;
+            if (node && node.id && !seenIds.has(node.id)) {
+                seenIds.add(node.id);
+                items.push({
+                    id: node.id,
+                    title: node.title?.english || node.title?.romaji || node.title?.userPreferred || 'Anime',
+                    coverImage: node.coverImage?.large || '',
+                    format: (node.format || 'TV').toUpperCase(),
+                    status: node.status || 'N/A'
+                });
+            }
+        });
+    }
+
+    const mainSeries = [];
+    const movies = [];
+    const ovasSpecials = [];
+
+    items.forEach(item => {
+        if (item.format === 'TV') {
+            mainSeries.push(item);
+        } else if (item.format === 'MOVIE') {
+            movies.push(item);
+        } else if (['OVA', 'SPECIAL', 'ONA'].includes(item.format)) {
+            ovasSpecials.push(item);
+        } else {
+            mainSeries.push(item);
+        }
+    });
+
+    return { mainSeries, movies, ovasSpecials };
+}
+
+window.getFranchiseTree = getFranchiseTree;
