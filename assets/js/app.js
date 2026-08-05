@@ -1033,8 +1033,7 @@ function setupWatchGlobalFunctions() {
         const container = document.getElementById('episodes-grid');
         if (!container) return;
 
-        const malId = window.showData.idMal || window.showData.id;
-        const fillerSet = await fetchFillerEpisodes(malId);
+        const fillerSet = await fetchFillerEpisodes(window.showData.id);
         const subDubData = await fetchSubDubCounts(window.showData.id);
 
         const isDub = (window.currentLang === 'dub');
@@ -1076,51 +1075,25 @@ function setupWatchGlobalFunctions() {
         container.innerHTML = html;
     };
 
-    window.renderRelatedAdaptations = function() {
+    window.renderRelatedAdaptations = async function() {
         const showData = window.showData;
-        const { mainSeries, movies, ovasSpecials } = getFranchiseTree(showData);
-
         const relatedContainer = document.getElementById('watch-related-container');
         if (!relatedContainer) return;
 
-        if (mainSeries.length === 0 && movies.length === 0 && ovasSpecials.length === 0) {
+        const slug = slugify(showData.title.english || showData.title.romaji || showData.title.userPreferred);
+        const animexSeasons = await fetchAnimexFranchiseData(slug, showData.id);
+        const fallbackRelations = showData.relations?.edges || [];
+
+        const categories = categorizeFranchiseItems(animexSeasons, fallbackRelations);
+        const html = renderFranchiseSectionsHTML(categories);
+
+        if (!html) {
             relatedContainer.classList.add('hidden');
             return;
         }
 
         relatedContainer.classList.remove('hidden');
-        relatedContainer.innerHTML = '';
-
-        const categories = [
-            { title: 'Main Series / Seasons', items: mainSeries },
-            { title: 'Movies', items: movies },
-            { title: 'OVAs & Specials', items: ovasSpecials }
-        ];
-
-        categories.forEach(cat => {
-            if (cat.items.length === 0) return;
-
-            const sectionHtml = `
-                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">${cat.title}</h3>
-                    <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                        ${cat.items.map(item => `
-                            <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.id})">
-                                <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
-                                    <img class="w-full h-full object-cover" src="${item.coverImage}" alt="${item.title}" loading="lazy">
-                                    <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
-                                        ${item.format}
-                                    </span>
-                                </div>
-                                <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${item.title}</div>
-                                <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.format} &bull; ${item.status}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-            relatedContainer.innerHTML += sectionHtml;
-        });
+        relatedContainer.innerHTML = html;
     };
 
     window.viewRelatedShow = async function(relatedId) {
@@ -1783,38 +1756,12 @@ async function renderAnimeDetailsView() {
         `;
     }
 
-    // Categorized Franchise Tree
-    const { mainSeries, movies, ovasSpecials } = getFranchiseTree(showData);
-
-    const franchiseCategories = [
-        { title: 'Main Series / Seasons', items: mainSeries },
-        { title: 'Movies', items: movies },
-        { title: 'OVAs & Specials', items: ovasSpecials }
-    ];
-
-    let categorizedHtml = '';
-    franchiseCategories.forEach(cat => {
-        if (cat.items.length === 0) return;
-        categorizedHtml += `
-            <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
-                <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">${cat.title}</h3>
-                <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                    ${cat.items.map(item => `
-                        <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.id})">
-                            <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
-                                <img class="w-full h-full object-cover" src="${item.coverImage}" alt="${item.title}" loading="lazy">
-                                <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
-                                    ${item.format}
-                                </span>
-                            </div>
-                            <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${item.title}</div>
-                            <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.format} &bull; ${item.status}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    });
+    // Categorized Franchise Adaptations (Animex + AniList Fallback)
+    const detailsRelations = showData.relations?.edges || [];
+    const showSlug = slugify(showData.title.english || showData.title.romaji || showData.title.userPreferred);
+    const animexSeasons = await fetchAnimexFranchiseData(showSlug, showData.id);
+    const franchiseCategories = categorizeFranchiseItems(animexSeasons, detailsRelations);
+    const categorizedHtml = renderFranchiseSectionsHTML(franchiseCategories);
 
     const totalEpisodes = getActualEpisodeCount(showData);
 
@@ -1974,8 +1921,7 @@ async function renderAnimeDetailsView() {
     async function renderDetailsGridForBatch(batchIdx, totalEps) {
         const container = document.getElementById('details-episodes-grid');
         if (!container) return;
-        const malId = showData.idMal || showData.id;
-        const fillerSet = await fetchFillerEpisodes(malId);
+        const fillerSet = await fetchFillerEpisodes(showData.id);
         const subDubData = await fetchSubDubCounts(showData.id);
 
         const detailsSubBadge = document.getElementById('details-sub-badge');
