@@ -742,7 +742,7 @@ async function renderWatchView() {
                     </div>
                     <hr class="border-white/5">
                     <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
-                    <div id="episodes-grid" class="grid grid-cols-10 gap-1.5 overflow-hidden pr-1"></div>
+                    <div id="episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
             </div>
         </div>
@@ -804,7 +804,7 @@ async function renderWatchView() {
 
 window.renderWatchView = renderWatchView;
 
-function hydrateWatchUI() {
+async function hydrateWatchUI() {
     const showData = window.showData;
     const spinner = document.getElementById('player-loading-spinner');
     if (spinner) spinner.classList.add('hidden');
@@ -831,9 +831,25 @@ function hydrateWatchUI() {
     
     const badgeSubEpisodesEl = document.getElementById('badge-sub-episodes');
     const badgeDubEpisodesEl = document.getElementById('badge-dub-episodes');
-    const actEps = getActualEpisodeCount(showData);
-    if (badgeSubEpisodesEl) badgeSubEpisodesEl.innerText = `SUB: ${actEps}`;
-    if (badgeDubEpisodesEl) badgeDubEpisodesEl.innerText = `DUB: ${actEps}`;
+    const langToggleBtn = document.getElementById('lang-toggle-btn');
+    const playerSubdubToggle = document.getElementById('player-subdub-toggle');
+
+    const counts = await fetchSubDubCounts(showData.id);
+    if (badgeSubEpisodesEl) badgeSubEpisodesEl.innerText = `SUB: ${counts.subCount}`;
+
+    if (badgeDubEpisodesEl) {
+        if (counts.dubCount === 0) {
+            badgeDubEpisodesEl.classList.add('hidden');
+            if (langToggleBtn) langToggleBtn.classList.add('hidden');
+            if (playerSubdubToggle) playerSubdubToggle.classList.add('hidden');
+            window.currentLang = 'sub';
+        } else {
+            badgeDubEpisodesEl.classList.remove('hidden');
+            badgeDubEpisodesEl.innerText = `DUB: ${counts.dubCount}`;
+            if (langToggleBtn) langToggleBtn.classList.remove('hidden');
+            if (playerSubdubToggle) playerSubdubToggle.classList.remove('hidden');
+        }
+    }
 
     const badgeRatingEl = document.getElementById('badge-rating');
     if (badgeRatingEl) badgeRatingEl.innerText = `★ ${showData.averageScore || showData.meanScore || 'N/A'}%`;
@@ -946,6 +962,7 @@ function setupWatchGlobalFunctions() {
         localStorage.setItem(`lang_${window.showData.id}`, window.currentLang);
         toggleUserPreference('preferredLang', window.currentLang);
         window.updateLanguageDisplay();
+        window.renderEpisodePicker();
         window.loadEpisodeStream(window.currentEp);
     };
 
@@ -1016,23 +1033,31 @@ function setupWatchGlobalFunctions() {
         const container = document.getElementById('episodes-grid');
         if (!container) return;
 
-        const fillerSet = await fetchFillerEpisodes(window.showData.id, window.showData.idMal);
+        const fillerSet = await fetchFillerEpisodes(window.showData.id);
+        const subDubData = await fetchSubDubCounts(window.showData.id);
+
+        const isDub = (window.currentLang === 'dub');
+        const validEps = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
+                              : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+
+        const totalValidEps = validEps.length;
         const batchSize = 100;
-        const start = batchIdx * batchSize + 1;
-        const end = Math.min((batchIdx + 1) * batchSize, totalEps);
+        const startIdx = batchIdx * batchSize;
+        const endIdx = Math.min((batchIdx + 1) * batchSize, totalValidEps);
 
         let html = '';
-        for (let i = start; i <= end; i++) {
+        for (let idx = startIdx; idx < endIdx; idx++) {
+            const i = validEps[idx];
             const isWatched = localStorage.getItem(`watched_${window.showData.id}_${i}`) === 'true';
             const isActive = (i === window.currentEp);
             const isFiller = fillerSet.has(i);
 
-            let btnClasses = "episode-btn glass-panel aspect-square rounded-md flex items-center justify-center font-bold text-[11px] cursor-pointer transition-all duration-200 ";
+            let btnClasses = "episode-btn glass-panel text-xs font-semibold py-2 px-1 rounded-md text-center flex items-center justify-center cursor-pointer transition-all duration-200 ";
 
             if (isActive) {
                 btnClasses += "bg-themeCyan text-themeBlack shadow-[0_0_12px_rgba(0,255,204,0.5)] border-themeCyan ";
             } else if (isFiller) {
-                btnClasses += "shadow-[0_0_10px_rgba(180,83,9,0.75)] border-amber-700/70 text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 ";
+                btnClasses += "border border-amber-600/80 bg-amber-950/40 text-amber-300 shadow-[0_0_10px_rgba(180,83,9,0.7)] ";
             } else if (isWatched) {
                 btnClasses += "text-themeCyan hover:text-white border border-themeCyan/30 bg-[#121218]/70 ";
             } else {
@@ -1877,8 +1902,8 @@ async function renderAnimeDetailsView() {
                 <div class="flex flex-col gap-4">
                     <div class="flex items-center gap-3 flex-wrap">
                         <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">${showData.format || 'ANIME'}</span>
-                        <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">SUB: ${totalEpisodes}</span>
-                        <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-md uppercase">DUB: ${totalEpisodes}</span>
+                        <span id="details-sub-badge" class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">SUB: ${totalEpisodes}</span>
+                        <span id="details-dub-badge" class="px-2.5 py-1 text-xs font-semibold tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-md uppercase">DUB: ${totalEpisodes}</span>
                         <span class="text-themeCyan font-bold text-sm">★ ${showData.averageScore || showData.meanScore || 'N/A'}% Average Score</span>
                     </div>
                     <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-none">${title}</h1>
@@ -1979,17 +2004,43 @@ async function renderAnimeDetailsView() {
     async function renderDetailsGridForBatch(batchIdx, totalEps) {
         const container = document.getElementById('details-episodes-grid');
         if (!container) return;
-        const fillerSet = await fetchFillerEpisodes(showData.id, showData.idMal);
+        const fillerSet = await fetchFillerEpisodes(showData.id);
+        const subDubData = await fetchSubDubCounts(showData.id);
+
+        const detailsSubBadge = document.getElementById('details-sub-badge');
+        const detailsDubBadge = document.getElementById('details-dub-badge');
+        const detailsLangSelector = document.getElementById('details-lang-selector');
+
+        if (detailsSubBadge) detailsSubBadge.innerText = `SUB: ${subDubData.subCount}`;
+        if (detailsDubBadge) {
+            if (subDubData.dubCount === 0) {
+                detailsDubBadge.classList.add('hidden');
+                if (detailsLangSelector) detailsLangSelector.classList.add('hidden');
+            } else {
+                detailsDubBadge.classList.remove('hidden');
+                detailsDubBadge.innerText = `DUB: ${subDubData.dubCount}`;
+                if (detailsLangSelector) detailsLangSelector.classList.remove('hidden');
+            }
+        }
+
+        const activeLang = localStorage.getItem(`lang_${showData.id}`) || 'sub';
+        const isDub = (activeLang === 'dub');
+        const validEps = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
+                              : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+
+        const totalValidEps = validEps.length;
         const batchSize = 100;
-        const start = batchIdx * batchSize + 1;
-        const end = Math.min((batchIdx + 1) * batchSize, totalEps);
+        const startIdx = batchIdx * batchSize;
+        const endIdx = Math.min((batchIdx + 1) * batchSize, totalValidEps);
+
         let html = '';
-        for (let i = start; i <= end; i++) {
+        for (let idx = startIdx; idx < endIdx; idx++) {
+            const i = validEps[idx];
             const isWatched = localStorage.getItem(`watched_${showData.id}_${i}`) === 'true';
             const isFiller = fillerSet.has(i);
             let btnClasses = "p-3 rounded-lg text-center font-semibold text-xs transition-all duration-300 transform hover:scale-105 active:scale-95 glass-panel border ";
             if (isFiller) {
-                btnClasses += "shadow-[0_0_10px_rgba(180,83,9,0.75)] border-amber-700/70 text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 ";
+                btnClasses += "border border-amber-600/80 bg-amber-950/40 text-amber-300 shadow-[0_0_10px_rgba(180,83,9,0.7)] ";
             } else if (isWatched) {
                 btnClasses += "text-themeCyan border-themeCyan/30 hover:border-themeCyan bg-slate-900/60 ";
             } else {
