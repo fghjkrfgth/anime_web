@@ -54,16 +54,8 @@ async function fetchHomeCatalog() {
     return await fetchAniListGraphQL({ query });
 }
 
-// 3. WORKER PROXY ENGINE (RESERVED ONLY FOR THIRD-PARTY SCRAPING / SCHEDULE)
+// 3. WORKER PROXY ENGINE (STEALTH COMMUNITY ROUTES)
 async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
-    const urlParams = new URLSearchParams(syncParams).toString();
-
-    // Default target MUST be the schedule scraper or target domain, NOT AniList
-    let targetDataUrl = "https://anikototv.to";
-    if (syncParams.target) {
-        targetDataUrl = syncParams.target;
-    }
-
     const isPost = !!bodyPayload;
     const fetchOptions = {
         method: isPost ? 'POST' : 'GET',
@@ -75,14 +67,32 @@ async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
         fetchOptions.body = JSON.stringify(bodyPayload);
     }
 
-    const queryConnector = (urlParams && !isPost) ? `&${urlParams}` : '';
+    let routePath = "/rating";
+    const cleanedParams = {};
+
+    if (syncParams.route === 'comment' || syncParams.action === 'comment' || syncParams.s || syncParams.slug) {
+        routePath = "/comment";
+        cleanedParams.s = syncParams.s || syncParams.slug || "";
+        cleanedParams.id = syncParams.id || syncParams.anilistId || syncParams.anilist_id || "";
+    } else if (syncParams.action === 'schedule' || syncParams.route === 'schedule') {
+        routePath = "/schedule";
+        if (syncParams.action) cleanedParams.action = syncParams.action;
+    } else {
+        routePath = "/rating";
+        cleanedParams.id = syncParams.id || syncParams.anilist_id || syncParams.anilistId || "";
+        cleanedParams.e = syncParams.e || syncParams.ep_num || syncParams.ep || syncParams.episodeId || "1";
+        cleanedParams.lang = syncParams.lang || syncParams.language || syncParams.provider || "sub";
+    }
+
+    const queryStr = new URLSearchParams(cleanedParams).toString();
+    const queryConnector = (queryStr && !isPost) ? `?${queryStr}` : '';
 
     if (!CLUSTER_MODE) {
         const activeWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
         currentHost = new URL(activeWorkerUrl).hostname;
         updateActiveNodeDisplay();
 
-        const targetUrl = `${activeWorkerUrl}/?src=${encodeURIComponent(targetDataUrl)}${queryConnector}`;
+        const targetUrl = `${activeWorkerUrl}${routePath}${queryConnector}`;
         const response = await fetch(targetUrl, fetchOptions);
         if (!response.ok) throw new Error(`Gateway HTTP error! status: ${response.status}`);
         return await response.json();
@@ -100,7 +110,7 @@ async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
         if (blacklistedIndices.has(idx)) continue;
 
         const activeWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[idx]);
-        const targetUrl = `${activeWorkerUrl}/?src=${encodeURIComponent(targetDataUrl)}${queryConnector}`;
+        const targetUrl = `${activeWorkerUrl}${routePath}${queryConnector}`;
 
         attempts++;
         currentHost = new URL(activeWorkerUrl).hostname;
@@ -131,7 +141,7 @@ async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
     const primaryWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
     currentHost = new URL(primaryWorkerUrl).hostname + " (Fallback)";
     updateActiveNodeDisplay();
-    const fallbackUrl = `${primaryWorkerUrl}/?src=${encodeURIComponent(targetDataUrl)}${queryConnector}`;
+    const fallbackUrl = `${primaryWorkerUrl}${routePath}${queryConnector}`;
     const fallbackResponse = await fetch(fallbackUrl, fetchOptions);
     if (!fallbackResponse.ok) throw new Error(`Gateway failed: ${fallbackResponse.status}`);
     return await fallbackResponse.json();
@@ -211,8 +221,8 @@ async function fetchFranchiseTree(slug, anilistId) {
 
     try {
         const data = await fetchClusterNode({
-            action: 'franchise',
-            slug: slug,
+            route: 'comment',
+            s: slug,
             id: anilistId
         });
 
