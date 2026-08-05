@@ -444,60 +444,108 @@ function getWatchEpisodeBtnClasses(isActive, isFiller, isWatched) {
 
 window.getWatchEpisodeBtnClasses = getWatchEpisodeBtnClasses;
 
-// Franchise Tree Categorization Helper
-function getFranchiseTree(showData) {
-    if (!showData) return { mainSeries: [], movies: [], ovasSpecials: [] };
+// FRANCHISE CATEGORIZATION & RENDERING (MAIN SEASONS, MOVIES, OVAS/SPECIALS)
+function categorizeFranchiseItems(animexSeasons, fallbackRelations) {
+    const mainSeasons = [];
+    const movies = [];
+    const ovasSpecials = [];
 
-    let items = [];
     const seenIds = new Set();
 
-    if (showData.seasons && Array.isArray(showData.seasons) && showData.seasons.length > 0) {
-        showData.seasons.forEach(season => {
-            const id = season.id || season.anilistId;
-            if (season && id && !seenIds.has(id)) {
-                seenIds.add(id);
-                items.push({
-                    id: id,
-                    title: season.title?.english || season.title?.romaji || season.title?.userPreferred || season.name || 'Anime',
-                    coverImage: season.coverImage?.large || season.poster || season.bannerImage || '',
-                    format: (season.format || 'TV').toUpperCase(),
-                    status: season.status || 'N/A'
-                });
+    if (Array.isArray(animexSeasons) && animexSeasons.length > 0) {
+        animexSeasons.forEach(item => {
+            if (!item) return;
+            const id = item.anilistId || item.id;
+            if (id && seenIds.has(id)) return;
+            if (id) seenIds.add(id);
+
+            const titleStr = typeof item.title === 'string' ? item.title : (item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Anime');
+            const typeStr = (item.type || item.format || '').toUpperCase();
+
+            const entry = {
+                id: id,
+                title: titleStr,
+                coverImage: item.poster || item.coverImage || item.image,
+                format: typeStr || 'TV',
+                rawItem: item
+            };
+
+            if (typeStr === 'MOVIE' || typeStr.includes('MOVIE')) {
+                movies.push(entry);
+            } else if (typeStr === 'SPECIAL' || typeStr === 'OVA' || typeStr.includes('SPECIAL') || typeStr.includes('OVA')) {
+                ovasSpecials.push(entry);
+            } else {
+                mainSeasons.push(entry);
             }
         });
-    } else if (showData.relations?.edges) {
-        showData.relations.edges.forEach(edge => {
-            const node = edge.node;
-            if (node && node.id && !seenIds.has(node.id)) {
-                seenIds.add(node.id);
-                items.push({
-                    id: node.id,
-                    title: node.title?.english || node.title?.romaji || node.title?.userPreferred || 'Anime',
-                    coverImage: node.coverImage?.large || '',
-                    format: (node.format || 'TV').toUpperCase(),
-                    status: node.status || 'N/A'
-                });
+    } else if (Array.isArray(fallbackRelations)) {
+        fallbackRelations.forEach(r => {
+            const node = r.node;
+            if (!node || !node.id || seenIds.has(node.id)) return;
+            seenIds.add(node.id);
+
+            const titleStr = node.title?.english || node.title?.romaji || node.title?.userPreferred || 'Anime';
+            const fmt = (node.format || '').toUpperCase();
+            const relType = (r.relationType || '').toUpperCase();
+
+            const entry = {
+                id: node.id,
+                title: titleStr,
+                coverImage: node.coverImage?.large || node.coverImage?.extraLarge || '',
+                format: fmt || 'TV',
+                rawItem: node
+            };
+
+            if (fmt === 'MOVIE' || relType.includes('MOVIE')) {
+                movies.push(entry);
+            } else if (fmt === 'SPECIAL' || fmt === 'OVA' || relType.includes('SPECIAL') || relType.includes('OVA')) {
+                ovasSpecials.push(entry);
+            } else {
+                mainSeasons.push(entry);
             }
         });
     }
 
-    const mainSeries = [];
-    const movies = [];
-    const ovasSpecials = [];
-
-    items.forEach(item => {
-        if (item.format === 'TV') {
-            mainSeries.push(item);
-        } else if (item.format === 'MOVIE') {
-            movies.push(item);
-        } else if (['OVA', 'SPECIAL', 'ONA'].includes(item.format)) {
-            ovasSpecials.push(item);
-        } else {
-            mainSeries.push(item);
-        }
-    });
-
-    return { mainSeries, movies, ovasSpecials };
+    return { mainSeasons, movies, ovasSpecials };
 }
 
-window.getFranchiseTree = getFranchiseTree;
+function renderFranchiseSectionsHTML(categories) {
+    const sections = [
+        { title: 'Main Seasons & Series', items: categories.mainSeasons },
+        { title: 'Movies', items: categories.movies },
+        { title: 'OVAs & Specials', items: categories.ovasSpecials }
+    ];
+
+    let html = '';
+    sections.forEach(sec => {
+        if (!sec.items || sec.items.length === 0) return;
+
+        html += `
+            <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">${sec.title}</h3>
+                <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                    ${sec.items.map(item => {
+                        const posterUrl = typeof item.coverImage === 'string' ? item.coverImage : (item.coverImage?.large || item.coverImage?.extraLarge || '');
+                        return `
+                            <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.id})">
+                                <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
+                                    <img class="w-full h-full object-cover" src="${posterUrl}" alt="${item.title}" loading="lazy">
+                                    <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
+                                        ${item.format}
+                                    </span>
+                                </div>
+                                <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${item.title}</div>
+                                <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.format}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    });
+
+    return html;
+}
+
+window.categorizeFranchiseItems = categorizeFranchiseItems;
+window.renderFranchiseSectionsHTML = renderFranchiseSectionsHTML;
