@@ -806,9 +806,10 @@
 
                 if (Hls.isSupported()) {
                     hlsInstance = new Hls({
-                        maxBufferLength: 10, // Max length in seconds
-                        maxMaxBufferLength: 15,
-                        maxBufferSize: 5 * 1024 * 1024, // Keep buffer footprint tiny
+                        maxBufferLength: 30,          // Keep at least 30 seconds buffered
+                        maxMaxBufferLength: 60,       // Max buffer cap
+                        maxBufferSize: 30 * 1024 * 1024, // 30MB buffer footprint
+                        backBufferLength: 10,
                         enableWorker: true,
                         lowLatencyMode: true
                     });
