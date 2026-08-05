@@ -426,3 +426,20 @@ function watchShow(show) {
         window.handleSpaRouting();
     }
 }
+
+// Watch Page 4x25 Grid & Filler Styling Helper
+function getWatchEpisodeBtnClasses(isActive, isFiller, isWatched) {
+    let btnClasses = "episode-btn glass-panel text-xs font-semibold py-2 px-1 rounded-md text-center flex items-center justify-center cursor-pointer transition-all duration-200 ";
+    if (isActive) {
+        btnClasses += "bg-themeCyan text-themeBlack shadow-[0_0_12px_rgba(0,255,204,0.5)] border-themeCyan ";
+    } else if (isFiller) {
+        btnClasses += "border border-amber-600/80 bg-amber-950/40 text-amber-300 shadow-[0_0_10px_rgba(180,83,9,0.7)] ";
+    } else if (isWatched) {
+        btnClasses += "text-themeCyan hover:text-white border border-themeCyan/30 bg-[#121218]/70 ";
+    } else {
+        btnClasses += "text-steelGray hover:text-white border border-white/5 hover:border-white/20 bg-[#121218]/40 ";
+    }
+    return btnClasses;
+}
+
+window.getWatchEpisodeBtnClasses = getWatchEpisodeBtnClasses;
