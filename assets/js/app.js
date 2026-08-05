@@ -1033,7 +1033,8 @@ function setupWatchGlobalFunctions() {
         const container = document.getElementById('episodes-grid');
         if (!container) return;
 
-        const fillerSet = await fetchFillerEpisodes(window.showData.id);
+        const malId = window.showData.idMal || window.showData.id;
+        const fillerSet = await fetchFillerEpisodes(malId);
         const subDubData = await fetchSubDubCounts(window.showData.id);
 
         const isDub = (window.currentLang === 'dub');
@@ -1077,47 +1078,12 @@ function setupWatchGlobalFunctions() {
 
     window.renderRelatedAdaptations = function() {
         const showData = window.showData;
-        const relations = showData.relations?.edges || [];
-        const recommendations = showData.recommendations?.edges || [];
-        
-        const items = [];
-        const seenIds = new Set();
-        
-        relations.forEach(r => {
-            if (r.node && r.node.id && !seenIds.has(r.node.id)) {
-                seenIds.add(r.node.id);
-                items.push({
-                    id: r.node.id,
-                    title: r.node.title,
-                    coverImage: r.node.coverImage,
-                    format: r.node.format || 'TV',
-                    status: r.node.status,
-                    type: r.node.type || 'ANIME',
-                    relationType: r.relationType || 'RELATION'
-                });
-            }
-        });
-
-        recommendations.forEach(rec => {
-            const media = rec.node?.mediaRecommendation;
-            if (media && media.id && !seenIds.has(media.id)) {
-                seenIds.add(media.id);
-                items.push({
-                    id: media.id,
-                    title: media.title,
-                    coverImage: media.coverImage,
-                    format: media.format || 'TV',
-                    status: media.status,
-                    type: media.type || 'ANIME',
-                    relationType: 'RECOMMENDED'
-                });
-            }
-        });
+        const { mainSeries, movies, ovasSpecials } = getFranchiseTree(showData);
 
         const relatedContainer = document.getElementById('watch-related-container');
         if (!relatedContainer) return;
 
-        if (items.length === 0) {
+        if (mainSeries.length === 0 && movies.length === 0 && ovasSpecials.length === 0) {
             relatedContainer.classList.add('hidden');
             return;
         }
@@ -1125,24 +1091,10 @@ function setupWatchGlobalFunctions() {
         relatedContainer.classList.remove('hidden');
         relatedContainer.innerHTML = '';
 
-        const tvSeries = [];
-        const movies = [];
-        const others = [];
-
-        items.forEach(item => {
-            if (item.format === 'TV') {
-                tvSeries.push(item);
-            } else if (item.format === 'MOVIE') {
-                movies.push(item);
-            } else {
-                others.push(item);
-            }
-        });
-
         const categories = [
-            { title: 'TV Series', items: tvSeries },
+            { title: 'Main Series / Seasons', items: mainSeries },
             { title: 'Movies', items: movies },
-            { title: 'Other Adaptations & Similar', items: others }
+            { title: 'OVAs & Specials', items: ovasSpecials }
         ];
 
         categories.forEach(cat => {
@@ -1152,23 +1104,18 @@ function setupWatchGlobalFunctions() {
                 <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
                     <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">${cat.title}</h3>
                     <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                        ${cat.items.map(item => {
-                            const titleText = item.title.english || item.title.romaji || item.title.userPreferred || 'Anime';
-                            const coverUrl = item.coverImage?.large || '';
-                            const labelText = item.relationType === 'RECOMMENDED' ? 'Similar' : item.relationType.replace('_', ' ');
-                            return `
-                                <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.id})">
-                                    <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
-                                        <img class="w-full h-full object-cover" src="${coverUrl}" alt="${titleText}" loading="lazy">
-                                        <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
-                                            ${labelText}
-                                        </span>
-                                    </div>
-                                    <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${titleText}</div>
-                                    <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.format} &bull; ${item.status || 'N/A'}</div>
+                        ${cat.items.map(item => `
+                            <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.id})">
+                                <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
+                                    <img class="w-full h-full object-cover" src="${item.coverImage}" alt="${item.title}" loading="lazy">
+                                    <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
+                                        ${item.format}
+                                    </span>
                                 </div>
-                            `;
-                        }).join('')}
+                                <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${item.title}</div>
+                                <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.format} &bull; ${item.status}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
             `;
@@ -1836,68 +1783,38 @@ async function renderAnimeDetailsView() {
         `;
     }
 
-    // Categorized Related Adaptations
-    const detailsRelations = showData.relations?.edges || [];
-    const detailsRecs = showData.recommendations?.edges || [];
+    // Categorized Franchise Tree
+    const { mainSeries, movies, ovasSpecials } = getFranchiseTree(showData);
 
-    const groupedMap = {
-        'Sequels & Prequels': [],
-        'Side Stories & Spin-offs': [],
-        'Alternative Versions': [],
-        'Same Series Adaptations': [],
-        'Similar Recommendations': []
-    };
-
-    detailsRelations.forEach(r => {
-        const type = r.relationType || 'OTHER';
-        const node = r.node;
-        if (!node) return;
-        
-        if (type === 'SEQUEL' || type === 'PREQUEL') {
-            groupedMap['Sequels & Prequels'].push({ node, label: type });
-        } else if (type === 'SIDE_STORY' || type === 'SPIN_OFF') {
-            groupedMap['Side Stories & Spin-offs'].push({ node, label: type.replace('_', ' ') });
-        } else if (type === 'ALTERNATIVE' || type === 'FULL_VERSION') {
-            groupedMap['Alternative Versions'].push({ node, label: type.replace('_', ' ') });
-        } else {
-            groupedMap['Same Series Adaptations'].push({ node, label: type.replace('_', ' ') });
-        }
-    });
-
-    detailsRecs.forEach(rec => {
-        const media = rec.node?.mediaRecommendation;
-        if (media) {
-            groupedMap['Similar Recommendations'].push({ node: media, label: 'Similar' });
-        }
-    });
+    const franchiseCategories = [
+        { title: 'Main Series / Seasons', items: mainSeries },
+        { title: 'Movies', items: movies },
+        { title: 'OVAs & Specials', items: ovasSpecials }
+    ];
 
     let categorizedHtml = '';
-    for (const [catName, list] of Object.entries(groupedMap)) {
-        if (list.length === 0) continue;
+    franchiseCategories.forEach(cat => {
+        if (cat.items.length === 0) return;
         categorizedHtml += `
             <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
-                <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">${catName}</h3>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">${cat.title}</h3>
                 <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
-                    ${list.map(item => {
-                        const titleText = item.node.title.english || item.node.title.romaji || item.node.title.userPreferred || 'Anime';
-                        const coverUrl = item.node.coverImage?.large || '';
-                        return `
-                            <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.node.id})">
-                                <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
-                                    <img class="w-full h-full object-cover" src="${coverUrl}" alt="${titleText}" loading="lazy">
-                                    <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
-                                        ${item.label}
-                                    </span>
-                                </div>
-                                <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${titleText}</div>
-                                <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.node.format || 'TV'} &bull; ${item.node.status || 'N/A'}</div>
+                    ${cat.items.map(item => `
+                        <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.id})">
+                            <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
+                                <img class="w-full h-full object-cover" src="${item.coverImage}" alt="${item.title}" loading="lazy">
+                                <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
+                                    ${item.format}
+                                </span>
                             </div>
-                        `;
-                    }).join('')}
+                            <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${item.title}</div>
+                            <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.format} &bull; ${item.status}</div>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
         `;
-    }
+    });
 
     const totalEpisodes = getActualEpisodeCount(showData);
 
@@ -2057,7 +1974,8 @@ async function renderAnimeDetailsView() {
     async function renderDetailsGridForBatch(batchIdx, totalEps) {
         const container = document.getElementById('details-episodes-grid');
         if (!container) return;
-        const fillerSet = await fetchFillerEpisodes(showData.id);
+        const malId = showData.idMal || showData.id;
+        const fillerSet = await fetchFillerEpisodes(malId);
         const subDubData = await fetchSubDubCounts(showData.id);
 
         const detailsSubBadge = document.getElementById('details-sub-badge');
