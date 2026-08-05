@@ -1211,16 +1211,69 @@ function setupWatchGlobalFunctions() {
         if (skipOutroBtn) skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
 
         try {
-            const data = await fetchClusterNode({
-                anilist_id: window.showData.id,
-                ep_num: epNum,
-                language: window.currentLang
-            });
+            // Dual parallel probe for Sub and Dub stream availability
+            const [subResult, dubResult] = await Promise.allSettled([
+                fetchClusterNode({ anilist_id: window.showData.id, ep_num: epNum, language: 'sub' }),
+                fetchClusterNode({ anilist_id: window.showData.id, ep_num: epNum, language: 'dub' })
+            ]);
 
-            if (!data || !data.success || !data.manifest) {
-                throw new Error(data ? data.error : "Unknown streams response error");
+            const subData = (subResult.status === 'fulfilled' && subResult.value && subResult.value.success && subResult.value.manifest) ? subResult.value : null;
+            const dubData = (dubResult.status === 'fulfilled' && dubResult.value && dubResult.value.success && dubResult.value.manifest) ? dubResult.value : null;
+
+            const playerSubdubToggle = document.getElementById('player-subdub-toggle');
+            const langToggleBtn = document.getElementById('lang-toggle-btn');
+
+            let activeData = null;
+
+            if (window.currentLang === 'dub') {
+                if (dubData) {
+                    activeData = dubData;
+                    if (playerSubdubToggle) {
+                        playerSubdubToggle.removeAttribute('title');
+                        playerSubdubToggle.classList.remove('opacity-50');
+                    }
+                } else if (subData) {
+                    // Fallback to Sub if Dub is unavailable for this episode
+                    activeData = subData;
+                    window.currentLang = 'sub';
+                    localStorage.setItem(`lang_${window.showData.id}`, 'sub');
+                    toggleUserPreference('preferredLang', 'sub');
+                    if (window.updateLanguageDisplay) window.updateLanguageDisplay();
+
+                    if (playerSubdubToggle) {
+                        playerSubdubToggle.setAttribute('title', `Dub not available for Episode ${epNum}`);
+                        playerSubdubToggle.classList.add('opacity-50');
+                    }
+                    if (langToggleBtn) {
+                        langToggleBtn.setAttribute('title', `Dub not available for Episode ${epNum}`);
+                    }
+                }
+            } else {
+                // User requested Sub
+                if (subData) {
+                    activeData = subData;
+                } else if (dubData) {
+                    activeData = dubData;
+                    window.currentLang = 'dub';
+                    localStorage.setItem(`lang_${window.showData.id}`, 'dub');
+                    toggleUserPreference('preferredLang', 'dub');
+                    if (window.updateLanguageDisplay) window.updateLanguageDisplay();
+                }
+
+                if (!dubData && playerSubdubToggle) {
+                    playerSubdubToggle.setAttribute('title', `Dub not available for Episode ${epNum}`);
+                    playerSubdubToggle.classList.add('opacity-50');
+                } else if (dubData && playerSubdubToggle) {
+                    playerSubdubToggle.removeAttribute('title');
+                    playerSubdubToggle.classList.remove('opacity-50');
+                }
             }
 
+            if (!activeData) {
+                throw new Error("Neither Sub nor Dub stream source could be resolved for this episode.");
+            }
+
+            const data = activeData;
             window.introTimes = data.intro;
             window.outroTimes = data.outro;
 
