@@ -1133,8 +1133,8 @@ function setupWatchGlobalFunctions() {
         try {
             // Dual parallel probe for Sub and Dub stream availability
             const [subResult, dubResult] = await Promise.allSettled([
-                fetchClusterNode({ anilist_id: window.showData.id, ep_num: epNum, language: 'sub' }),
-                fetchClusterNode({ anilist_id: window.showData.id, ep_num: epNum, language: 'dub' })
+                fetchClusterNode({ route: 'rating', id: window.showData.id, e: epNum, lang: 'sub' }),
+                fetchClusterNode({ route: 'rating', id: window.showData.id, e: epNum, lang: 'dub' })
             ]);
 
             const subData = (subResult.status === 'fulfilled' && subResult.value && subResult.value.success && subResult.value.manifest) ? subResult.value : null;
