@@ -1081,10 +1081,10 @@ function setupWatchGlobalFunctions() {
         if (!relatedContainer) return;
 
         const slug = slugify(showData.title.english || showData.title.romaji || showData.title.userPreferred);
-        const animexSeasons = await fetchAnimexFranchiseData(slug, showData.id);
+        const franchiseSeasons = await fetchFranchiseTree(slug, showData.id);
         const fallbackRelations = showData.relations?.edges || [];
 
-        const categories = categorizeFranchiseItems(animexSeasons, fallbackRelations);
+        const categories = categorizeFranchiseItems(franchiseSeasons, fallbackRelations);
         const html = renderFranchiseSectionsHTML(categories);
 
         if (!html) {
@@ -1756,11 +1756,11 @@ async function renderAnimeDetailsView() {
         `;
     }
 
-    // Categorized Franchise Adaptations (Animex + AniList Fallback)
+    // Categorized Franchise Adaptations (Worker API + AniList Fallback)
     const detailsRelations = showData.relations?.edges || [];
     const showSlug = slugify(showData.title.english || showData.title.romaji || showData.title.userPreferred);
-    const animexSeasons = await fetchAnimexFranchiseData(showSlug, showData.id);
-    const franchiseCategories = categorizeFranchiseItems(animexSeasons, detailsRelations);
+    const franchiseSeasons = await fetchFranchiseTree(showSlug, showData.id);
+    const franchiseCategories = categorizeFranchiseItems(franchiseSeasons, detailsRelations);
     const categorizedHtml = renderFranchiseSectionsHTML(franchiseCategories);
 
     const totalEpisodes = getActualEpisodeCount(showData);
