@@ -4,6 +4,77 @@
 
 let currentQueryText = '';
 
+const FULL_SHOW_QUERY = `
+  query ($id: Int) {
+    Media(id: $id, type: ANIME) {
+      id
+      title { romaji english native userPreferred }
+      coverImage { large extraLarge }
+      bannerImage
+      description
+      meanScore
+      format
+      status
+      episodes
+      season
+      seasonYear
+      genres
+      studios(isMain: true) {
+        nodes { name }
+      }
+      tags {
+        name
+        rank
+        category
+      }
+      characters(sort: [ROLE, RELEVANCE, ID], perPage: 12) {
+        edges {
+          role
+          node {
+            id
+            name { full userPreferred }
+            image { large }
+          }
+        }
+      }
+      staff(perPage: 8) {
+        edges {
+          role
+          node {
+            id
+            name { full }
+            image { large }
+          }
+        }
+      }
+      stats {
+        scoreDistribution {
+          score
+          amount
+        }
+      }
+      streamingEpisodes {
+        title
+        thumbnail
+        url
+        site
+      }
+      relations {
+        edges {
+          relationType
+          node {
+            id
+            title { romaji english native userPreferred }
+            coverImage { large }
+            type
+            status
+          }
+        }
+      }
+    }
+  }
+`;
+
 function debounce(func, wait) {
     let timeout;
     return function (...args) {
@@ -352,12 +423,12 @@ async function initApp() {
         handleSpaRouting();
     });
 
-    // Intercept clicks on links starting with /home or /watch/ to keep SPA routing pure
+    // Intercept clicks on links starting with /home, /watch/ or /anime/ to keep SPA routing pure
     document.addEventListener('click', (e) => {
         const anchor = e.target.closest('a');
         if (anchor) {
             const href = anchor.getAttribute('href');
-            if (href && (href.startsWith('/home') || href.startsWith('/watch/'))) {
+            if (href && (href.startsWith('/home') || href.startsWith('/watch/') || href.startsWith('/anime/'))) {
                 e.preventDefault();
                 window.history.pushState(null, '', href);
                 handleSpaRouting();
@@ -375,16 +446,35 @@ async function handleSpaRouting() {
     }
 
     const isWatch = window.location.pathname.startsWith('/watch/');
+    const isDetails = window.location.pathname.startsWith('/anime/');
     
+    // Toggle views
+    const watch = document.getElementById('watch-page-layout');
+    if (watch) {
+        if (isWatch) watch.classList.remove('hidden');
+        else watch.classList.add('hidden');
+    }
+
+    const details = document.getElementById('anime-details-layout');
+    if (details) {
+        if (isDetails) details.classList.remove('hidden');
+        else details.classList.add('hidden');
+    }
+
+    const homepageWrapper = document.getElementById('homepage-sections-wrapper');
+    const searchResultsLayout = document.getElementById('search-results-layout');
+
     if (isWatch) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
         await renderWatchView();
+    } else if (isDetails) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        await renderAnimeDetailsView();
     } else {
-        // Toggle views
-        const watch = document.getElementById('watch-page-layout');
-        if (watch) watch.classList.add('hidden');
-        
-        const homepageWrapper = document.getElementById('homepage-sections-wrapper');
         if (homepageWrapper) homepageWrapper.classList.remove('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
         
         checkUrlParamsAndSearch();
         
@@ -601,45 +691,13 @@ async function renderWatchView() {
 
     setupWatchGlobalFunctions();
 
-    if (showData && parseInt(showData.id, 10) === anilistId) {
+    if (showData && parseInt(showData.id, 10) === anilistId && showData.characters) {
         window.showData = showData;
         hydrateWatchUI();
     } else {
         document.getElementById('player-loading-spinner').classList.remove('hidden');
         try {
-            const query = `
-              query ($id: Int) {
-                Media(id: $id, type: ANIME) {
-                  id
-                  title { romaji english native userPreferred }
-                  coverImage { large extraLarge }
-                  bannerImage
-                  description
-                  meanScore
-                  format
-                  status
-                  episodes
-                  season
-                  seasonYear
-                  studios(isMain: true) {
-                    nodes { name }
-                  }
-                  relations {
-                    edges {
-                      relationType
-                      node {
-                        id
-                        title { romaji english native userPreferred }
-                        coverImage { large }
-                        type
-                        status
-                      }
-                    }
-                  }
-                }
-              }
-            `;
-            const json = await fetchAniListGraphQL({ query, variables: { id: anilistId } });
+            const json = await fetchAniListGraphQL({ query: FULL_SHOW_QUERY, variables: { id: anilistId } });
             if (json && json.data && json.data.Media) {
                 window.showData = json.data.Media;
                 localStorage.setItem('activeShowData', JSON.stringify(window.showData));
@@ -966,9 +1024,10 @@ function setupWatchGlobalFunctions() {
 
             if (Hls.isSupported()) {
                 window.hlsInstance = new Hls({
-                    maxBufferLength: 10,
-                    maxMaxBufferLength: 15,
-                    maxBufferSize: 5 * 1024 * 1024,
+                    maxBufferLength: 30,          // Keep at least 30 seconds buffered
+                    maxMaxBufferLength: 60,       // Max buffer cap
+                    maxBufferSize: 30 * 1024 * 1024, // 30MB buffer footprint
+                    backBufferLength: 10,
                     enableWorker: true,
                     lowLatencyMode: true
                 });
@@ -1320,5 +1379,211 @@ if (dockFilterBtn) {
 function toggleClusterModeDebug() {
     alert(`Cluster Mode Status: ${CLUSTER_MODE ? "ENABLED (Decentralized Node Shuffling)" : "DISABLED (Primary Worker Proxy)"}\nActive Server: ${currentHost}`);
 }
+
+async function renderAnimeDetailsView() {
+    const homepageWrapper = document.getElementById('homepage-sections-wrapper');
+    if (homepageWrapper) homepageWrapper.classList.add('hidden');
+    
+    const searchResultsLayout = document.getElementById('search-results-layout');
+    if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+
+    const watchLayout = document.getElementById('watch-page-layout');
+    if (watchLayout) watchLayout.classList.add('hidden');
+
+    let detailsLayout = document.getElementById('anime-details-layout');
+    if (!detailsLayout) {
+        detailsLayout = document.createElement('div');
+        detailsLayout.id = 'anime-details-layout';
+        detailsLayout.className = 'w-full relative py-6 min-h-screen';
+        document.getElementById('main-content').appendChild(detailsLayout);
+    }
+    detailsLayout.classList.remove('hidden');
+
+    const pathname = window.location.pathname;
+    const match = pathname.match(/\/anime\/([a-z0-9\-]+)-(\d+)/i);
+    let anilistId = null;
+
+    if (match) {
+        anilistId = parseInt(match[2], 10);
+    } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        anilistId = parseInt(urlParams.get('anilist_id') || urlParams.get('id'), 10);
+    }
+
+    if (!anilistId) {
+        window.history.replaceState(null, '', '/home');
+        handleSpaRouting();
+        return;
+    }
+
+    detailsLayout.innerHTML = `
+        <div class="w-full flex items-center justify-center py-24">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-themeCyan"></div>
+        </div>
+    `;
+
+    let showData = null;
+    try {
+        const cached = JSON.parse(localStorage.getItem('activeShowData'));
+        if (cached && parseInt(cached.id, 10) === anilistId && cached.characters) {
+            showData = cached;
+        }
+    } catch (e) {}
+
+    if (!showData) {
+        try {
+            const json = await fetchAniListGraphQL({ query: FULL_SHOW_QUERY, variables: { id: anilistId } });
+            if (json && json.data && json.data.Media) {
+                showData = json.data.Media;
+                localStorage.setItem('activeShowData', JSON.stringify(showData));
+            } else {
+                throw new Error("Anime not found");
+            }
+        } catch (err) {
+            console.error("Failed to fetch anime details:", err);
+            detailsLayout.innerHTML = `
+                <div class="w-full text-center py-12 text-themeCrimson font-semibold">
+                    Failed to fetch details from AniList: ${err.message}.
+                    <br>
+                    <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="mt-4 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white">Back to Home</button>
+                </div>
+            `;
+            return;
+        }
+    }
+
+    window.showData = showData;
+
+    const bannerImg = showData.bannerImage || showData.coverImage.extraLarge || showData.coverImage.large || '';
+    const posterImg = showData.coverImage.extraLarge || showData.coverImage.large || '';
+    const title = showData.title.english || showData.title.romaji || showData.title.userPreferred;
+    const studios = showData.studios?.nodes?.map(n => n.name).join(', ') || 'N/A';
+    const score = showData.meanScore ? `★ ${showData.meanScore}%` : '★ N/A';
+    const genres = showData.genres?.map(g => `<span class="px-2.5 py-1 bg-white/5 border border-white/10 text-xs text-white rounded-full font-medium">${g}</span>`).join(' ') || '';
+    
+    const charactersList = showData.characters?.edges || [];
+    let charactersHtml = '';
+    if (charactersList.length > 0) {
+        charactersHtml = `
+            <div class="mt-8">
+                <h3 class="text-lg font-bold text-white uppercase tracking-wider mb-4 border-l-4 border-themeCyan pl-3">Characters</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                    ${charactersList.map(edge => `
+                        <div class="glass-panel p-3 rounded-xl border border-white/5 flex flex-col items-center text-center gap-2">
+                            <img class="w-16 h-16 rounded-full object-cover border border-white/10" src="${edge.node.image.large}" alt="${edge.node.name.full}">
+                            <div class="text-xs font-semibold text-white truncate w-full">${edge.node.name.userPreferred}</div>
+                            <div class="text-[10px] text-steelGray uppercase tracking-wide">${edge.role}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    const staffList = showData.staff?.edges || [];
+    let staffHtml = '';
+    if (staffList.length > 0) {
+        staffHtml = `
+            <div class="mt-8">
+                <h3 class="text-lg font-bold text-white uppercase tracking-wider mb-4 border-l-4 border-themeCyan pl-3">Main Staff</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    ${staffList.map(edge => `
+                        <div class="glass-panel p-3 rounded-xl border border-white/5 flex flex-col items-center text-center gap-2">
+                            <img class="w-12 h-12 rounded-full object-cover border border-white/10" src="${edge.node.image.large}" alt="${edge.node.name.full}">
+                            <div class="text-xs font-semibold text-white truncate w-full">${edge.node.name.full}</div>
+                            <div class="text-[10px] text-steelGray uppercase tracking-wide">${edge.role}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    const totalEpisodes = showData.episodes || 12;
+    let episodesHtml = '';
+    for (let ep = 1; ep <= totalEpisodes; ep++) {
+        episodesHtml += `
+            <button onclick="navigateWatchEpisode(${ep})" class="glass-panel p-4 rounded-xl border border-white/5 hover:border-[#00f5ff]/60 hover:text-[#00f5ff] text-white font-bold text-center transition-all duration-300 transform hover:scale-105 active:scale-95 flex flex-col gap-1">
+                <span class="text-themeCyan text-xs uppercase tracking-wider">Episode</span>
+                <span class="text-lg">${ep}</span>
+            </button>
+        `;
+    }
+
+    detailsLayout.innerHTML = `
+        <div class="absolute inset-x-0 top-0 h-[350px] bg-cover bg-center bg-no-repeat opacity-[0.15] blur-md pointer-events-none z-0" style="background-image: url('${bannerImg}')"></div>
+        <div class="absolute inset-x-0 top-0 h-[350px] bg-gradient-to-b from-transparent to-themeBlack pointer-events-none z-0"></div>
+
+        <div class="relative z-10 grid grid-cols-12 gap-8 mt-6">
+            <div class="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-6">
+                <div class="w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+                    <img class="w-full h-full object-cover" src="${posterImg}" alt="${title}">
+                </div>
+                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Format</span>
+                        <span class="text-white text-sm font-semibold">${showData.format || 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Status</span>
+                        <span class="text-white text-sm font-semibold uppercase">${showData.status || 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Studio</span>
+                        <span class="text-white text-sm font-semibold">${studios}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Season</span>
+                        <span class="text-white text-sm font-semibold uppercase">${showData.season || 'N/A'} ${showData.seasonYear || ''}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-span-12 md:col-span-8 lg:col-span-9 flex flex-col gap-6">
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center gap-3">
+                        <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">${showData.format || 'ANIME'}</span>
+                        <span class="text-themeCyan font-bold text-sm">${score}</span>
+                    </div>
+                    <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-none">${title}</h1>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        ${genres}
+                    </div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button onclick="navigateWatchEpisode(1)" class="px-8 py-4 bg-[#00ffcc] hover:bg-[#00ffcc]/80 text-[#08080c] font-bold tracking-wider rounded-xl shadow-lg hover:shadow-[#00ffcc]/20 transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase flex items-center gap-2">
+                        <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        Start Watching
+                    </button>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-3">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">Synopsis</h3>
+                    <p class="text-steelGray text-sm font-light leading-relaxed">${showData.description || 'No synopsis available.'}</p>
+                </div>
+
+                <div class="mt-4">
+                    <h3 class="text-lg font-bold text-white uppercase tracking-wider mb-4 border-l-4 border-themeCyan pl-3">Episodes</h3>
+                    <div class="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-8 gap-3">
+                        ${episodesHtml}
+                    </div>
+                </div>
+
+                ${charactersHtml}
+                ${staffHtml}
+            </div>
+        </div>
+    `;
+}
+
+window.navigateWatchEpisode = function(epNum) {
+    const show = window.showData;
+    const slug = window.slugify(show.title.english || show.title.romaji || show.title.userPreferred);
+    window.history.pushState({}, '', `/watch/anime/${slug}-${show.id}?ep=${epNum}`);
+    handleSpaRouting();
+};
+
+window.renderAnimeDetailsView = renderAnimeDetailsView;
 
 window.addEventListener('DOMContentLoaded', initApp);
