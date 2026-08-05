@@ -1025,15 +1025,19 @@ function setupWatchGlobalFunctions() {
         const activeUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
 
         for (let track of trackList) {
-            if (!track.file) continue;
+            if (!track.file && !track.content) continue;
 
             try {
-                const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}`;
-                
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error("Sandbox load error");
+                let vttText;
+                if (track.content) {
+                    vttText = track.content;
+                } else {
+                    const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}`;
+                    const response = await fetch(proxyUrl);
+                    if (!response.ok) throw new Error("Sandbox load error");
+                    vttText = await response.text();
+                }
 
-                const vttText = await response.text();
                 const base64Vtt = btoa(unescape(encodeURIComponent(vttText)));
                 const dataUrl = 'data:text/vtt;base64,' + base64Vtt;
 
@@ -1050,7 +1054,7 @@ function setupWatchGlobalFunctions() {
                 video.appendChild(trackEl);
             } catch (err) {
                 console.warn(`[Subtitles Fallback] CORS track fetch failure: ${track.label}. Loading via proxy directly.`);
-                const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}`;
+                const proxyUrl = track.file ? `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}` : '';
                 const trackEl = document.createElement('track');
                 trackEl.kind = track.kind || 'captions';
                 trackEl.label = track.label || 'Subtitles';
