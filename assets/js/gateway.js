@@ -147,12 +147,27 @@ function updateActiveNodeDisplay() {
 // 4. FILLER EPISODE DATA FETCHING & CACHING
 const fillerCache = new Map();
 
-async function fetchFillerEpisodes(anilistId) {
+async function fetchFillerEpisodes(anilistId, malId = null, totalEpisodes = 0) {
     if (!anilistId) return new Set();
+
+    const sessionKey = `fillers_${anilistId}`;
+    try {
+        const stored = sessionStorage.getItem(sessionKey);
+        if (stored) {
+            const arr = JSON.parse(stored);
+            const cachedSet = new Set(arr);
+            fillerCache.set(anilistId, cachedSet);
+            return cachedSet;
+        }
+    } catch (e) {}
+
     if (fillerCache.has(anilistId)) return fillerCache.get(anilistId);
 
     const fillerSet = new Set();
+    const targetMalId = malId || anilistId;
+
     try {
+        // 1. AniZip Mappings
         const res = await fetch(`https://api.ani.zip/mappings?anilist_id=${anilistId}`);
         if (res.ok) {
             const data = await res.json();
@@ -170,23 +185,61 @@ async function fetchFillerEpisodes(anilistId) {
         console.warn("[Filler API] Warning fetching filler info from AniZip:", e);
     }
 
+    // 2. Anify API Multi-provider check
     if (fillerSet.size === 0) {
         try {
-            const res = await fetch(`https://api.jikan.moe/v4/anime/${anilistId}/episodes`);
+            const res = await fetch(`https://api.anify.tv/episodes/${anilistId}`);
             if (res.ok) {
                 const data = await res.json();
-                if (data && Array.isArray(data.data)) {
-                    for (const item of data.data) {
-                        if (item.filler === true) {
-                            fillerSet.add(item.mal_id || item.episode_id);
+                if (Array.isArray(data)) {
+                    data.forEach(provider => {
+                        if (provider && Array.isArray(provider.episodes)) {
+                            provider.episodes.forEach(ep => {
+                                if (ep.isFiller || ep.filler) {
+                                    const num = parseInt(ep.number || ep.episode, 10);
+                                    if (!isNaN(num)) fillerSet.add(num);
+                                }
+                            });
                         }
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn("[Filler API] Warning fetching filler info from Anify:", e);
+        }
+    }
+
+    // 3. Jikan Paginated Fallback (Sequential fetch for 100+ episodes)
+    if (fillerSet.size === 0 && targetMalId) {
+        try {
+            let page = 1;
+            let hasNextPage = true;
+            while (hasNextPage && page <= 25) {
+                const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes?page=${page}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && Array.isArray(data.data)) {
+                        data.data.forEach(item => {
+                            if (item.filler === true) {
+                                const epNum = item.mal_id || item.episode_id;
+                                if (epNum) fillerSet.add(epNum);
+                            }
+                        });
                     }
+                    hasNextPage = data?.pagination?.has_next_page || false;
+                    page++;
+                } else {
+                    break;
                 }
             }
         } catch (err) {
-            console.warn("[Filler API] Warning fetching filler info from Jikan:", err);
+            console.warn("[Filler API] Warning fetching filler info from Jikan (Paginated):", err);
         }
     }
+
+    try {
+        sessionStorage.setItem(sessionKey, JSON.stringify(Array.from(fillerSet)));
+    } catch (e) {}
 
     fillerCache.set(anilistId, fillerSet);
     return fillerSet;
