@@ -12,10 +12,18 @@ const FULL_SHOW_QUERY = `
       coverImage { large extraLarge }
       bannerImage
       description
+      duration
+      averageScore
       meanScore
-      format
+      popularity
+      favourites
+      source
       status
       episodes
+      nextAiringEpisode {
+        episode
+        timeUntilAiring
+      }
       season
       seasonYear
       genres
@@ -27,9 +35,18 @@ const FULL_SHOW_QUERY = `
         rank
         category
       }
+      trailer {
+        site
+        id
+      }
       characters(sort: [ROLE, RELEVANCE, ID], perPage: 12) {
         edges {
           role
+          voiceActors(language: JAPANESE) {
+            id
+            name { full }
+            image { large }
+          }
           node {
             id
             name { full userPreferred }
@@ -59,6 +76,32 @@ const FULL_SHOW_QUERY = `
         url
         site
       }
+      reviews(perPage: 5) {
+        nodes {
+          id
+          summary
+          score
+          body
+          user {
+            username
+            avatar { large }
+          }
+        }
+      }
+      recommendations(perPage: 10) {
+        edges {
+          node {
+            mediaRecommendation {
+              id
+              title { romaji english native userPreferred }
+              coverImage { large }
+              type
+              status
+              format
+            }
+          }
+        }
+      }
       relations {
         edges {
           relationType
@@ -68,12 +111,24 @@ const FULL_SHOW_QUERY = `
             coverImage { large }
             type
             status
+            format
           }
         }
       }
     }
   }
 `;
+
+function getActualEpisodeCount(media) {
+    if (!media) return 12;
+    if (media.episodes) return media.episodes;
+    if (media.nextAiringEpisode && media.nextAiringEpisode.episode) {
+        return media.nextAiringEpisode.episode - 1;
+    }
+    if (media.id === 21) return 1120; // One Piece safe current count
+    if (media.status === 'RELEASING') return 24;
+    return 12;
+}
 
 function debounce(func, wait) {
     let timeout;
@@ -608,45 +663,45 @@ async function renderWatchView() {
                         <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-themeCyan"></div>
                     </div>
                 </div>
-                <div class="glass-panel p-5 md:p-8 rounded-2xl border border-white/5 flex flex-col gap-4">
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <h1 id="show-title" class="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">Loading Title...</h1>
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span id="badge-episodes" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md">-- Episodes</span>
-                            <span id="badge-rating" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md">★ N/A</span>
-                            <span id="badge-language" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md uppercase">SUB</span>
-                        </div>
-                    </div>
-                    <hr class="border-white/5 my-1">
-                    <div class="flex flex-col gap-2 relative">
-                        <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Synopsis</h3>
-                        <div id="synopsis-wrapper" class="text-steelGray text-xs md:text-sm font-light leading-relaxed max-h-12 overflow-hidden transition-all duration-500 ease-in-out">
-                            <p id="show-synopsis">Loading show details...</p>
-                        </div>
-                        <button id="read-more-btn" onclick="toggleSynopsis()" class="text-themeCyan hover:text-white text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase">+ Read More</button>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-white/5 p-4 rounded-xl border border-white/5">
-                        <div>
-                            <span class="text-steelGray text-[10px] uppercase tracking-wider block">Format</span>
-                            <span id="meta-format" class="text-white text-xs md:text-sm font-semibold">N/A</span>
-                        </div>
-                        <div>
-                            <span class="text-steelGray text-[10px] uppercase tracking-wider block">Status</span>
-                            <span id="meta-status" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
-                        </div>
-                        <div>
-                            <span class="text-steelGray text-[10px] uppercase tracking-wider block">Aired Season</span>
-                            <span id="meta-season" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
-                        </div>
-                        <div>
-                            <span class="text-steelGray text-[10px] uppercase tracking-wider block">Studio</span>
-                            <span id="meta-studio" class="text-white text-xs md:text-sm font-semibold">N/A</span>
-                        </div>
-                    </div>
-                    <div id="related-section" class="mt-4 flex flex-col gap-3 hidden">
-                        <h3 class="text-sm font-semibold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">Related Adaptations</h3>
-                        <div id="related-row" class="flex gap-4 overflow-x-auto pb-3 scrollbar-thin"></div>
-                    </div>
+                   <!-- Metadata/Details Block -->
+                   <div class="glass-panel p-5 md:p-8 rounded-2xl border border-white/5 flex flex-col gap-4">
+                       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                           <h1 id="show-title" class="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">Loading Title...</h1>
+                           <div class="flex items-center gap-2 flex-wrap">
+                               <span id="badge-episodes" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md">-- Episodes</span>
+                               <span id="badge-rating" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md">★ N/A</span>
+                               <span id="badge-language" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md uppercase">SUB</span>
+                           </div>
+                       </div>
+                       <hr class="border-white/5 my-1">
+                       <div class="flex flex-col gap-2 relative">
+                           <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Synopsis</h3>
+                           <div id="synopsis-wrapper" class="text-steelGray text-xs md:text-sm font-light leading-relaxed max-h-12 overflow-hidden transition-all duration-500 ease-in-out">
+                               <p id="show-synopsis">Loading show details...</p>
+                           </div>
+                           <button id="read-more-btn" onclick="toggleSynopsis()" class="text-themeCyan hover:text-white text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase">+ Read More</button>
+                       </div>
+                       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                           <div>
+                               <span class="text-steelGray text-[10px] uppercase tracking-wider block">Format</span>
+                               <span id="meta-format" class="text-white text-xs md:text-sm font-semibold">N/A</span>
+                           </div>
+                           <div>
+                               <span class="text-steelGray text-[10px] uppercase tracking-wider block">Status</span>
+                               <span id="meta-status" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
+                           </div>
+                           <div>
+                               <span class="text-steelGray text-[10px] uppercase tracking-wider block">Aired Season</span>
+                               <span id="meta-season" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
+                           </div>
+                           <div>
+                               <span class="text-steelGray text-[10px] uppercase tracking-wider block">Studio</span>
+                               <span id="meta-studio" class="text-white text-xs md:text-sm font-semibold">N/A</span>
+                           </div>
+                       </div>
+                   </div>
+                   <!-- Separate Related Adaptations / Similar Anime container -->
+                   <div id="watch-related-container" class="mt-4 flex flex-col gap-6 hidden"></div>  </div>
                 </div>
             </div>
             <div class="col-span-12 lg:col-span-3 flex flex-col gap-6">
@@ -745,10 +800,13 @@ function hydrateWatchUI() {
     if (synopsisEl) synopsisEl.innerHTML = showData.description || 'No description available.';
     
     const badgeEpisodesEl = document.getElementById('badge-episodes');
-    if (badgeEpisodesEl) badgeEpisodesEl.innerText = `${showData.episodes || 'Ongoing'} Episodes`;
+    if (badgeEpisodesEl) {
+        const actEps = getActualEpisodeCount(showData);
+        badgeEpisodesEl.innerText = `${actEps} Episodes`;
+    }
     
     const badgeRatingEl = document.getElementById('badge-rating');
-    if (badgeRatingEl) badgeRatingEl.innerText = `★ ${showData.meanScore || 'N/A'}%`;
+    if (badgeRatingEl) badgeRatingEl.innerText = `★ ${showData.averageScore || showData.meanScore || 'N/A'}%`;
 
     const formatEl = document.getElementById('meta-format');
     if (formatEl) formatEl.innerText = showData.format || 'TV';
@@ -823,7 +881,7 @@ function setupWatchGlobalFunctions() {
 
     window.renderEpisodePicker = function() {
         const selector = document.getElementById('batch-selector');
-        const totalEps = window.showData.episodes || 12;
+        const totalEps = getActualEpisodeCount(window.showData);
 
         const batchSize = 100;
         const numBatches = Math.ceil(totalEps / batchSize);
@@ -888,94 +946,118 @@ function setupWatchGlobalFunctions() {
     };
 
     window.renderRelatedAdaptations = function() {
-        const relations = window.showData.relations?.edges || [];
-        const row = document.getElementById('related-row');
-        const section = document.getElementById('related-section');
+        const showData = window.showData;
+        const relations = showData.relations?.edges || [];
+        const recommendations = showData.recommendations?.edges || [];
+        
+        const items = [];
+        const seenIds = new Set();
+        
+        relations.forEach(r => {
+            if (r.node && r.node.id && !seenIds.has(r.node.id)) {
+                seenIds.add(r.node.id);
+                items.push({
+                    id: r.node.id,
+                    title: r.node.title,
+                    coverImage: r.node.coverImage,
+                    format: r.node.format || 'TV',
+                    status: r.node.status,
+                    type: r.node.type || 'ANIME',
+                    relationType: r.relationType || 'RELATION'
+                });
+            }
+        });
 
-        if (!row || !section) return;
+        recommendations.forEach(rec => {
+            const media = rec.node?.mediaRecommendation;
+            if (media && media.id && !seenIds.has(media.id)) {
+                seenIds.add(media.id);
+                items.push({
+                    id: media.id,
+                    title: media.title,
+                    coverImage: media.coverImage,
+                    format: media.format || 'TV',
+                    status: media.status,
+                    type: media.type || 'ANIME',
+                    relationType: 'RECOMMENDED'
+                });
+            }
+        });
 
-        if (!relations || relations.length === 0) {
-            section.classList.add('hidden');
+        const relatedContainer = document.getElementById('watch-related-container');
+        if (!relatedContainer) return;
+
+        if (items.length === 0) {
+            relatedContainer.classList.add('hidden');
             return;
         }
 
-        section.classList.remove('hidden');
-        let html = '';
+        relatedContainer.classList.remove('hidden');
+        relatedContainer.innerHTML = '';
 
-        relations.forEach(item => {
-            const node = item.node;
-            if (!node || !node.id) return;
+        const tvSeries = [];
+        const movies = [];
+        const others = [];
 
-            const rTitle = node.title?.english || node.title?.romaji || node.title?.userPreferred || 'Related';
-            const rCover = node.coverImage?.large || '';
-            const relationType = item.relationType || 'Alternative';
-
-            html += `
-                <div class="flex-shrink-0 w-28 md:w-32 group cursor-pointer" onclick="viewRelatedShow(${node.id})">
-                    <div class="relative aspect-[3/4] rounded-lg overflow-hidden border border-white/5 group-hover:border-themeCyan/40 transition-all duration-300">
-                        <img src="${rCover}" alt="${rTitle}" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
-                        <span class="absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 bg-black/70 border border-white/10 rounded uppercase text-themeCyan">
-                            ${relationType}
-                        </span>
-                    </div>
-                    <h4 class="text-white text-[11px] md:text-xs font-semibold truncate mt-1.5 group-hover:text-themeCyan transition-all duration-300">
-                        ${rTitle}
-                    </h4>
-                    <span class="text-steelGray text-[10px] block">
-                        ${node.type || 'ANIME'} • ${node.status || 'FINISHED'}
-                    </span>
-                </div>
-            `;
+        items.forEach(item => {
+            if (item.format === 'TV') {
+                tvSeries.push(item);
+            } else if (item.format === 'MOVIE') {
+                movies.push(item);
+            } else {
+                others.push(item);
+            }
         });
 
-        row.innerHTML = html;
+        const categories = [
+            { title: 'TV Series', items: tvSeries },
+            { title: 'Movies', items: movies },
+            { title: 'Other Adaptations & Similar', items: others }
+        ];
+
+        categories.forEach(cat => {
+            if (cat.items.length === 0) return;
+
+            const sectionHtml = `
+                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">${cat.title}</h3>
+                    <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                        ${cat.items.map(item => {
+                            const titleText = item.title.english || item.title.romaji || item.title.userPreferred || 'Anime';
+                            const coverUrl = item.coverImage?.large || '';
+                            const labelText = item.relationType === 'RECOMMENDED' ? 'Similar' : item.relationType.replace('_', ' ');
+                            return `
+                                <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.id})">
+                                    <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
+                                        <img class="w-full h-full object-cover" src="${coverUrl}" alt="${titleText}" loading="lazy">
+                                        <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
+                                            ${labelText}
+                                        </span>
+                                    </div>
+                                    <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${titleText}</div>
+                                    <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.format} &bull; ${item.status || 'N/A'}</div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+            relatedContainer.innerHTML += sectionHtml;
+        });
     };
 
     window.viewRelatedShow = async function(relatedId) {
         const spinner = document.getElementById('player-loading-spinner');
         if (spinner) spinner.classList.remove('hidden');
         try {
-            const query = `
-              query ($id: Int) {
-                Media(id: $id, type: ANIME) {
-                  id
-                  title { romaji english native userPreferred }
-                  coverImage { large extraLarge }
-                  bannerImage
-                  description
-                  meanScore
-                  format
-                  status
-                  episodes
-                  season
-                  seasonYear
-                  studios(isMain: true) {
-                    nodes { name }
-                  }
-                  relations {
-                    edges {
-                      relationType
-                      node {
-                        id
-                        title { romaji english native userPreferred }
-                        coverImage { large }
-                        type
-                        status
-                      }
-                    }
-                  }
-                }
-              }
-            `;
-            const json = await fetchAniListGraphQL({ query, variables: { id: relatedId } });
+            const json = await fetchAniListGraphQL({ query: FULL_SHOW_QUERY, variables: { id: relatedId } });
             if (json && json.data && json.data.Media) {
                 const data = json.data.Media;
                 localStorage.setItem('activeShowData', JSON.stringify(data));
                 
                 const slug = slugify(data.title.english || data.title.romaji || data.title.userPreferred);
-                window.history.pushState(null, '', `/watch/anime/${slug}-${data.id}?ep=1`);
-                
-                renderWatchView();
+                window.history.pushState(null, '', `/anime/${slug}-${data.id}`);
+                handleSpaRouting();
             } else {
                 throw new Error("Media not found");
             }
@@ -1458,63 +1540,190 @@ async function renderAnimeDetailsView() {
     const posterImg = showData.coverImage.extraLarge || showData.coverImage.large || '';
     const title = showData.title.english || showData.title.romaji || showData.title.userPreferred;
     const studios = showData.studios?.nodes?.map(n => n.name).join(', ') || 'N/A';
-    const score = showData.meanScore ? `★ ${showData.meanScore}%` : '★ N/A';
+    const score = showData.averageScore || showData.meanScore ? `★ ${showData.averageScore || showData.meanScore}%` : '★ N/A';
     const genres = showData.genres?.map(g => `<span class="px-2.5 py-1 bg-white/5 border border-white/10 text-xs text-white rounded-full font-medium">${g}</span>`).join(' ') || '';
     
+    // Synopsis with "Read More" Toggle
+    const synopsisHtml = `
+        <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-3 relative">
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">Synopsis</h3>
+            <div id="details-synopsis-wrapper" class="text-steelGray text-sm font-light leading-relaxed max-h-24 overflow-hidden transition-all duration-500 ease-in-out">
+                <p id="details-synopsis">${showData.description || 'No synopsis available.'}</p>
+            </div>
+            <button id="details-read-more-btn" onclick="toggleDetailsSynopsis()" class="text-themeCyan hover:text-white text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase">+ Read More</button>
+        </div>
+    `;
+
+    // Trailer
+    let trailerHtml = '';
+    if (showData.trailer && showData.trailer.site === 'youtube') {
+        trailerHtml = `
+            <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">Official Trailer</h3>
+                <div class="relative w-full aspect-video rounded-xl overflow-hidden shadow-lg border border-white/10">
+                    <iframe class="absolute inset-0 w-full h-full" src="https://www.youtube.com/embed/${showData.trailer.id}" title="Trailer" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
+            </div>
+        `;
+    }
+
+    // Cast & Staff / Voice Actors
     const charactersList = showData.characters?.edges || [];
     let charactersHtml = '';
     if (charactersList.length > 0) {
         charactersHtml = `
-            <div class="mt-8">
-                <h3 class="text-lg font-bold text-white uppercase tracking-wider mb-4 border-l-4 border-themeCyan pl-3">Characters</h3>
-                <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
-                    ${charactersList.map(edge => `
-                        <div class="glass-panel p-3 rounded-xl border border-white/5 flex flex-col items-center text-center gap-2">
-                            <img class="w-16 h-16 rounded-full object-cover border border-white/10" src="${edge.node.image.large}" alt="${edge.node.name.full}">
-                            <div class="text-xs font-semibold text-white truncate w-full">${edge.node.name.userPreferred}</div>
-                            <div class="text-[10px] text-steelGray uppercase tracking-wide">${edge.role}</div>
-                        </div>
-                    `).join('')}
+            <div class="glass-panel p-6 rounded-2xl border border-white/5">
+                <h3 class="text-lg font-bold text-white uppercase tracking-wider mb-4 border-l-4 border-themeCyan pl-3">Cast & Voice Actors</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                    ${charactersList.map(edge => {
+                        const charNode = edge.node;
+                        const charName = charNode.name.userPreferred || charNode.name.full;
+                        const charImage = charNode.image.large || '';
+                        const charRole = edge.role || 'SUPPORTING';
+                        
+                        const vaNode = edge.voiceActors?.[0];
+                        const vaName = vaNode ? vaNode.name.full : '';
+                        const vaImage = vaNode ? vaNode.image.large : '';
+                        
+                        return `
+                            <div class="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex justify-between items-center gap-3 transition-all duration-300 hover:border-themeCyan/30">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <img class="w-10 h-14 rounded-lg object-cover border border-white/10 flex-shrink-0" src="${charImage}" alt="${charName}" loading="lazy">
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-bold text-white truncate">${charName}</div>
+                                        <div class="text-[9px] text-steelGray uppercase tracking-wider mt-1">${charRole}</div>
+                                    </div>
+                                </div>
+                                ${vaNode ? `
+                                    <div class="flex items-center gap-3 text-right min-w-0">
+                                        <div class="min-w-0">
+                                            <div class="text-xs font-medium text-white truncate">${vaName}</div>
+                                            <div class="text-[9px] text-themeCyan uppercase tracking-wider mt-1">Japanese</div>
+                                        </div>
+                                        <img class="w-10 h-14 rounded-lg object-cover border border-white/10 flex-shrink-0" src="${vaImage}" alt="${vaName}" loading="lazy">
+                                    </div>
+                                ` : `
+                                    <div class="text-[10px] text-steelGray italic pr-3">No VA Listed</div>
+                                `}
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `;
     }
 
-    const staffList = showData.staff?.edges || [];
-    let staffHtml = '';
-    if (staffList.length > 0) {
-        staffHtml = `
-            <div class="mt-8">
-                <h3 class="text-lg font-bold text-white uppercase tracking-wider mb-4 border-l-4 border-themeCyan pl-3">Main Staff</h3>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    ${staffList.map(edge => `
-                        <div class="glass-panel p-3 rounded-xl border border-white/5 flex flex-col items-center text-center gap-2">
-                            <img class="w-12 h-12 rounded-full object-cover border border-white/10" src="${edge.node.image.large}" alt="${edge.node.name.full}">
-                            <div class="text-xs font-semibold text-white truncate w-full">${edge.node.name.full}</div>
-                            <div class="text-[10px] text-steelGray uppercase tracking-wide">${edge.role}</div>
-                        </div>
-                    `).join('')}
+    // Reviews
+    const reviewsList = showData.reviews?.nodes || [];
+    let reviewsHtml = '';
+    if (reviewsList.length > 0) {
+        reviewsHtml = `
+            <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <h3 class="text-lg font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">User Reviews</h3>
+                <div class="flex flex-col gap-4">
+                    ${reviewsList.map(review => {
+                        const username = review.user.username;
+                        const avatarUrl = review.user.avatar.large || '';
+                        const reviewSummary = review.summary;
+                        const reviewScore = review.score;
+                        const reviewBody = review.body ? review.body.replace(/__+/g, '').replace(/~~+/g, '').replace(/\*+/g, '').substring(0, 300) + '...' : '';
+                        return `
+                            <div class="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex flex-col gap-3">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <img class="w-10 h-10 rounded-full border border-white/10 object-cover" src="${avatarUrl}" alt="${username}">
+                                        <div>
+                                            <div class="text-sm font-semibold text-white">${username}</div>
+                                            <div class="text-[10px] text-steelGray">BlackLeg Critic</div>
+                                        </div>
+                                    </div>
+                                    <div class="px-2.5 py-1 bg-themeCyan/10 border border-themeCyan/20 text-themeCyan text-xs font-bold rounded-lg">
+                                        Score: ${reviewScore}%
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-bold text-white mb-1">"${reviewSummary}"</div>
+                                    <p class="text-steelGray text-xs font-light leading-relaxed">${reviewBody}</p>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `;
     }
 
-    const totalEpisodes = showData.episodes || 12;
-    let episodesHtml = '';
-    for (let ep = 1; ep <= totalEpisodes; ep++) {
-        episodesHtml += `
-            <button onclick="navigateWatchEpisode(${ep})" class="glass-panel p-4 rounded-xl border border-white/5 hover:border-[#00f5ff]/60 hover:text-[#00f5ff] text-white font-bold text-center transition-all duration-300 transform hover:scale-105 active:scale-95 flex flex-col gap-1">
-                <span class="text-themeCyan text-xs uppercase tracking-wider">Episode</span>
-                <span class="text-lg">${ep}</span>
-            </button>
+    // Categorized Related Adaptations
+    const detailsRelations = showData.relations?.edges || [];
+    const detailsRecs = showData.recommendations?.edges || [];
+
+    const groupedMap = {
+        'Sequels & Prequels': [],
+        'Side Stories & Spin-offs': [],
+        'Alternative Versions': [],
+        'Same Series Adaptations': [],
+        'Similar Recommendations': []
+    };
+
+    detailsRelations.forEach(r => {
+        const type = r.relationType || 'OTHER';
+        const node = r.node;
+        if (!node) return;
+        
+        if (type === 'SEQUEL' || type === 'PREQUEL') {
+            groupedMap['Sequels & Prequels'].push({ node, label: type });
+        } else if (type === 'SIDE_STORY' || type === 'SPIN_OFF') {
+            groupedMap['Side Stories & Spin-offs'].push({ node, label: type.replace('_', ' ') });
+        } else if (type === 'ALTERNATIVE' || type === 'FULL_VERSION') {
+            groupedMap['Alternative Versions'].push({ node, label: type.replace('_', ' ') });
+        } else {
+            groupedMap['Same Series Adaptations'].push({ node, label: type.replace('_', ' ') });
+        }
+    });
+
+    detailsRecs.forEach(rec => {
+        const media = rec.node?.mediaRecommendation;
+        if (media) {
+            groupedMap['Similar Recommendations'].push({ node: media, label: 'Similar' });
+        }
+    });
+
+    let categorizedHtml = '';
+    for (const [catName, list] of Object.entries(groupedMap)) {
+        if (list.length === 0) continue;
+        categorizedHtml += `
+            <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">${catName}</h3>
+                <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
+                    ${list.map(item => {
+                        const titleText = item.node.title.english || item.node.title.romaji || item.node.title.userPreferred || 'Anime';
+                        const coverUrl = item.node.coverImage?.large || '';
+                        return `
+                            <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow(${item.node.id})">
+                                <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
+                                    <img class="w-full h-full object-cover" src="${coverUrl}" alt="${titleText}" loading="lazy">
+                                    <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
+                                        ${item.label}
+                                    </span>
+                                </div>
+                                <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${titleText}</div>
+                                <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.node.format || 'TV'} &bull; ${item.node.status || 'N/A'}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
         `;
     }
+
+    const totalEpisodes = getActualEpisodeCount(showData);
 
     detailsLayout.innerHTML = `
-        <div class="absolute inset-x-0 top-0 h-[350px] bg-cover bg-center bg-no-repeat opacity-[0.15] blur-md pointer-events-none z-0" style="background-image: url('${bannerImg}')"></div>
-        <div class="absolute inset-x-0 top-0 h-[350px] bg-gradient-to-b from-transparent to-themeBlack pointer-events-none z-0"></div>
+        <div class="absolute inset-x-0 top-0 h-[450px] bg-cover bg-center bg-no-repeat opacity-[0.12] blur-xl pointer-events-none z-0" style="background-image: url('${bannerImg}')"></div>
+        <div class="absolute inset-x-0 top-0 h-[450px] bg-gradient-to-b from-transparent to-themeBlack pointer-events-none z-0"></div>
 
         <div class="relative z-10 grid grid-cols-12 gap-8 mt-6">
+            <!-- Left Column: Poster & Metadata Metrics -->
             <div class="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-6">
                 <div class="w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                     <img class="w-full h-full object-cover" src="${posterImg}" alt="${title}">
@@ -1536,14 +1745,31 @@ async function renderAnimeDetailsView() {
                         <span class="text-[10px] text-steelGray uppercase tracking-wider block">Season</span>
                         <span class="text-white text-sm font-semibold uppercase">${showData.season || 'N/A'} ${showData.seasonYear || ''}</span>
                     </div>
+                    <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Source Material</span>
+                        <span class="text-white text-sm font-semibold uppercase">${showData.source || 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Episode Duration</span>
+                        <span class="text-white text-sm font-semibold">${showData.duration ? showData.duration + ' mins' : 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Popularity Rank</span>
+                        <span class="text-white text-sm font-semibold">#${showData.popularity ? showData.popularity.toLocaleString() : 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-steelGray uppercase tracking-wider block">Favorites</span>
+                        <span class="text-white text-sm font-semibold">${showData.favourites ? showData.favourites.toLocaleString() : 'N/A'}</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="col-span-12 md:col-span-8 lg:col-span-9 flex flex-col gap-6">
+            <!-- Middle Column: Main Details & Media -->
+            <div class="col-span-12 md:col-span-8 lg:col-span-6 flex flex-col gap-6">
                 <div class="flex flex-col gap-4">
                     <div class="flex items-center gap-3">
                         <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">${showData.format || 'ANIME'}</span>
-                        <span class="text-themeCyan font-bold text-sm">${score}</span>
+                        <span class="text-themeCyan font-bold text-sm">★ ${showData.averageScore || showData.meanScore || 'N/A'}% Average Score</span>
                     </div>
                     <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-none">${title}</h1>
                     <div class="flex flex-wrap gap-2 mt-2">
@@ -1558,23 +1784,94 @@ async function renderAnimeDetailsView() {
                     </button>
                 </div>
 
-                <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-3">
-                    <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">Synopsis</h3>
-                    <p class="text-steelGray text-sm font-light leading-relaxed">${showData.description || 'No synopsis available.'}</p>
-                </div>
-
-                <div class="mt-4">
-                    <h3 class="text-lg font-bold text-white uppercase tracking-wider mb-4 border-l-4 border-themeCyan pl-3">Episodes</h3>
-                    <div class="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-8 gap-3">
-                        ${episodesHtml}
-                    </div>
-                </div>
-
+                ${synopsisHtml}
+                ${trailerHtml}
                 ${charactersHtml}
-                ${staffHtml}
+                ${reviewsHtml}
+                ${categorizedHtml}
+            </div>
+
+            <!-- Right Column: Episode Grid & Selector -->
+            <div class="col-span-12 lg:col-span-3 flex flex-col gap-6">
+                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 sticky top-[100px] max-h-[calc(100vh-140px)] overflow-y-auto scrollbar-thin">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">Episodes</h3>
+                        <span class="text-xs text-steelGray font-semibold">${totalEpisodes} total</span>
+                    </div>
+                    <hr class="border-white/5">
+                    <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
+                    <div id="details-episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
+                </div>
             </div>
         </div>
     `;
+
+    // Initialize the details episode picker
+    window.renderDetailsEpisodePicker = function(totalEps) {
+        const selector = document.getElementById('details-batch-selector');
+        if (!selector) return;
+        const batchSize = 100;
+        const numBatches = Math.ceil(totalEps / batchSize);
+        if (numBatches > 1) {
+            selector.classList.remove('hidden');
+            let selectorHtml = '';
+            for (let b = 0; b < numBatches; b++) {
+                const start = b * batchSize + 1;
+                const end = Math.min((b + 1) * batchSize, totalEps);
+                selectorHtml += `<option value="${b}">Episodes ${start} - ${end}</option>`;
+            }
+            selector.innerHTML = selectorHtml;
+            selector.onchange = (e) => {
+                renderDetailsGridForBatch(parseInt(e.target.value, 10), totalEps);
+            };
+            renderDetailsGridForBatch(0, totalEps);
+        } else {
+            selector.classList.add('hidden');
+            renderDetailsGridForBatch(0, totalEps);
+        }
+    };
+
+    function renderDetailsGridForBatch(batchIdx, totalEps) {
+        const container = document.getElementById('details-episodes-grid');
+        if (!container) return;
+        const batchSize = 100;
+        const start = batchIdx * batchSize + 1;
+        const end = Math.min((batchIdx + 1) * batchSize, totalEps);
+        let html = '';
+        for (let i = start; i <= end; i++) {
+            const isWatched = localStorage.getItem(`watched_${window.showData.id}_${i}`) === 'true';
+            let btnClasses = "p-3 rounded-lg text-center font-semibold text-xs transition-all duration-300 transform hover:scale-105 active:scale-95 glass-panel border ";
+            if (isWatched) {
+                btnClasses += "text-themeCyan border-themeCyan/30 hover:border-themeCyan bg-slate-900/60 ";
+            } else {
+                btnClasses += "text-white border-white/5 hover:border-white/20 hover:text-themeCyan bg-white/5 ";
+            }
+            html += `
+                <button onclick="navigateWatchEpisode(${i})" class="${btnClasses}">
+                    ${i}
+                </button>
+            `;
+        }
+        container.innerHTML = html;
+    }
+
+    window.renderDetailsEpisodePicker(totalEpisodes);
+
+    window.toggleDetailsSynopsis = function() {
+        const wrapper = document.getElementById('details-synopsis-wrapper');
+        const btn = document.getElementById('details-read-more-btn');
+        if (!wrapper || !btn) return;
+
+        if (wrapper.classList.contains('max-h-24')) {
+            wrapper.classList.remove('max-h-24');
+            wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
+            btn.innerText = "- Show Less";
+        } else {
+            wrapper.style.maxHeight = '6rem';
+            wrapper.classList.add('max-h-24');
+            btn.innerText = "+ Read More";
+        }
+    };
 }
 
 window.navigateWatchEpisode = function(epNum) {
