@@ -83,7 +83,7 @@ const FULL_SHOW_QUERY = `
           score
           body
           user {
-            username
+            name
             avatar { large }
           }
         }
@@ -1622,8 +1622,8 @@ async function renderAnimeDetailsView() {
                 <h3 class="text-lg font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">User Reviews</h3>
                 <div class="flex flex-col gap-4">
                     ${reviewsList.map(review => {
-                        const username = review.user.username;
-                        const avatarUrl = review.user.avatar.large || '';
+                        const username = review.user?.name || 'Anonymous';
+                        const avatarUrl = review.user?.avatar?.large || '';
                         const reviewSummary = review.summary;
                         const reviewScore = review.score;
                         const reviewBody = review.body ? review.body.replace(/__+/g, '').replace(/~~+/g, '').replace(/\*+/g, '').substring(0, 300) + '...' : '';
