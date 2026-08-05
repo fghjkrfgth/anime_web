@@ -201,60 +201,35 @@ async function fetchFillerEpisodes(anilistId, malId = null) {
 
 window.fetchFillerEpisodes = fetchFillerEpisodes;
 
-// 5. ANIMEX FRANCHISE TREE FETCHING
-const animexCache = new Map();
+// 5. FRANCHISE TREE FETCHING (VIA WORKER PROXY)
+const franchiseCache = new Map();
 
-async function fetchAnimexFranchiseData(slug, anilistId) {
+async function fetchFranchiseTree(slug, anilistId) {
+    if (!slug || !anilistId) return [];
     const key = `${slug}-${anilistId}`;
-    if (animexCache.has(key)) return animexCache.get(key);
-
-    const animexUrl = `https://animex.one/anime/${slug}-${anilistId}/__data.json?x-sveltekit-invalidated=01`;
+    if (franchiseCache.has(key)) return franchiseCache.get(key);
 
     try {
-        let response = null;
-        try {
-            response = await fetch(animexUrl, { headers: { 'Accept': 'application/json' } });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        } catch (corsErr) {
-            response = await fetchClusterNode({ target: animexUrl });
-        }
+        const data = await fetchClusterNode({
+            action: 'franchise',
+            slug: slug,
+            id: anilistId
+        });
 
-        if (response) {
-            const json = typeof response.json === 'function' ? await response.json() : response;
-            let seasons = [];
-
-            if (json) {
-                if (Array.isArray(json.seasons)) {
-                    seasons = json.seasons;
-                } else if (json.nodes && Array.isArray(json.nodes)) {
-                    for (const node of json.nodes) {
-                        if (node && node.data && Array.isArray(node.data.seasons)) {
-                            seasons = node.data.seasons;
-                            break;
-                        } else if (node && Array.isArray(node.seasons)) {
-                            seasons = node.seasons;
-                            break;
-                        }
-                    }
-                } else if (json.data && Array.isArray(json.data.seasons)) {
-                    seasons = json.data.seasons;
-                }
-            }
-
-            if (seasons && seasons.length > 0) {
-                animexCache.set(key, seasons);
-                return seasons;
-            }
+        if (data && Array.isArray(data.seasons)) {
+            franchiseCache.set(key, data.seasons);
+            return data.seasons;
         }
     } catch (err) {
-        console.warn("[Animex Franchise] Fetch failed, falling back to AniList relations:", err);
+        console.warn("[Franchise Tree] Worker fetch error:", err);
     }
 
-    animexCache.set(key, []);
+    franchiseCache.set(key, []);
     return [];
 }
 
-window.fetchAnimexFranchiseData = fetchAnimexFranchiseData;
+window.fetchFranchiseTree = fetchFranchiseTree;
+window.fetchAnimexFranchiseData = fetchFranchiseTree;
 
 // 5. ACCURATE SUB / DUB EPISODE COUNTS & METADATA FETCHING
 const subDubCache = new Map();
