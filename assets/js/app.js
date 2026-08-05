@@ -630,7 +630,7 @@ async function renderWatchView() {
         <div id="banner-backdrop"
             class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.06] blur-2xl pointer-events-none z-0"></div>
         <div class="flex-grow max-w-7xl mx-auto w-full py-6 z-10 grid grid-cols-12 gap-6 relative">
-            <div class="col-span-12 lg:col-span-9 flex flex-col gap-6">
+            <div class="col-span-12 lg:col-span-8 flex flex-col gap-6">
                 <div class="relative w-full aspect-video rounded-2xl overflow-hidden glass-panel border border-white/5 shadow-2xl group">
                     <video id="main-video-player" class="w-full h-full object-contain" controls playsinline></video>
                     <div id="autoplay-handshake-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-opacity duration-500">
@@ -663,56 +663,86 @@ async function renderWatchView() {
                         <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-themeCyan"></div>
                     </div>
                 </div>
-                   <!-- Metadata/Details Block -->
-                   <div class="glass-panel p-5 md:p-8 rounded-2xl border border-white/5 flex flex-col gap-4">
-                       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                           <h1 id="show-title" class="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">Loading Title...</h1>
-                           <div class="flex items-center gap-2 flex-wrap">
-                               <span id="badge-episodes" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md">-- Episodes</span>
-                               <span id="badge-rating" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md">★ N/A</span>
-                               <span id="badge-language" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md uppercase">SUB</span>
-                           </div>
-                       </div>
-                       <hr class="border-white/5 my-1">
-                       <div class="flex flex-col gap-2 relative">
-                           <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Synopsis</h3>
-                           <div id="synopsis-wrapper" class="text-steelGray text-xs md:text-sm font-light leading-relaxed max-h-12 overflow-hidden transition-all duration-500 ease-in-out">
-                               <p id="show-synopsis">Loading show details...</p>
-                           </div>
-                           <button id="read-more-btn" onclick="toggleSynopsis()" class="text-themeCyan hover:text-white text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase">+ Read More</button>
-                       </div>
-                       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-white/5 p-4 rounded-xl border border-white/5">
-                           <div>
-                               <span class="text-steelGray text-[10px] uppercase tracking-wider block">Format</span>
-                               <span id="meta-format" class="text-white text-xs md:text-sm font-semibold">N/A</span>
-                           </div>
-                           <div>
-                               <span class="text-steelGray text-[10px] uppercase tracking-wider block">Status</span>
-                               <span id="meta-status" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
-                           </div>
-                           <div>
-                               <span class="text-steelGray text-[10px] uppercase tracking-wider block">Aired Season</span>
-                               <span id="meta-season" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
-                           </div>
-                           <div>
-                               <span class="text-steelGray text-[10px] uppercase tracking-wider block">Studio</span>
-                               <span id="meta-studio" class="text-white text-xs md:text-sm font-semibold">N/A</span>
-                           </div>
-                       </div>
-                   </div>
-                   <!-- Separate Related Adaptations / Similar Anime container -->
-                   <div id="watch-related-container" class="mt-4 flex flex-col gap-6 hidden"></div>  </div>
+
+                <!-- Player Control Panel & Automated Feature Toggles -->
+                <div class="glass-panel p-4 rounded-xl border border-white/5 flex flex-wrap items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <button id="prev-ep-btn" onclick="changeEpisode(window.currentEp - 1)" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-lg transition-all duration-300 flex items-center gap-1.5 uppercase">
+                            &larr; Prev
+                        </button>
+                        <button id="next-ep-btn" onclick="changeEpisode(window.currentEp + 1)" class="px-3.5 py-2 bg-themeCyan hover:bg-themeCyan/80 text-themeBlack font-extrabold text-xs rounded-lg transition-all duration-300 flex items-center gap-1.5 shadow-md shadow-themeCyan/20 uppercase">
+                            Next &rarr;
+                        </button>
+                        <button id="player-subdub-toggle" onclick="toggleLanguage()" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-themeCyan text-xs font-bold rounded-lg tracking-wider uppercase transition-all duration-300">
+                            Audio: SUB
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
+                            <input type="checkbox" id="toggle-auto-skip-intro" onchange="toggleUserPreference('autoSkipIntro', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-themeCyan focus:ring-0">
+                            <span class="text-steelGray">Auto Skip Intro</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
+                            <input type="checkbox" id="toggle-auto-skip-outro" onchange="toggleUserPreference('autoSkipOutro', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-themeCyan focus:ring-0">
+                            <span class="text-steelGray">Auto Skip Outro</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
+                            <input type="checkbox" id="toggle-auto-next" onchange="toggleUserPreference('autoNext', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-themeCyan focus:ring-0">
+                            <span class="text-steelGray">Auto Next</span>
+                        </label>
+                    </div>
                 </div>
+
+                <!-- Metadata/Details Block -->
+                <div class="glass-panel p-5 md:p-8 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <h1 id="show-title" class="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">Loading Title...</h1>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span id="badge-sub-episodes" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">SUB: --</span>
+                            <span id="badge-dub-episodes" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-md uppercase">DUB: --</span>
+                            <span id="badge-rating" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md">★ N/A</span>
+                            <span id="badge-language" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md uppercase">SUB</span>
+                        </div>
+                    </div>
+                    <hr class="border-white/5 my-1">
+                    <div class="flex flex-col gap-2 relative">
+                        <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Synopsis</h3>
+                        <div id="synopsis-wrapper" class="text-steelGray text-xs md:text-sm font-light leading-relaxed max-h-12 overflow-hidden transition-all duration-500 ease-in-out">
+                            <p id="show-synopsis">Loading show details...</p>
+                        </div>
+                        <button id="read-more-btn" onclick="toggleSynopsis()" class="text-themeCyan hover:text-white text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase">+ Read More</button>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                        <div>
+                            <span class="text-steelGray text-[10px] uppercase tracking-wider block">Format</span>
+                            <span id="meta-format" class="text-white text-xs md:text-sm font-semibold">N/A</span>
+                        </div>
+                        <div>
+                            <span class="text-steelGray text-[10px] uppercase tracking-wider block">Status</span>
+                            <span id="meta-status" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
+                        </div>
+                        <div>
+                            <span class="text-steelGray text-[10px] uppercase tracking-wider block">Aired Season</span>
+                            <span id="meta-season" class="text-white text-xs md:text-sm font-semibold uppercase">N/A</span>
+                        </div>
+                        <div>
+                            <span class="text-steelGray text-[10px] uppercase tracking-wider block">Studio</span>
+                            <span id="meta-studio" class="text-white text-xs md:text-sm font-semibold">N/A</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Separate Related Adaptations / Similar Anime container -->
+                <div id="watch-related-container" class="mt-4 flex flex-col gap-6 hidden"></div>
             </div>
-            <div class="col-span-12 lg:col-span-3 flex flex-col gap-6">
-                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-5 h-fit lg:max-h-[600px]">
+            <div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
                     <div class="flex items-center justify-between">
                         <h2 class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-2.5">Episodes</h2>
-                        <button id="lang-toggle-btn" onclick="toggleLanguage()" class="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold rounded-md text-themeCyan tracking-widest uppercase transition-all duration-300">Language: SUB</button>
+                        <button id="lang-toggle-btn" onclick="toggleLanguage()" class="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold rounded-md text-themeCyan tracking-widest uppercase transition-all duration-300">SUB</button>
                     </div>
                     <hr class="border-white/5">
                     <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
-                    <div id="episodes-grid" class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-4 gap-2 overflow-y-auto pr-1 max-h-[420px] scrollbar-thin"></div>
+                    <div id="episodes-grid" class="grid grid-cols-10 gap-1.5 overflow-hidden pr-1"></div>
                 </div>
             </div>
         </div>
@@ -799,12 +829,12 @@ function hydrateWatchUI() {
     const synopsisEl = document.getElementById('show-synopsis');
     if (synopsisEl) synopsisEl.innerHTML = showData.description || 'No description available.';
     
-    const badgeEpisodesEl = document.getElementById('badge-episodes');
-    if (badgeEpisodesEl) {
-        const actEps = getActualEpisodeCount(showData);
-        badgeEpisodesEl.innerText = `${actEps} Episodes`;
-    }
-    
+    const badgeSubEpisodesEl = document.getElementById('badge-sub-episodes');
+    const badgeDubEpisodesEl = document.getElementById('badge-dub-episodes');
+    const actEps = getActualEpisodeCount(showData);
+    if (badgeSubEpisodesEl) badgeSubEpisodesEl.innerText = `SUB: ${actEps}`;
+    if (badgeDubEpisodesEl) badgeDubEpisodesEl.innerText = `DUB: ${actEps}`;
+
     const badgeRatingEl = document.getElementById('badge-rating');
     if (badgeRatingEl) badgeRatingEl.innerText = `★ ${showData.averageScore || showData.meanScore || 'N/A'}%`;
 
@@ -827,6 +857,32 @@ function hydrateWatchUI() {
     renderRelatedAdaptations();
 }
 
+function getUserPreferences() {
+    try {
+        const stored = localStorage.getItem('anime_user_preferences');
+        if (stored) return JSON.parse(stored);
+    } catch (e) {}
+    return {
+        autoSkipIntro: false,
+        autoSkipOutro: false,
+        autoNext: true,
+        preferredLang: 'sub'
+    };
+}
+
+function toggleUserPreference(key, value) {
+    const prefs = getUserPreferences();
+    prefs[key] = value;
+    localStorage.setItem('anime_user_preferences', JSON.stringify(prefs));
+    if (key === 'preferredLang' && window.currentLang !== value) {
+        window.currentLang = value;
+        if (window.updateLanguageDisplay) window.updateLanguageDisplay();
+        if (window.loadEpisodeStream && window.currentEp) window.loadEpisodeStream(window.currentEp);
+    }
+}
+window.getUserPreferences = getUserPreferences;
+window.toggleUserPreference = toggleUserPreference;
+
 function setupWatchGlobalFunctions() {
     const video = document.getElementById('main-video-player');
     const skipIntroBtn = document.getElementById('skip-intro-btn');
@@ -838,16 +894,57 @@ function setupWatchGlobalFunctions() {
     window.lastSavedTime = 0;
     window.hlsInstance = null;
 
+    // Sync UI with user preferences
+    const prefs = getUserPreferences();
+    const autoSkipIntroEl = document.getElementById('toggle-auto-skip-intro');
+    if (autoSkipIntroEl) autoSkipIntroEl.checked = !!prefs.autoSkipIntro;
+    const autoSkipOutroEl = document.getElementById('toggle-auto-skip-outro');
+    if (autoSkipOutroEl) autoSkipOutroEl.checked = !!prefs.autoSkipOutro;
+    const autoNextEl = document.getElementById('toggle-auto-next');
+    if (autoNextEl) autoNextEl.checked = !!prefs.autoNext;
+
+    if (video) {
+        video.ontimeupdate = () => {
+            const currentPrefs = getUserPreferences();
+            const currTime = video.currentTime;
+
+            if (currentPrefs.autoSkipIntro && window.introTimes && window.introTimes.end > 0) {
+                if (currTime >= window.introTimes.start && currTime < window.introTimes.end - 0.5) {
+                    video.currentTime = window.introTimes.end;
+                }
+            }
+
+            if (currentPrefs.autoSkipOutro && window.outroTimes && window.outroTimes.end > 0) {
+                if (currTime >= window.outroTimes.start && currTime < window.outroTimes.end - 0.5) {
+                    video.currentTime = window.outroTimes.end;
+                }
+            }
+        };
+
+        video.onended = () => {
+            const currentPrefs = getUserPreferences();
+            if (currentPrefs.autoNext) {
+                const totalEps = getActualEpisodeCount(window.showData);
+                if (window.currentEp < totalEps) {
+                    window.changeEpisode(window.currentEp + 1);
+                }
+            }
+        };
+    }
+
     window.updateLanguageDisplay = function() {
         const badgeLanguage = document.getElementById('badge-language');
         const langToggleBtn = document.getElementById('lang-toggle-btn');
-        if (badgeLanguage) badgeLanguage.innerText = window.currentLang;
-        if (langToggleBtn) langToggleBtn.innerText = `Language: ${window.currentLang.toUpperCase()}`;
+        const playerSubdubToggle = document.getElementById('player-subdub-toggle');
+        if (badgeLanguage) badgeLanguage.innerText = window.currentLang.toUpperCase();
+        if (langToggleBtn) langToggleBtn.innerText = window.currentLang.toUpperCase();
+        if (playerSubdubToggle) playerSubdubToggle.innerText = `Audio: ${window.currentLang.toUpperCase()}`;
     };
 
     window.toggleLanguage = function() {
         window.currentLang = window.currentLang === 'sub' ? 'dub' : 'sub';
         localStorage.setItem(`lang_${window.showData.id}`, window.currentLang);
+        toggleUserPreference('preferredLang', window.currentLang);
         window.updateLanguageDisplay();
         window.loadEpisodeStream(window.currentEp);
     };
@@ -869,6 +966,8 @@ function setupWatchGlobalFunctions() {
     };
 
     window.changeEpisode = function(epNum) {
+        const totalEps = getActualEpisodeCount(window.showData);
+        if (epNum < 1 || epNum > totalEps) return;
         if (epNum === window.currentEp) return;
         window.currentEp = epNum;
 
@@ -913,10 +1012,11 @@ function setupWatchGlobalFunctions() {
         }
     };
 
-    window.renderEpisodesGridForBatch = function(batchIdx, totalEps) {
+    window.renderEpisodesGridForBatch = async function(batchIdx, totalEps) {
         const container = document.getElementById('episodes-grid');
         if (!container) return;
 
+        const fillerSet = await fetchFillerEpisodes(window.showData.id, window.showData.idMal);
         const batchSize = 100;
         const start = batchIdx * batchSize + 1;
         const end = Math.min((batchIdx + 1) * batchSize, totalEps);
@@ -925,19 +1025,24 @@ function setupWatchGlobalFunctions() {
         for (let i = start; i <= end; i++) {
             const isWatched = localStorage.getItem(`watched_${window.showData.id}_${i}`) === 'true';
             const isActive = (i === window.currentEp);
+            const isFiller = fillerSet.has(i);
 
-            let btnClasses = "episode-btn glass-panel aspect-square rounded-lg flex items-center justify-center font-bold text-xs md:text-sm cursor-pointer ";
+            let btnClasses = "episode-btn glass-panel aspect-square rounded-md flex items-center justify-center font-bold text-[11px] cursor-pointer transition-all duration-200 ";
 
             if (isActive) {
                 btnClasses += "bg-themeCyan text-themeBlack shadow-[0_0_12px_rgba(0,255,204,0.5)] border-themeCyan ";
+            } else if (isFiller) {
+                btnClasses += "shadow-[0_0_10px_rgba(180,83,9,0.75)] border-amber-700/70 text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 ";
             } else if (isWatched) {
                 btnClasses += "text-themeCyan hover:text-white border border-themeCyan/30 bg-[#121218]/70 ";
             } else {
                 btnClasses += "text-steelGray hover:text-white border border-white/5 hover:border-white/20 bg-[#121218]/40 ";
             }
 
+            const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
+
             html += `
-                <button class="${btnClasses}" onclick="changeEpisode(${i})">
+                <button class="${btnClasses}" title="${titleAttr}" onclick="changeEpisode(${i})">
                     ${i}
                 </button>
             `;
@@ -1756,7 +1861,10 @@ async function renderAnimeDetailsView() {
                 <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 max-h-[500px] overflow-y-auto scrollbar-thin">
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">Episodes</h3>
-                        <span class="text-xs text-steelGray font-semibold">${totalEpisodes} total</span>
+                        <select id="details-lang-selector" onchange="setDetailsAudioPref(${showData.id}, this.value)" class="bg-[#121218] text-white border border-white/10 px-2 py-1 rounded text-xs font-bold uppercase focus:outline-none">
+                            <option value="sub">Audio: SUB</option>
+                            <option value="dub">Audio: DUB</option>
+                        </select>
                     </div>
                     <hr class="border-white/5">
                     <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
@@ -1767,8 +1875,10 @@ async function renderAnimeDetailsView() {
             <!-- Main Column: Title & Metadata -->
             <div class="col-span-12 md:col-span-8 lg:col-span-9 flex flex-col gap-6">
                 <div class="flex flex-col gap-4">
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 flex-wrap">
                         <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">${showData.format || 'ANIME'}</span>
+                        <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">SUB: ${totalEpisodes}</span>
+                        <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-md uppercase">DUB: ${totalEpisodes}</span>
                         <span class="text-themeCyan font-bold text-sm">★ ${showData.averageScore || showData.meanScore || 'N/A'}% Average Score</span>
                     </div>
                     <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-none">${title}</h1>
@@ -1836,6 +1946,11 @@ async function renderAnimeDetailsView() {
         </div>
     `;
 
+    window.setDetailsAudioPref = function(showId, lang) {
+        localStorage.setItem(`lang_${showId}`, lang);
+        toggleUserPreference('preferredLang', lang);
+    };
+
     // Initialize the details episode picker
     window.renderDetailsEpisodePicker = function(totalEps) {
         const selector = document.getElementById('details-batch-selector');
@@ -1861,23 +1976,28 @@ async function renderAnimeDetailsView() {
         }
     };
 
-    function renderDetailsGridForBatch(batchIdx, totalEps) {
+    async function renderDetailsGridForBatch(batchIdx, totalEps) {
         const container = document.getElementById('details-episodes-grid');
         if (!container) return;
+        const fillerSet = await fetchFillerEpisodes(showData.id, showData.idMal);
         const batchSize = 100;
         const start = batchIdx * batchSize + 1;
         const end = Math.min((batchIdx + 1) * batchSize, totalEps);
         let html = '';
         for (let i = start; i <= end; i++) {
-            const isWatched = localStorage.getItem(`watched_${window.showData.id}_${i}`) === 'true';
+            const isWatched = localStorage.getItem(`watched_${showData.id}_${i}`) === 'true';
+            const isFiller = fillerSet.has(i);
             let btnClasses = "p-3 rounded-lg text-center font-semibold text-xs transition-all duration-300 transform hover:scale-105 active:scale-95 glass-panel border ";
-            if (isWatched) {
+            if (isFiller) {
+                btnClasses += "shadow-[0_0_10px_rgba(180,83,9,0.75)] border-amber-700/70 text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 ";
+            } else if (isWatched) {
                 btnClasses += "text-themeCyan border-themeCyan/30 hover:border-themeCyan bg-slate-900/60 ";
             } else {
                 btnClasses += "text-white border-white/5 hover:border-white/20 hover:text-themeCyan bg-white/5 ";
             }
+            const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
             html += `
-                <button onclick="navigateWatchEpisode(${i})" class="${btnClasses}">
+                <button onclick="navigateWatchEpisode(${i})" title="${titleAttr}" class="${btnClasses}">
                     ${i}
                 </button>
             `;
