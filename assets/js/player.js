@@ -16,12 +16,13 @@ function applySubtitleStyles(fontSize, styleType) {
     else if (styleType === 'semi-trans') bg = 'rgba(0,0,0,0.45)';
 
     styleTag.textContent = `
-        ::cue {
+        video::cue, ::cue {
             font-size: ${fontSize || '1.1rem'} !important;
             background: ${bg} !important;
             color: #ffffff !important;
             text-shadow: 0 1px 3px rgba(0,0,0,0.9);
-            font-family: inherit;
+            font-family: 'Outfit', sans-serif !important;
+            margin-bottom: 14% !important;
         }
     `;
 }
