@@ -11,18 +11,19 @@ function applySubtitleStyles(fontSize, styleType) {
         styleTag.id = 'custom-cue-styles';
         document.head.appendChild(styleTag);
     }
-    let bg = 'rgba(0,0,0,0.85)';
+    let bg = 'rgba(8, 8, 12, 0.75)';
     if (styleType === 'transparent') bg = 'transparent';
-    else if (styleType === 'semi-trans') bg = 'rgba(0,0,0,0.45)';
+    else if (styleType === 'semi-trans') bg = 'rgba(0, 0, 0, 0.45)';
 
     styleTag.textContent = `
         video::cue, ::cue {
-            font-size: ${fontSize || '1.1rem'} !important;
+            font-size: ${fontSize || '15px'} !important;
             background: ${bg} !important;
             color: #ffffff !important;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+            text-shadow: 0 0 4px rgba(0,0,0,0.9) !important;
             font-family: 'Outfit', sans-serif !important;
-            margin-bottom: 14% !important;
+            line-height: 1.4 !important;
+            margin-bottom: 15% !important;
         }
     `;
 }
@@ -56,27 +57,27 @@ function initPlayerControls() {
             <div id="player-overlay-title" class="truncate font-bold tracking-wide">
                 ${showTitle} - Episode ${epNum}
             </div>
-            <div id="player-overlay-status" class="px-2 py-0.5 rounded text-[10px] font-mono bg-black/50 border border-white/10 uppercase" style="color: var(--anime-accent-color, #f59e0b);">
+            <div id="player-overlay-status" class="px-2 py-0.5 rounded text-[10px] font-mono bg-black/40 border border-white/10 uppercase" style="color: var(--anime-accent-color, #f59e0b);">
                 BLACKLEG PLAYER
             </div>
         </div>
 
         <!-- Center Bar: 10s Rewind, Center Play/Pause, 10s Fast-Forward -->
         <div class="flex items-center justify-center gap-6 md:gap-8 my-auto pointer-events-auto">
-            <button id="btn-rewind-10" title="Rewind 10s (Left Arrow / J)" class="w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 border border-white/15 text-white flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-md">
+            <button id="btn-rewind-10" title="Rewind 10s (Left Arrow / J)" class="w-12 h-12 rounded-full bg-black/40 hover:bg-black/70 border border-white/15 text-white flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-md">
                 <span class="text-xs font-extrabold tracking-tighter">⏮ 10s</span>
             </button>
             <button id="btn-center-play" title="Play/Pause (Space / K)" class="w-16 h-16 rounded-full text-[#08080c] flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-xl" style="background: var(--anime-accent-color, #f59e0b); box-shadow: 0 0 25px rgba(var(--anime-accent-rgb, 245, 158, 11), 0.6);">
                 <svg id="icon-center-play" class="w-8 h-8 fill-current translate-x-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                 <svg id="icon-center-pause" class="w-8 h-8 fill-current hidden" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
             </button>
-            <button id="btn-forward-10" title="Forward 10s (Right Arrow / L)" class="w-12 h-12 rounded-full bg-black/60 hover:bg-black/80 border border-white/15 text-white flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-md">
+            <button id="btn-forward-10" title="Forward 10s (Right Arrow / L)" class="w-12 h-12 rounded-full bg-black/40 hover:bg-black/70 border border-white/15 text-white flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-md">
                 <span class="text-xs font-extrabold tracking-tighter">10s ⏭</span>
             </button>
         </div>
 
-        <!-- Bottom Controls & Progress Bar Wrapper -->
-        <div class="flex flex-col gap-2 pointer-events-auto bg-black/75 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 relative">
+        <!-- Bottom Controls & Progress Bar Wrapper (Transparent Gradient Overlay) -->
+        <div class="flex flex-col gap-2 pointer-events-auto bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 border-none shadow-none relative rounded-b-xl">
             
             <!-- Segmented Custom Progress Bar -->
             <div id="player-progress-container" class="relative w-full h-3 flex items-center cursor-pointer group py-1">
@@ -107,9 +108,33 @@ function initPlayerControls() {
                 </div>
 
                 <div class="flex items-center gap-3 md:gap-4 relative">
+                    <!-- In-Player Automation Controls Popover -->
+                    <div class="relative">
+                        <button id="btn-auto-toggles" title="Auto Settings" class="px-2 py-1 text-xs font-bold font-mono text-white/80 hover:text-white hover:bg-white/10 rounded border border-white/10 transition-all flex items-center gap-1">
+                            ⚡ Auto
+                        </button>
+                        <div id="player-auto-popover" class="absolute right-0 bottom-10 w-48 p-3 rounded-xl bg-slate-950/90 border border-white/15 backdrop-blur-xl shadow-2xl hidden z-50 flex flex-col gap-2.5 text-xs text-white">
+                            <div class="font-bold border-b border-white/10 pb-1 text-slate-300 flex justify-between items-center text-[11px]">
+                                <span>Automation Controls</span>
+                            </div>
+                            <label class="flex items-center justify-between cursor-pointer hover:bg-white/5 p-1 rounded transition-colors">
+                                <span class="text-slate-200 text-[11px]">Auto Skip Intro</span>
+                                <input id="chk-player-skip-intro" type="checkbox" class="accent-[var(--anime-accent-color,#f59e0b)] w-4 h-4 cursor-pointer">
+                            </label>
+                            <label class="flex items-center justify-between cursor-pointer hover:bg-white/5 p-1 rounded transition-colors">
+                                <span class="text-slate-200 text-[11px]">Auto Skip Outro</span>
+                                <input id="chk-player-skip-outro" type="checkbox" class="accent-[var(--anime-accent-color,#f59e0b)] w-4 h-4 cursor-pointer">
+                            </label>
+                            <label class="flex items-center justify-between cursor-pointer hover:bg-white/5 p-1 rounded transition-colors">
+                                <span class="text-slate-200 text-[11px]">Auto Next Ep</span>
+                                <input id="chk-player-auto-next" type="checkbox" class="accent-[var(--anime-accent-color,#f59e0b)] w-4 h-4 cursor-pointer">
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- Subtitles/Captions Button & Popover -->
                     <div class="relative">
-                        <button id="btn-captions-toggle" title="Subtitles / Captions (C)" class="px-2 py-1 text-xs font-bold font-mono text-white/80 hover:text-white bg-white/5 hover:bg-white/15 rounded border border-white/10 transition-all">
+                        <button id="btn-captions-toggle" title="Subtitles / Captions (C)" class="px-2 py-1 text-xs font-bold font-mono text-white/80 hover:text-white hover:bg-white/10 rounded border border-white/10 transition-all">
                             CC
                         </button>
                         <div id="player-captions-popover" class="absolute right-0 bottom-10 w-56 p-3 rounded-xl bg-slate-950/90 border border-white/15 backdrop-blur-xl shadow-2xl hidden z-50 flex flex-col gap-3 text-xs text-white">
@@ -124,10 +149,10 @@ function initPlayerControls() {
                                 <div class="flex items-center justify-between">
                                     <span class="text-[11px] text-slate-400">Size</span>
                                     <select id="caption-size-select" class="bg-slate-900 border border-white/10 text-xs text-white rounded px-1.5 py-0.5 outline-none cursor-pointer">
-                                        <option value="0.8rem">Small</option>
-                                        <option value="1.1rem" selected>Medium</option>
-                                        <option value="1.4rem">Large</option>
-                                        <option value="1.8rem">X-Large</option>
+                                        <option value="12px">Small</option>
+                                        <option value="15px" selected>Medium</option>
+                                        <option value="18px">Large</option>
+                                        <option value="22px">X-Large</option>
                                     </select>
                                 </div>
                                 <div class="flex items-center justify-between">
@@ -144,7 +169,7 @@ function initPlayerControls() {
 
                     <!-- Playback Speed Button & Popover -->
                     <div class="relative">
-                        <button id="btn-speed-toggle" title="Playback Speed (< / >)" class="px-2 py-1 text-xs font-bold font-mono text-white/80 hover:text-white bg-white/5 hover:bg-white/15 rounded border border-white/10 transition-all">
+                        <button id="btn-speed-toggle" title="Playback Speed (< / >)" class="px-2 py-1 text-xs font-bold font-mono text-white/80 hover:text-white hover:bg-white/10 rounded border border-white/10 transition-all">
                             1.0x
                         </button>
                         <div id="player-speed-popover" class="absolute right-0 bottom-10 w-32 p-2 rounded-xl bg-slate-950/90 border border-white/15 backdrop-blur-xl shadow-2xl hidden z-50 flex flex-col gap-1 text-xs text-white">
@@ -190,6 +215,11 @@ function initPlayerControls() {
     const captionsPopover = document.getElementById('player-captions-popover');
     const btnSpeed = document.getElementById('btn-speed-toggle');
     const speedPopover = document.getElementById('player-speed-popover');
+    const btnAuto = document.getElementById('btn-auto-toggles');
+    const autoPopover = document.getElementById('player-auto-popover');
+    const chkSkipIntro = document.getElementById('chk-player-skip-intro');
+    const chkSkipOutro = document.getElementById('chk-player-skip-outro');
+    const chkAutoNext = document.getElementById('chk-player-auto-next');
     const progressContainer = document.getElementById('player-progress-container');
     const progressFill = document.getElementById('player-progress-fill');
     const progressTooltip = document.getElementById('player-progress-tooltip');
@@ -229,12 +259,38 @@ function initPlayerControls() {
     }
 
     function updateTimeDisplay() {
+        const currentTime = video.currentTime;
+        const prefs = (typeof window.getUserPreferences === 'function') ? window.getUserPreferences() : { autoSkipIntro: false, autoSkipOutro: false, autoNext: true };
+
+        // --- CONSOLIDATED AUTOMATED SKIP LOGIC ---
+        // 1. Auto Skip Intro
+        if (prefs.autoSkipIntro && window.introTimes) {
+            const start = window.introTimes.start !== undefined ? window.introTimes.start : (Array.isArray(window.introTimes) ? window.introTimes[0] : 0);
+            const end = window.introTimes.end !== undefined ? window.introTimes.end : (Array.isArray(window.introTimes) ? window.introTimes[1] : 90);
+            if (end > 0 && currentTime >= start && currentTime < (end - 0.5)) {
+                console.log(`[Player Engine] Auto-Skipping Intro to ${end}s`);
+                video.currentTime = end;
+                return;
+            }
+        }
+
+        // 2. Auto Skip Outro
+        if (prefs.autoSkipOutro && window.outroTimes) {
+            const start = window.outroTimes.start !== undefined ? window.outroTimes.start : (Array.isArray(window.outroTimes) ? window.outroTimes[0] : 1300);
+            const end = window.outroTimes.end !== undefined ? window.outroTimes.end : (Array.isArray(window.outroTimes) ? window.outroTimes[1] : 1390);
+            if (end > 0 && currentTime >= start && currentTime < (end - 0.5)) {
+                console.log(`[Player Engine] Auto-Skipping Outro to ${end}s`);
+                video.currentTime = end;
+                return;
+            }
+        }
+
         const timeDisplay = document.getElementById('player-time-display');
         if (timeDisplay) {
-            timeDisplay.innerText = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+            timeDisplay.innerText = `${formatTime(currentTime)} / ${formatTime(video.duration)}`;
         }
         if (video.duration && progressFill) {
-            const pct = (video.currentTime / video.duration) * 100;
+            const pct = (currentTime / video.duration) * 100;
             progressFill.style.width = `${pct}%`;
         }
 
@@ -264,6 +320,21 @@ function initPlayerControls() {
             }
         }
     }
+
+    // --- CONSOLIDATED AUTOMATED NEXT EPISODE LOGIC ---
+    video.onended = () => {
+        updatePlayPauseIcons();
+        const prefs = (typeof window.getUserPreferences === 'function') ? window.getUserPreferences() : { autoNext: true };
+        if (prefs.autoNext && window.showData) {
+            const totalEps = (typeof window.getActualEpisodeCount === 'function') ? window.getActualEpisodeCount(window.showData) : 0;
+            if (window.currentEp && window.currentEp < totalEps) {
+                console.log(`[Player Engine] Episode ended. Advancing to Episode ${window.currentEp + 1}...`);
+                if (typeof window.changeEpisode === 'function') {
+                    window.changeEpisode(window.currentEp + 1);
+                }
+            }
+        }
+    };
 
     function seekRelative(seconds) {
         if (!video.duration) return;
@@ -333,6 +404,50 @@ function initPlayerControls() {
         };
     }
 
+    // --- AUTOMATION TOGGLES POPOVER & EVENT BINDINGS ---
+    function syncAutoTogglesUI() {
+        if (typeof window.getUserPreferences !== 'function') return;
+        const prefs = window.getUserPreferences();
+        if (chkSkipIntro) chkSkipIntro.checked = !!prefs.autoSkipIntro;
+        if (chkSkipOutro) chkSkipOutro.checked = !!prefs.autoSkipOutro;
+        if (chkAutoNext) chkAutoNext.checked = (prefs.autoNext !== undefined ? !!prefs.autoNext : true);
+    }
+
+    if (btnAuto) {
+        btnAuto.onclick = (e) => {
+            e.stopPropagation();
+            if (captionsPopover) captionsPopover.classList.add('hidden');
+            if (speedPopover) speedPopover.classList.add('hidden');
+            if (autoPopover) {
+                const isHidden = autoPopover.classList.contains('hidden');
+                if (isHidden) syncAutoTogglesUI();
+                autoPopover.classList.toggle('hidden');
+            }
+        };
+    }
+
+    if (chkSkipIntro) {
+        chkSkipIntro.onchange = (e) => {
+            if (typeof window.toggleUserPreference === 'function') {
+                window.toggleUserPreference('autoSkipIntro', e.target.checked);
+            }
+        };
+    }
+    if (chkSkipOutro) {
+        chkSkipOutro.onchange = (e) => {
+            if (typeof window.toggleUserPreference === 'function') {
+                window.toggleUserPreference('autoSkipOutro', e.target.checked);
+            }
+        };
+    }
+    if (chkAutoNext) {
+        chkAutoNext.onchange = (e) => {
+            if (typeof window.toggleUserPreference === 'function') {
+                window.toggleUserPreference('autoNext', e.target.checked);
+            }
+        };
+    }
+
     // Subtitles & Captions Menu Populate & Listeners
     function populateCaptionsMenu() {
         const tracksList = document.getElementById('captions-tracks-list');
@@ -371,6 +486,7 @@ function initPlayerControls() {
         btnCaptions.onclick = (e) => {
             e.stopPropagation();
             if (speedPopover) speedPopover.classList.add('hidden');
+            if (autoPopover) autoPopover.classList.add('hidden');
             if (captionsPopover) {
                 const isHidden = captionsPopover.classList.contains('hidden');
                 if (isHidden) populateCaptionsMenu();
@@ -395,6 +511,7 @@ function initPlayerControls() {
         btnSpeed.onclick = (e) => {
             e.stopPropagation();
             if (captionsPopover) captionsPopover.classList.add('hidden');
+            if (autoPopover) autoPopover.classList.add('hidden');
             if (speedPopover) {
                 speedPopover.classList.toggle('hidden');
             }
@@ -426,6 +543,11 @@ function initPlayerControls() {
         if (speedPopover && !speedPopover.classList.contains('hidden')) {
             if (!speedPopover.contains(e.target) && !btnSpeed.contains(e.target)) {
                 speedPopover.classList.add('hidden');
+            }
+        }
+        if (autoPopover && !autoPopover.classList.contains('hidden')) {
+            if (!autoPopover.contains(e.target) && !btnAuto.contains(e.target)) {
+                autoPopover.classList.add('hidden');
             }
         }
     };
