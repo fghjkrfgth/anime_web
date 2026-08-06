@@ -2,7 +2,7 @@
 // ADVANCED PLAYER CONTROLS & KEYBOARD SHORTCUTS ENGINE
 // -------------------------------------------------------------------------
 
-let overlayHideTimeout = null;
+window.overlayHideTimeout = window.overlayHideTimeout || null;
 
 function initPlayerControls() {
     const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
@@ -15,14 +15,17 @@ function initPlayerControls() {
         container.id = 'player-container';
     }
 
-    let overlay = document.getElementById('custom-player-controls-overlay');
-    if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.id = 'custom-player-controls-overlay';
-        overlay.className = 'absolute inset-0 z-20 flex flex-col justify-between p-4 bg-gradient-to-t from-black/80 via-transparent to-black/40 opacity-0 pointer-events-none transition-opacity duration-300 select-none';
+    let existingOverlay = document.getElementById('custom-player-controls-overlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
 
-        const showTitle = window.showData?.title?.english || window.showData?.title?.romaji || window.showData?.title?.userPreferred || 'Anime';
-        const epNum = window.currentEp || 1;
+    const overlay = document.createElement('div');
+    overlay.id = 'custom-player-controls-overlay';
+    overlay.className = 'absolute inset-0 z-20 flex flex-col justify-between p-4 bg-gradient-to-t from-black/80 via-transparent to-black/40 opacity-0 pointer-events-none transition-opacity duration-300 select-none';
+
+    const showTitle = window.showData?.title?.english || window.showData?.title?.romaji || window.showData?.title?.userPreferred || 'Anime';
+    const epNum = window.currentEp || 1;
 
         overlay.innerHTML = `
             <!-- Top Bar: Title & Status -->
@@ -77,7 +80,6 @@ function initPlayerControls() {
             </div>
         `;
         container.appendChild(overlay);
-    }
 
     const btnRewind = document.getElementById('btn-rewind-10');
     const btnForward = document.getElementById('btn-forward-10');
@@ -184,8 +186,8 @@ function initPlayerControls() {
     function showOverlayTemporarily() {
         overlay.classList.remove('opacity-0', 'pointer-events-none');
         overlay.classList.add('opacity-100', 'pointer-events-auto');
-        if (overlayHideTimeout) clearTimeout(overlayHideTimeout);
-        overlayHideTimeout = setTimeout(() => {
+        if (window.overlayHideTimeout) clearTimeout(window.overlayHideTimeout);
+        window.overlayHideTimeout = setTimeout(() => {
             if (!video.paused) {
                 overlay.classList.remove('opacity-100', 'pointer-events-auto');
                 overlay.classList.add('opacity-0', 'pointer-events-none');
