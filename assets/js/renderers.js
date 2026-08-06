@@ -604,3 +604,165 @@ function renderDualSubDubButtonsHTML(activeLang, dubUnavailable = false) {
 
 window.renderDualSubDubButtonsHTML = renderDualSubDubButtonsHTML;
 
+// -------------------------------------------------------------------------
+// IMMERSIVE LANDING PAGE RENDERER (/)
+// -------------------------------------------------------------------------
+window.renderLandingView = function() {
+    let landingLayout = document.getElementById('landing-page-layout');
+    if (!landingLayout) {
+        landingLayout = document.createElement('div');
+        landingLayout.id = 'landing-page-layout';
+        landingLayout.className = 'w-full relative min-h-screen py-6 flex flex-col gap-16 select-none';
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+            mainContent.appendChild(landingLayout);
+        }
+    }
+    if (landingLayout) {
+        landingLayout.classList.remove('hidden');
+    } else {
+        return;
+    }
+
+    landingLayout.innerHTML = `
+        <!-- HERO SECTION -->
+        <div class="relative w-full rounded-3xl overflow-hidden p-8 md:p-16 border border-white/10 bg-slate-950/80 backdrop-blur-2xl shadow-[0_0_80px_rgba(0,255,204,0.15)] flex flex-col items-center text-center gap-8 mt-4 group">
+            
+            <!-- Animated Background Glow & Particles -->
+            <div class="absolute inset-0 bg-gradient-to-tr from-[#00f5ff]/10 via-transparent to-[#bd00ff]/15 opacity-70 pointer-events-none"></div>
+            <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#00f5ff]/20 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
+            <div class="absolute -bottom-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#bd00ff]/20 rounded-full blur-[120px] pointer-events-none"></div>
+
+            <!-- Top Badge -->
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/15 text-themeCyan text-xs font-mono font-extrabold uppercase tracking-widest shadow-md">
+                <span class="w-2 h-2 rounded-full bg-themeCyan animate-ping"></span>
+                DECENTRALIZED ARCHITECTURE V3.0
+            </div>
+
+            <!-- Main Title & Tagline -->
+            <div class="flex flex-col gap-4 max-w-4xl z-10">
+                <h1 class="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-white tracking-tight uppercase leading-none">
+                    ANIME<span class="text-transparent bg-clip-text bg-gradient-to-r from-themeCyan via-cyan-300 to-amber-400 drop-shadow-[0_0_25px_rgba(0,255,204,0.6)]">FLOW</span>
+                </h1>
+                <p class="text-lg md:text-2xl text-slate-300 font-light tracking-wide max-w-2xl mx-auto leading-relaxed">
+                    Next-Generation Decentralized Anime Streaming Engine.
+                </p>
+            </div>
+
+            <!-- Main CTA Glass Button -->
+            <div class="z-10 mt-2">
+                <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="relative group/btn px-10 py-5 rounded-2xl bg-gradient-to-r from-themeCyan via-cyan-400 to-amber-400 text-[#08080c] font-black text-base md:text-lg uppercase tracking-wider transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-[0_0_35px_rgba(0,255,204,0.5)] hover:shadow-[0_0_50px_rgba(0,255,204,0.8)] flex items-center gap-3">
+                    <span class="text-xl">🚀</span> START STREAMING
+                    <svg class="w-5 h-5 fill-current transition-transform group-hover/btn:translate-x-1" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- TRIBUTE & LEGACY SECTION (Dedicated Honor to Banned Sites) -->
+        <div class="w-full flex flex-col items-center gap-8 text-center px-4">
+            <div class="flex flex-col items-center gap-2">
+                <div class="flex items-center gap-2 text-amber-400 text-xs font-mono uppercase tracking-widest">
+                    <span>👑</span> HONORING THE PIONEERS
+                </div>
+                <h2 class="text-2xl md:text-4xl font-extrabold text-white uppercase tracking-wider">
+                    Built in Memory of the Giants
+                </h2>
+                <div class="h-1 w-24 bg-gradient-to-r from-themeCyan to-amber-400 rounded-full mt-2"></div>
+            </div>
+
+            <!-- Tribute Badges Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 w-full max-w-4xl">
+                <!-- Zoro.to -->
+                <div class="glass-panel p-5 rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-2 transition-all duration-300 hover:border-emerald-400/60 hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] group">
+                    <span class="text-2xl font-black text-emerald-400 group-hover:scale-110 transition-transform">Zoro.to</span>
+                    <span class="text-[10px] text-steelGray font-mono uppercase tracking-wider">2020 — 2023</span>
+                </div>
+                <!-- HiAnime -->
+                <div class="glass-panel p-5 rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-2 transition-all duration-300 hover:border-pink-400/60 hover:shadow-[0_0_20px_rgba(244,114,182,0.3)] group">
+                    <span class="text-2xl font-black text-pink-400 group-hover:scale-110 transition-transform">HiAnime</span>
+                    <span class="text-[10px] text-steelGray font-mono uppercase tracking-wider">Legacy Pillar</span>
+                </div>
+                <!-- AniWatch -->
+                <div class="glass-panel p-5 rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-2 transition-all duration-300 hover:border-cyan-400/60 hover:shadow-[0_0_20px_rgba(34,211,238,0.3)] group">
+                    <span class="text-2xl font-black text-cyan-400 group-hover:scale-110 transition-transform">AniWatch</span>
+                    <span class="text-[10px] text-steelGray font-mono uppercase tracking-wider">Speed Benchmark</span>
+                </div>
+                <!-- AnimeKai -->
+                <div class="glass-panel p-5 rounded-2xl border border-white/10 flex flex-col items-center justify-center gap-2 transition-all duration-300 hover:border-amber-400/60 hover:shadow-[0_0_20px_rgba(251,191,36,0.3)] group">
+                    <span class="text-2xl font-black text-amber-400 group-hover:scale-110 transition-transform">AnimeKai</span>
+                    <span class="text-[10px] text-steelGray font-mono uppercase tracking-wider">Catalog Master</span>
+                </div>
+            </div>
+
+            <!-- Legacy Promise Banner -->
+            <div class="glass-panel p-6 md:p-8 rounded-3xl border border-white/10 max-w-3xl w-full bg-slate-950/60 backdrop-blur-xl relative overflow-hidden shadow-xl text-left flex flex-col md:flex-row items-center gap-6">
+                <div class="w-14 h-14 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 text-3xl shrink-0">
+                    🔥
+                </div>
+                <div class="flex flex-col gap-1.5">
+                    <h4 class="text-base md:text-lg font-bold text-white uppercase tracking-wide">The BlackLeg Legacy Promise</h4>
+                    <p class="text-xs md:text-sm text-steelGray leading-relaxed font-light">
+                        They built the foundation; we carry the torch. BlackLeg and ANIMEFLOW promise to carry their legacy forward—delivering zero-ad, ultra-fast, high-performance streaming for anime fans worldwide.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- HOW IT WORKS & KEY FEATURES -->
+        <div class="w-full flex flex-col items-center gap-10 px-4">
+            <div class="flex flex-col items-center gap-2 text-center">
+                <span class="text-themeCyan text-xs font-mono uppercase tracking-widest">⚡ ARCHITECTURE OVERVIEW</span>
+                <h2 class="text-2xl md:text-4xl font-extrabold text-white uppercase tracking-wider">How It Works & Key Features</h2>
+                <div class="h-1 w-24 bg-gradient-to-r from-themeCyan to-amber-400 rounded-full mt-2"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-7xl">
+                <!-- Feature 1 -->
+                <div class="glass-panel p-6 rounded-3xl border border-white/10 flex flex-col gap-4 hover:border-themeCyan/50 transition-all duration-300 group hover:-translate-y-1">
+                    <div class="w-12 h-12 rounded-2xl bg-themeCyan/10 border border-themeCyan/30 flex items-center justify-center text-themeCyan text-2xl group-hover:scale-110 transition-transform">
+                        🌐
+                    </div>
+                    <h3 class="text-base font-bold text-white uppercase tracking-wider">Decentralized Cluster Proxy</h3>
+                    <p class="text-xs text-steelGray leading-relaxed font-light">
+                        Bypasses rate limits and streams directly via high-speed Worker nodes, ensuring zero buffering and instant playback startup.
+                    </p>
+                </div>
+
+                <!-- Feature 2 -->
+                <div class="glass-panel p-6 rounded-3xl border border-white/10 flex flex-col gap-4 hover:border-amber-400/50 transition-all duration-300 group hover:-translate-y-1">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 text-2xl group-hover:scale-110 transition-transform">
+                        🌳
+                    </div>
+                    <h3 class="text-base font-bold text-white uppercase tracking-wider">Smart Timeline Serialization</h3>
+                    <p class="text-xs text-steelGray leading-relaxed font-light">
+                        Full franchise tree navigation powered by SvelteKit data de-serialization, connecting prequels, sequels, and side-stories seamlessly.
+                    </p>
+                </div>
+
+                <!-- Feature 3 -->
+                <div class="glass-panel p-6 rounded-3xl border border-white/10 flex flex-col gap-4 hover:border-cyan-400/50 transition-all duration-300 group hover:-translate-y-1">
+                    <div class="w-12 h-12 rounded-2xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center text-cyan-400 text-2xl group-hover:scale-110 transition-transform">
+                        ⏩
+                    </div>
+                    <h3 class="text-base font-bold text-white uppercase tracking-wider">In-Player Filler Engine</h3>
+                    <p class="text-xs text-steelGray leading-relaxed font-light">
+                        Automated filler detection with instant skip toggles and marker highlights embedded directly on the custom progress bar timeline.
+                    </p>
+                </div>
+
+                <!-- Feature 4 -->
+                <div class="glass-panel p-6 rounded-3xl border border-white/10 flex flex-col gap-4 hover:border-pink-400/50 transition-all duration-300 group hover:-translate-y-1">
+                    <div class="w-12 h-12 rounded-2xl bg-pink-400/10 border border-pink-400/30 flex items-center justify-center text-pink-400 text-2xl group-hover:scale-110 transition-transform">
+                        🎨
+                    </div>
+                    <h3 class="text-base font-bold text-white uppercase tracking-wider">Theme-Synced Player</h3>
+                    <p class="text-xs text-steelGray leading-relaxed font-light">
+                        Dynamic accent color adaptation tailored to every anime's unique palette, morphing UI highlights dynamically as you browse.
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+};
+
+
