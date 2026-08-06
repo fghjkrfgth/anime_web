@@ -670,24 +670,29 @@ async function renderWatchView() {
                         <button id="prev-ep-btn" onclick="changeEpisode(window.currentEp - 1)" class="px-3.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs rounded-lg transition-all duration-300 flex items-center gap-1.5 uppercase">
                             &larr; Prev
                         </button>
-                        <button id="next-ep-btn" onclick="changeEpisode(window.currentEp + 1)" class="px-3.5 py-2 bg-themeCyan hover:bg-themeCyan/80 text-themeBlack font-extrabold text-xs rounded-lg transition-all duration-300 flex items-center gap-1.5 shadow-md shadow-themeCyan/20 uppercase">
+                        <button id="next-ep-btn" onclick="changeEpisode(window.currentEp + 1)" class="px-3.5 py-2 bg-[var(--anime-accent-color,#f59e0b)] hover:opacity-90 text-[#08080c] font-extrabold text-xs rounded-lg transition-all duration-300 flex items-center gap-1.5 shadow-md shadow-[var(--anime-accent-color,#f59e0b)]/20 uppercase">
                             Next &rarr;
                         </button>
-                        <button id="player-subdub-toggle" onclick="toggleLanguage()" class="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-themeCyan text-xs font-bold rounded-lg tracking-wider uppercase transition-all duration-300">
-                            Audio: SUB
-                        </button>
+                        <div class="flex items-center gap-1.5 p-1 rounded-xl bg-[#121218] border border-white/10 select-none">
+                            <button id="btn-sub-toggle" onclick="setAudioLanguage('sub')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300">
+                                💬 SUB
+                            </button>
+                            <button id="btn-dub-toggle" onclick="setAudioLanguage('dub')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300">
+                                🎙️ DUB
+                            </button>
+                        </div>
                     </div>
                     <div class="flex items-center gap-4 flex-wrap">
                         <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
-                            <input type="checkbox" id="toggle-auto-skip-intro" onchange="toggleUserPreference('autoSkipIntro', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-themeCyan focus:ring-0">
+                            <input type="checkbox" id="toggle-auto-skip-intro" onchange="toggleUserPreference('autoSkipIntro', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-[var(--anime-accent-color,#f59e0b)] focus:ring-0">
                             <span class="text-steelGray">Auto Skip Intro</span>
                         </label>
                         <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
-                            <input type="checkbox" id="toggle-auto-skip-outro" onchange="toggleUserPreference('autoSkipOutro', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-themeCyan focus:ring-0">
+                            <input type="checkbox" id="toggle-auto-skip-outro" onchange="toggleUserPreference('autoSkipOutro', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-[var(--anime-accent-color,#f59e0b)] focus:ring-0">
                             <span class="text-steelGray">Auto Skip Outro</span>
                         </label>
                         <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
-                            <input type="checkbox" id="toggle-auto-next" onchange="toggleUserPreference('autoNext', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-themeCyan focus:ring-0">
+                            <input type="checkbox" id="toggle-auto-next" onchange="toggleUserPreference('autoNext', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-[var(--anime-accent-color,#f59e0b)] focus:ring-0">
                             <span class="text-steelGray">Auto Next</span>
                         </label>
                     </div>
@@ -698,10 +703,8 @@ async function renderWatchView() {
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <h1 id="show-title" class="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">Loading Title...</h1>
                         <div class="flex items-center gap-2 flex-wrap">
-                            <span id="badge-sub-episodes" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">SUB: --</span>
-                            <span id="badge-dub-episodes" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-md uppercase">DUB: --</span>
-                            <span id="badge-rating" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md">★ N/A</span>
-                            <span id="badge-language" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md uppercase">SUB</span>
+                            <span id="badge-rating" class="px-2.5 py-1 text-[10px] md:text-xs font-bold tracking-wider rounded-md" style="background: rgba(var(--anime-accent-rgb,245,158,11),0.15); border: 1px solid rgba(var(--anime-accent-rgb,245,158,11),0.3); color: var(--anime-accent-color,#f59e0b);">★ N/A</span>
+                            <span id="badge-episodes" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-white bg-slate-900/60 border border-white/10 rounded-md">-- EPISODES</span>
                         </div>
                     </div>
                     <hr class="border-white/5 my-1">
@@ -710,7 +713,7 @@ async function renderWatchView() {
                         <div id="synopsis-wrapper" class="text-steelGray text-xs md:text-sm font-light leading-relaxed max-h-12 overflow-hidden transition-all duration-500 ease-in-out">
                             <p id="show-synopsis">Loading show details...</p>
                         </div>
-                        <button id="read-more-btn" onclick="toggleSynopsis()" class="text-themeCyan hover:text-white text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase">+ Read More</button>
+                        <button id="read-more-btn" onclick="toggleSynopsis()" class="text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase" style="color: var(--anime-accent-color,#f59e0b);">+ Read More</button>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 bg-white/5 p-4 rounded-xl border border-white/5">
                         <div>
@@ -737,11 +740,10 @@ async function renderWatchView() {
             <div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
                 <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
                     <div class="flex items-center justify-between">
-                        <h2 class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-2.5">Episodes</h2>
-                        <button id="lang-toggle-btn" onclick="toggleLanguage()" class="px-3 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold rounded-md text-themeCyan tracking-widest uppercase transition-all duration-300">SUB</button>
+                        <h2 class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 pl-2.5" style="border-color: var(--anime-accent-color,#f59e0b);">Episodes</h2>
                     </div>
                     <hr class="border-white/5">
-                    <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
+                    <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
                     <div id="episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
             </div>
@@ -854,6 +856,9 @@ async function hydrateWatchUI() {
     if (studioEl) studioEl.innerText = studio;
 
     updateSubDubButtonsUI();
+    if (typeof window.initPlayerControls === 'function') {
+        window.initPlayerControls();
+    }
     renderStreamPreRollOverlay(window.currentEp);
     renderEpisodePicker();
     renderRelatedAdaptations();
@@ -934,16 +939,21 @@ function setupWatchGlobalFunctions() {
 
         if (window.currentLang === 'dub') {
             dubBtn.className = "px-3.5 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)]";
+            dubBtn.innerHTML = "🎙️ DUB";
             subBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 text-steelGray hover:text-white bg-transparent";
+            subBtn.innerHTML = "💬 SUB";
         } else {
             subBtn.className = "px-3.5 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)]";
+            subBtn.innerHTML = "💬 SUB";
             dubBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 text-steelGray hover:text-white bg-transparent";
+            dubBtn.innerHTML = "🎙️ DUB";
         }
 
         if (window.dubUnavailable) {
             dubBtn.disabled = true;
             dubBtn.title = `Dub unavailable for Episode ${window.currentEp || 1}`;
-            dubBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 opacity-40 cursor-not-allowed text-steelGray/50 bg-transparent";
+            dubBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 opacity-50 cursor-not-allowed text-steelGray/50 bg-transparent";
+            dubBtn.innerHTML = "🎙️ DUB (Unavailable)";
         } else {
             dubBtn.disabled = false;
             dubBtn.removeAttribute('title');
@@ -953,7 +963,9 @@ function setupWatchGlobalFunctions() {
     window.setAudioLanguage = function(lang) {
         if (lang === 'dub' && window.dubUnavailable) return;
         window.currentLang = lang;
-        localStorage.setItem(`lang_${window.showData.id}`, lang);
+        if (window.showData?.id) {
+            localStorage.setItem(`lang_${window.showData.id}`, lang);
+        }
         toggleUserPreference('preferredLang', lang);
         window.updateSubDubButtonsUI();
         window.renderEpisodePicker();
@@ -998,25 +1010,39 @@ function setupWatchGlobalFunctions() {
     };
 
     window.showFillerWarningModal = function(epNum) {
+        const video = document.getElementById('main-video-player');
+        const container = video?.parentElement || document.getElementById('player-container') || document.body;
+
+        if (video && !video.paused) {
+            video.pause();
+        }
+
         let modal = document.getElementById('filler-warning-modal');
         if (!modal) {
             modal = document.createElement('div');
             modal.id = 'filler-warning-modal';
-            modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md transition-all duration-300';
-            document.body.appendChild(modal);
+            container.appendChild(modal);
+        } else if (modal.parentElement !== container) {
+            container.appendChild(modal);
         }
+
+        modal.className = 'absolute inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-md transition-all duration-300 p-4 select-none';
         modal.innerHTML = `
-            <div class="glass-panel p-6 md:p-8 rounded-2xl max-w-md w-full border border-amber-500/30 flex flex-col gap-6 text-center shadow-[0_0_30px_rgba(245,158,11,0.2)] mx-4">
-                <div class="w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/40">
+            <div class="glass-panel p-6 md:p-8 rounded-2xl max-w-md w-full border border-amber-500/40 flex flex-col gap-6 text-center shadow-[0_0_30px_rgba(245,158,11,0.3)] bg-[#08080c]/90">
+                <div class="w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/50 animate-pulse">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 </div>
                 <div>
-                    <h3 class="text-xl font-bold text-white mb-2">Filler Episode Warning</h3>
-                    <p class="text-steelGray text-sm">Warning: Episode <span class="text-amber-400 font-bold">${epNum}</span> is a Filler Episode.</p>
+                    <h3 class="text-lg md:text-xl font-extrabold text-white mb-2 tracking-wide uppercase">Filler Episode Warning</h3>
+                    <p class="text-steelGray text-xs md:text-sm">Warning: Episode <span class="text-amber-400 font-bold">${epNum}</span> is a Filler Episode.</p>
                 </div>
                 <div class="flex gap-3 justify-center">
-                    <button onclick="continueFillerEpisode(${epNum})" class="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-semibold text-xs tracking-wider uppercase transition-all">Continue Episode</button>
-                    <button onclick="skipFillerEpisode(${epNum})" class="px-5 py-2.5 rounded-xl bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] font-bold text-xs tracking-wider uppercase shadow-[0_0_15px_var(--anime-accent-color,#f59e0b)] hover:opacity-90 transition-all">Skip Filler</button>
+                    <button onclick="continueFillerEpisode(${epNum})" class="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-semibold text-xs tracking-wider uppercase transition-all duration-200">
+                        Continue Episode
+                    </button>
+                    <button onclick="skipFillerEpisode(${epNum})" class="px-5 py-2.5 rounded-xl bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] font-bold text-xs tracking-wider uppercase shadow-[0_0_15px_var(--anime-accent-color,#f59e0b)] hover:opacity-90 transition-all duration-200">
+                        Skip Filler &rarr;
+                    </button>
                 </div>
             </div>
         `;
@@ -1047,6 +1073,7 @@ function setupWatchGlobalFunctions() {
             window.changeEpisode(currentEp, true);
         }
     };
+}
 
     window.toggleSynopsis = function() {
         const wrapper = document.getElementById('synopsis-wrapper');
