@@ -427,15 +427,34 @@ function watchShow(show) {
     }
 }
 
+// Dynamic AniList Accent Color Theming Helper
+function applyAnimeThemeColor(colorHex) {
+    let hex = colorHex;
+    if (!hex || typeof hex !== 'string' || hex.toLowerCase() === '#ffffff' || hex.toLowerCase() === '#000000' || !/^#([0-9A-F]{3}){1,2}$/i.test(hex)) {
+        hex = '#f59e0b'; // Amber-500 fallback
+    }
+    document.documentElement.style.setProperty('--anime-accent-color', hex);
+    let cleanHex = hex.replace('#', '');
+    if (cleanHex.length === 3) {
+        cleanHex = cleanHex.split('').map(c => c + c).join('');
+    }
+    const r = parseInt(cleanHex.slice(0, 2), 16) || 245;
+    const g = parseInt(cleanHex.slice(2, 4), 16) || 158;
+    const b = parseInt(cleanHex.slice(4, 6), 16) || 11;
+    document.documentElement.style.setProperty('--anime-accent-rgb', `${r}, ${g}, ${b}`);
+}
+
+window.applyAnimeThemeColor = applyAnimeThemeColor;
+
 // Watch Page 4x25 Grid & Filler Styling Helper
 function getWatchEpisodeBtnClasses(isActive, isFiller, isWatched) {
     let btnClasses = "episode-btn glass-panel text-xs font-semibold py-2 px-1 rounded-md text-center flex items-center justify-center cursor-pointer transition-all duration-200 ";
     if (isActive) {
-        btnClasses += "bg-themeCyan text-themeBlack shadow-[0_0_12px_rgba(0,255,204,0.5)] border-themeCyan ";
+        btnClasses += "bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] font-extrabold shadow-[0_0_12px_var(--anime-accent-color,#f59e0b)] border-[var(--anime-accent-color,#f59e0b)] ";
     } else if (isFiller) {
         btnClasses += "border border-amber-600/80 bg-amber-950/40 text-amber-300 shadow-[0_0_10px_rgba(180,83,9,0.7)] ";
     } else if (isWatched) {
-        btnClasses += "text-themeCyan hover:text-white border border-themeCyan/30 bg-[#121218]/70 ";
+        btnClasses += "text-[var(--anime-accent-color,#f59e0b)] hover:text-white border border-[var(--anime-accent-color,#f59e0b)]/30 bg-[#121218]/70 ";
     } else {
         btnClasses += "text-steelGray hover:text-white border border-white/5 hover:border-white/20 bg-[#121218]/40 ";
     }
@@ -522,19 +541,19 @@ function renderFranchiseSectionsHTML(categories) {
 
         html += `
             <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-4">
-                <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">${sec.title}</h3>
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 pl-3" style="border-color: var(--anime-accent-color, #f59e0b);">${sec.title}</h3>
                 <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
                     ${sec.items.map(item => {
                         const posterUrl = item.image || '';
                         return `
                             <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow('${item.anilistId}')">
-                                <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-themeCyan transition-all duration-300">
+                                <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-[var(--anime-accent-color,#f59e0b)] transition-all duration-300">
                                     <img class="w-full h-full object-cover" src="${posterUrl}" alt="${item.title}" loading="lazy">
-                                    <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-themeCyan px-1.5 py-0.5 rounded border border-themeCyan/20 uppercase tracking-widest">
+                                    <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-[var(--anime-accent-color,#f59e0b)] px-1.5 py-0.5 rounded border border-[var(--anime-accent-color,#f59e0b)]/20 uppercase tracking-widest">
                                         ${item.type}
                                     </span>
                                 </div>
-                                <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-themeCyan transition-colors">${item.title}</div>
+                                <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-[var(--anime-accent-color,#f59e0b)] transition-colors">${item.title}</div>
                                 <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.type}</div>
                             </div>
                         `;
