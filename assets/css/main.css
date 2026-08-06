@@ -129,4 +129,72 @@ video::cue {
     margin-bottom: 15% !important;
 }
 
+/* MINIMALIST CRYSTAL GLASS DESIGN SYSTEM */
+.glass-crystal {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 1px 1px 0px 0px rgba(255, 255, 255, 0.1), 0 20px 40px 0 rgba(0, 0, 0, 0.4);
+}
+
+.glass-crystal-card {
+    background: rgba(255, 255, 255, 0.025);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0px 1px 0px 0px rgba(255, 255, 255, 0.08), 0 12px 32px 0 rgba(0, 0, 0, 0.35);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-crystal-card:hover {
+    background: rgba(255, 255, 255, 0.045);
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+    transform: translateY(-2px);
+    box-shadow: inset 0px 1px 0px 0px rgba(255, 255, 255, 0.15), 0 20px 40px 0 rgba(0, 0, 0, 0.5);
+}
+
+.btn-crystal {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-crystal:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.35);
+    border-top-color: rgba(255, 255, 255, 0.6);
+    transform: scale(1.02);
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.35);
+}
+
+.btn-crystal:active {
+    transform: scale(0.98);
+}
+
+@keyframes fadeInCrystal {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.99);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.animate-crystal-in {
+    animation: fadeInCrystal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 
