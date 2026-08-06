@@ -9,7 +9,7 @@ const FULL_SHOW_QUERY = `
     Media(id: $id, type: ANIME) {
       id
       title { romaji english native userPreferred }
-      coverImage { large extraLarge }
+      coverImage { color large extraLarge }
       bannerImage
       description
       duration
@@ -808,7 +808,10 @@ async function hydrateWatchUI() {
     const showData = window.showData;
     const spinner = document.getElementById('player-loading-spinner');
     if (spinner) spinner.classList.add('hidden');
-    
+
+    const accentColor = showData.coverImage?.color || showData.color || '#f59e0b';
+    applyAnimeThemeColor(accentColor);
+
     const bannerUrl = showData.bannerImage || showData.banner || showData.coverImage?.extraLarge || showData.coverImage?.large || '';
     const bannerBackdrop = document.getElementById('banner-backdrop');
     if (bannerBackdrop) {
@@ -822,41 +825,23 @@ async function hydrateWatchUI() {
     } else if (pref === 'native') {
         title = showData.title.native || showData.title.romaji || showData.title.userPreferred;
     }
-    
+
     const showTitleEl = document.getElementById('show-title');
     if (showTitleEl) showTitleEl.innerText = title;
-    
+
     const synopsisEl = document.getElementById('show-synopsis');
     if (synopsisEl) synopsisEl.innerHTML = showData.description || 'No description available.';
-    
-    const badgeSubEpisodesEl = document.getElementById('badge-sub-episodes');
-    const badgeDubEpisodesEl = document.getElementById('badge-dub-episodes');
-    const langToggleBtn = document.getElementById('lang-toggle-btn');
-    const playerSubdubToggle = document.getElementById('player-subdub-toggle');
 
-    const counts = await fetchSubDubCounts(showData.id);
-    if (badgeSubEpisodesEl) badgeSubEpisodesEl.innerText = `SUB: ${counts.subCount}`;
-
-    if (badgeDubEpisodesEl) {
-        if (counts.dubCount === 0) {
-            badgeDubEpisodesEl.classList.add('hidden');
-            if (langToggleBtn) langToggleBtn.classList.add('hidden');
-            if (playerSubdubToggle) playerSubdubToggle.classList.add('hidden');
-            window.currentLang = 'sub';
-        } else {
-            badgeDubEpisodesEl.classList.remove('hidden');
-            badgeDubEpisodesEl.innerText = `DUB: ${counts.dubCount}`;
-            if (langToggleBtn) langToggleBtn.classList.remove('hidden');
-            if (playerSubdubToggle) playerSubdubToggle.classList.remove('hidden');
-        }
-    }
+    const totalEps = getActualEpisodeCount(showData);
+    const badgeEpisodesEl = document.getElementById('badge-episodes');
+    if (badgeEpisodesEl) badgeEpisodesEl.innerText = `${totalEps} EPISODES`;
 
     const badgeRatingEl = document.getElementById('badge-rating');
     if (badgeRatingEl) badgeRatingEl.innerText = `★ ${showData.averageScore || showData.meanScore || 'N/A'}%`;
 
     const formatEl = document.getElementById('meta-format');
     if (formatEl) formatEl.innerText = showData.format || 'TV';
-    
+
     const statusEl = document.getElementById('meta-status');
     if (statusEl) statusEl.innerText = showData.status || 'FINISHED';
 
@@ -868,7 +853,8 @@ async function hydrateWatchUI() {
     const studioEl = document.getElementById('meta-studio');
     if (studioEl) studioEl.innerText = studio;
 
-    updateLanguageDisplay();
+    updateSubDubButtonsUI();
+    renderStreamPreRollOverlay(window.currentEp);
     renderEpisodePicker();
     renderRelatedAdaptations();
 }
@@ -890,11 +876,6 @@ function toggleUserPreference(key, value) {
     const prefs = getUserPreferences();
     prefs[key] = value;
     localStorage.setItem('anime_user_preferences', JSON.stringify(prefs));
-    if (key === 'preferredLang' && window.currentLang !== value) {
-        window.currentLang = value;
-        if (window.updateLanguageDisplay) window.updateLanguageDisplay();
-        if (window.loadEpisodeStream && window.currentEp) window.loadEpisodeStream(window.currentEp);
-    }
 }
 window.getUserPreferences = getUserPreferences;
 window.toggleUserPreference = toggleUserPreference;
@@ -903,14 +884,12 @@ function setupWatchGlobalFunctions() {
     const video = document.getElementById('main-video-player');
     const skipIntroBtn = document.getElementById('skip-intro-btn');
     const skipOutroBtn = document.getElementById('skip-outro-btn');
-    const skipBtnsContainer = document.getElementById('skip-buttons-container');
 
     window.introTimes = null;
     window.outroTimes = null;
     window.lastSavedTime = 0;
     window.hlsInstance = null;
 
-    // Sync UI with user preferences
     const prefs = getUserPreferences();
     const autoSkipIntroEl = document.getElementById('toggle-auto-skip-intro');
     if (autoSkipIntroEl) autoSkipIntroEl.checked = !!prefs.autoSkipIntro;
@@ -948,22 +927,125 @@ function setupWatchGlobalFunctions() {
         };
     }
 
-    window.updateLanguageDisplay = function() {
-        const badgeLanguage = document.getElementById('badge-language');
-        const langToggleBtn = document.getElementById('lang-toggle-btn');
-        const playerSubdubToggle = document.getElementById('player-subdub-toggle');
-        if (badgeLanguage) badgeLanguage.innerText = window.currentLang.toUpperCase();
-        if (langToggleBtn) langToggleBtn.innerText = window.currentLang.toUpperCase();
-        if (playerSubdubToggle) playerSubdubToggle.innerText = `Audio: ${window.currentLang.toUpperCase()}`;
+    window.updateSubDubButtonsUI = function() {
+        const subBtn = document.getElementById('btn-sub-toggle');
+        const dubBtn = document.getElementById('btn-dub-toggle');
+        if (!subBtn || !dubBtn) return;
+
+        if (window.currentLang === 'dub') {
+            dubBtn.className = "px-3.5 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)]";
+            subBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 text-steelGray hover:text-white bg-transparent";
+        } else {
+            subBtn.className = "px-3.5 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)]";
+            dubBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 text-steelGray hover:text-white bg-transparent";
+        }
+
+        if (window.dubUnavailable) {
+            dubBtn.disabled = true;
+            dubBtn.title = `Dub unavailable for Episode ${window.currentEp || 1}`;
+            dubBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 opacity-40 cursor-not-allowed text-steelGray/50 bg-transparent";
+        } else {
+            dubBtn.disabled = false;
+            dubBtn.removeAttribute('title');
+        }
     };
 
-    window.toggleLanguage = function() {
-        window.currentLang = window.currentLang === 'sub' ? 'dub' : 'sub';
-        localStorage.setItem(`lang_${window.showData.id}`, window.currentLang);
-        toggleUserPreference('preferredLang', window.currentLang);
-        window.updateLanguageDisplay();
+    window.setAudioLanguage = function(lang) {
+        if (lang === 'dub' && window.dubUnavailable) return;
+        window.currentLang = lang;
+        localStorage.setItem(`lang_${window.showData.id}`, lang);
+        toggleUserPreference('preferredLang', lang);
+        window.updateSubDubButtonsUI();
         window.renderEpisodePicker();
         window.loadEpisodeStream(window.currentEp);
+    };
+
+    window.renderStreamPreRollOverlay = function(epNum) {
+        const video = document.getElementById('main-video-player');
+        const container = video?.parentElement;
+        if (!container) return;
+
+        const legacyOverlay = document.getElementById('autoplay-handshake-overlay');
+        if (legacyOverlay) legacyOverlay.remove();
+
+        let posterOverlay = document.getElementById('player-poster-overlay');
+        const posterUrl = window.showData?.bannerImage || window.showData?.coverImage?.extraLarge || window.showData?.coverImage?.large || '';
+
+        if (!posterOverlay) {
+            posterOverlay = document.createElement('div');
+            posterOverlay.id = 'player-poster-overlay';
+            container.appendChild(posterOverlay);
+        }
+
+        posterOverlay.className = "absolute inset-0 z-30 flex items-center justify-center bg-cover bg-center cursor-pointer group transition-all duration-500";
+        posterOverlay.style.backgroundImage = `url('${posterUrl}')`;
+        posterOverlay.onclick = function() {
+            posterOverlay.classList.add('hidden');
+            if (video) video.play().catch(() => {});
+        };
+
+        posterOverlay.innerHTML = `
+            <div class="absolute inset-0 bg-black/60 group-hover:bg-black/40 transition-colors"></div>
+            <div class="relative z-10 w-20 h-20 rounded-full bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] flex items-center justify-center shadow-[0_0_30px_var(--anime-accent-color,#f59e0b)] group-hover:scale-110 transition-all duration-300">
+                <svg class="w-10 h-10 fill-current translate-x-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+            <div class="absolute bottom-6 left-6 z-10 text-white font-bold text-sm md:text-base drop-shadow-md flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] text-xs uppercase font-extrabold">Episode ${epNum}</span>
+                <span>Click to Play</span>
+            </div>
+        `;
+        posterOverlay.classList.remove('hidden');
+    };
+
+    window.showFillerWarningModal = function(epNum) {
+        let modal = document.getElementById('filler-warning-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'filler-warning-modal';
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md transition-all duration-300';
+            document.body.appendChild(modal);
+        }
+        modal.innerHTML = `
+            <div class="glass-panel p-6 md:p-8 rounded-2xl max-w-md w-full border border-amber-500/30 flex flex-col gap-6 text-center shadow-[0_0_30px_rgba(245,158,11,0.2)] mx-4">
+                <div class="w-14 h-14 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/40">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-white mb-2">Filler Episode Warning</h3>
+                    <p class="text-steelGray text-sm">Warning: Episode <span class="text-amber-400 font-bold">${epNum}</span> is a Filler Episode.</p>
+                </div>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="continueFillerEpisode(${epNum})" class="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-white font-semibold text-xs tracking-wider uppercase transition-all">Continue Episode</button>
+                    <button onclick="skipFillerEpisode(${epNum})" class="px-5 py-2.5 rounded-xl bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] font-bold text-xs tracking-wider uppercase shadow-[0_0_15px_var(--anime-accent-color,#f59e0b)] hover:opacity-90 transition-all">Skip Filler</button>
+                </div>
+            </div>
+        `;
+        modal.classList.remove('hidden');
+    };
+
+    window.continueFillerEpisode = function(epNum) {
+        const modal = document.getElementById('filler-warning-modal');
+        if (modal) modal.classList.add('hidden');
+        window.changeEpisode(epNum, true);
+    };
+
+    window.skipFillerEpisode = async function(currentEp) {
+        const modal = document.getElementById('filler-warning-modal');
+        if (modal) modal.classList.add('hidden');
+
+        const totalEps = getActualEpisodeCount(window.showData);
+        const fillerSet = await fetchFillerEpisodes(window.showData.id);
+
+        let nextCanonEp = currentEp + 1;
+        while (nextCanonEp <= totalEps && fillerSet.has(nextCanonEp)) {
+            nextCanonEp++;
+        }
+
+        if (nextCanonEp <= totalEps) {
+            window.changeEpisode(nextCanonEp, false);
+        } else {
+            window.changeEpisode(currentEp, true);
+        }
     };
 
     window.toggleSynopsis = function() {
@@ -982,15 +1064,24 @@ function setupWatchGlobalFunctions() {
         }
     };
 
-    window.changeEpisode = function(epNum) {
+    window.changeEpisode = async function(epNum, bypassFillerCheck = false) {
         const totalEps = getActualEpisodeCount(window.showData);
         if (epNum < 1 || epNum > totalEps) return;
-        if (epNum === window.currentEp) return;
+
+        if (!bypassFillerCheck) {
+            const fillerSet = await fetchFillerEpisodes(window.showData.id);
+            if (fillerSet.has(epNum)) {
+                window.showFillerWarningModal(epNum);
+                return;
+            }
+        }
+
         window.currentEp = epNum;
 
         const slug = slugify(window.showData.title.english || window.showData.title.romaji || window.showData.title.userPreferred);
         window.history.pushState(null, '', `/watch/anime/${slug}-${window.showData.id}?ep=${epNum}`);
 
+        window.renderStreamPreRollOverlay(epNum);
         window.renderEpisodePicker();
         window.loadEpisodeStream(epNum);
     };
@@ -1052,18 +1143,7 @@ function setupWatchGlobalFunctions() {
             const isActive = (i === window.currentEp);
             const isFiller = fillerSet.has(i);
 
-            let btnClasses = "episode-btn glass-panel text-xs font-semibold py-2 px-1 rounded-md text-center flex items-center justify-center cursor-pointer transition-all duration-200 ";
-
-            if (isActive) {
-                btnClasses += "bg-themeCyan text-themeBlack shadow-[0_0_12px_rgba(0,255,204,0.5)] border-themeCyan ";
-            } else if (isFiller) {
-                btnClasses += "border border-amber-600/80 bg-amber-950/40 text-amber-300 shadow-[0_0_10px_rgba(180,83,9,0.7)] ";
-            } else if (isWatched) {
-                btnClasses += "text-themeCyan hover:text-white border border-themeCyan/30 bg-[#121218]/70 ";
-            } else {
-                btnClasses += "text-steelGray hover:text-white border border-white/5 hover:border-white/20 bg-[#121218]/40 ";
-            }
-
+            const btnClasses = getWatchEpisodeBtnClasses(isActive, isFiller, isWatched);
             const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
 
             html += `
@@ -1639,8 +1719,11 @@ async function renderAnimeDetailsView() {
 
     window.showData = showData;
 
-    const bannerImg = showData.bannerImage || showData.coverImage.extraLarge || showData.coverImage.large || '';
-    const posterImg = showData.coverImage.extraLarge || showData.coverImage.large || '';
+    const accentColor = showData.coverImage?.color || showData.color || '#f59e0b';
+    applyAnimeThemeColor(accentColor);
+
+    const bannerImg = showData.bannerImage || showData.coverImage?.extraLarge || showData.coverImage?.large || '';
+    const posterImg = showData.coverImage?.extraLarge || showData.coverImage?.large || '';
     const title = showData.title.english || showData.title.romaji || showData.title.userPreferred;
     const studios = showData.studios?.nodes?.map(n => n.name).join(', ') || 'N/A';
     const score = showData.averageScore || showData.meanScore ? `★ ${showData.averageScore || showData.meanScore}%` : '★ N/A';
@@ -1649,11 +1732,11 @@ async function renderAnimeDetailsView() {
     // Synopsis with "Read More" Toggle
     const synopsisHtml = `
         <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-3 relative">
-            <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">Synopsis</h3>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 pl-3" style="border-color: var(--anime-accent-color, #f59e0b);">Synopsis</h3>
             <div id="details-synopsis-wrapper" class="text-steelGray text-sm font-light leading-relaxed max-h-24 overflow-hidden transition-all duration-500 ease-in-out">
                 <p id="details-synopsis">${showData.description || 'No synopsis available.'}</p>
             </div>
-            <button id="details-read-more-btn" onclick="toggleDetailsSynopsis()" class="text-themeCyan hover:text-white text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase">+ Read More</button>
+            <button id="details-read-more-btn" onclick="toggleDetailsSynopsis()" class="text-xs font-bold tracking-wider mt-1 transition-all duration-300 self-start uppercase" style="color: var(--anime-accent-color, #f59e0b);">+ Read More</button>
         </div>
     `;
 
@@ -1790,8 +1873,8 @@ async function renderAnimeDetailsView() {
     }
 
     detailsLayout.innerHTML = `
-        <div class="absolute inset-x-0 top-0 h-[450px] bg-cover bg-center bg-no-repeat opacity-[0.12] blur-xl pointer-events-none z-0" style="background-image: url('${bannerImg}')"></div>
-        <div class="absolute inset-x-0 top-0 h-[450px] bg-gradient-to-b from-transparent to-themeBlack pointer-events-none z-0"></div>
+        <div class="absolute inset-x-0 top-0 h-[500px] bg-cover bg-center bg-no-repeat pointer-events-none z-0 opacity-40 transition-all duration-700" style="background-image: url('${bannerImg}'); mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%); -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);"></div>
+        <div class="absolute inset-x-0 top-0 h-[500px] pointer-events-none z-0" style="background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(15,23,42,1) 100%);"></div>
 
         <div class="relative z-10 grid grid-cols-12 gap-8 mt-6">
             <!-- Left Column: Poster & Episodes -->
@@ -1802,14 +1885,14 @@ async function renderAnimeDetailsView() {
                 <!-- Episode Grid & Selector -->
                 <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 max-h-[500px] overflow-y-auto scrollbar-thin">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-2.5">Episodes</h3>
+                        <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 pl-2.5" style="border-color: var(--anime-accent-color, #f59e0b);">Episodes</h3>
                         <select id="details-lang-selector" onchange="setDetailsAudioPref(${showData.id}, this.value)" class="bg-[#121218] text-white border border-white/10 px-2 py-1 rounded text-xs font-bold uppercase focus:outline-none">
                             <option value="sub">Audio: SUB</option>
                             <option value="dub">Audio: DUB</option>
                         </select>
                     </div>
                     <hr class="border-white/5">
-                    <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none cyan-glow-focus transition-all duration-300"></select>
+                    <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
                     <div id="details-episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
             </div>
@@ -1818,10 +1901,9 @@ async function renderAnimeDetailsView() {
             <div class="col-span-12 md:col-span-8 lg:col-span-9 flex flex-col gap-6">
                 <div class="flex flex-col gap-4">
                     <div class="flex items-center gap-3 flex-wrap">
-                        <span class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">${showData.format || 'ANIME'}</span>
-                        <span id="details-sub-badge" class="px-2.5 py-1 text-xs font-semibold tracking-wider text-themeCyan bg-themeCyan/10 border border-themeCyan/20 rounded-md uppercase">SUB: ${totalEpisodes}</span>
-                        <span id="details-dub-badge" class="px-2.5 py-1 text-xs font-semibold tracking-wider text-purple-400 bg-purple-500/10 border border-purple-500/20 rounded-md uppercase">DUB: ${totalEpisodes}</span>
-                        <span class="text-themeCyan font-bold text-sm">★ ${showData.averageScore || showData.meanScore || 'N/A'}% Average Score</span>
+                        <span class="px-2.5 py-1 text-xs font-semibold tracking-wider rounded-md uppercase" style="background: rgba(var(--anime-accent-rgb,245,158,11),0.15); border: 1px solid rgba(var(--anime-accent-rgb,245,158,11),0.3); color: var(--anime-accent-color, #f59e0b);">${showData.format || 'ANIME'}</span>
+                        <span class="px-2.5 py-1 text-xs font-semibold tracking-wider rounded-md uppercase" style="background: rgba(var(--anime-accent-rgb,245,158,11),0.15); border: 1px solid rgba(var(--anime-accent-rgb,245,158,11),0.3); color: var(--anime-accent-color, #f59e0b);">EPISODES: ${totalEpisodes}</span>
+                        <span class="font-bold text-sm" style="color: var(--anime-accent-color, #f59e0b);">★ ${showData.averageScore || showData.meanScore || 'N/A'}% Average Score</span>
                     </div>
                     <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-none">${title}</h1>
                     <div class="flex flex-wrap gap-2 mt-2">
@@ -1830,13 +1912,13 @@ async function renderAnimeDetailsView() {
                 </div>
 
                 <div class="flex gap-4">
-                    <button onclick="navigateWatchEpisode(1)" class="px-8 py-4 bg-[#00ffcc] hover:bg-[#00ffcc]/80 text-[#08080c] font-bold tracking-wider rounded-xl shadow-lg hover:shadow-[#00ffcc]/20 transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase flex items-center gap-2">
+                    <button onclick="navigateWatchEpisode(1)" class="px-8 py-4 text-[#08080c] font-bold tracking-wider rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase flex items-center gap-2" style="background: var(--anime-accent-color, #f59e0b); box-shadow: 0 0 20px rgba(var(--anime-accent-rgb,245,158,11),0.4);">
                         <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         Start Watching
                     </button>
                 </div>
 
-                <!-- New Top Metadata Container -->
+                <!-- Top Metadata Container -->
                 <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-6">
                     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
                         <div>
@@ -1882,8 +1964,8 @@ async function renderAnimeDetailsView() {
                 ${synopsisHtml}
                 ${trailerHtml}
                 ${charactersHtml}
-                ${reviewsHtml}
                 ${categorizedHtml}
+                ${reviewsHtml}
             </div>
         </div>
     `;
@@ -1924,19 +2006,13 @@ async function renderAnimeDetailsView() {
         const fillerSet = await fetchFillerEpisodes(showData.id);
         const subDubData = await fetchSubDubCounts(showData.id);
 
-        const detailsSubBadge = document.getElementById('details-sub-badge');
-        const detailsDubBadge = document.getElementById('details-dub-badge');
         const detailsLangSelector = document.getElementById('details-lang-selector');
 
-        if (detailsSubBadge) detailsSubBadge.innerText = `SUB: ${subDubData.subCount}`;
-        if (detailsDubBadge) {
+        if (detailsLangSelector) {
             if (subDubData.dubCount === 0) {
-                detailsDubBadge.classList.add('hidden');
-                if (detailsLangSelector) detailsLangSelector.classList.add('hidden');
+                detailsLangSelector.classList.add('hidden');
             } else {
-                detailsDubBadge.classList.remove('hidden');
-                detailsDubBadge.innerText = `DUB: ${subDubData.dubCount}`;
-                if (detailsLangSelector) detailsLangSelector.classList.remove('hidden');
+                detailsLangSelector.classList.remove('hidden');
             }
         }
 
@@ -1959,9 +2035,9 @@ async function renderAnimeDetailsView() {
             if (isFiller) {
                 btnClasses += "border border-amber-600/80 bg-amber-950/40 text-amber-300 shadow-[0_0_10px_rgba(180,83,9,0.7)] ";
             } else if (isWatched) {
-                btnClasses += "text-themeCyan border-themeCyan/30 hover:border-themeCyan bg-slate-900/60 ";
+                btnClasses += "text-[var(--anime-accent-color,#f59e0b)] border-[var(--anime-accent-color,#f59e0b)]/30 hover:border-[var(--anime-accent-color,#f59e0b)] bg-slate-900/60 ";
             } else {
-                btnClasses += "text-white border-white/5 hover:border-white/20 hover:text-themeCyan bg-white/5 ";
+                btnClasses += "text-white border-white/5 hover:border-white/20 hover:text-[var(--anime-accent-color,#f59e0b)] bg-white/5 ";
             }
             const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
             html += `
