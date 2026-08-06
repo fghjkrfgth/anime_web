@@ -43,39 +43,37 @@ function renderEmptyStreamFallback(epNum) {
 
     const fallback = document.createElement('div');
     fallback.id = 'empty-stream-fallback-overlay';
-    fallback.className = 'absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/90 backdrop-blur-2xl text-center select-none';
+    fallback.className = 'absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/80 backdrop-blur-2xl text-center select-none animate-crystal-in';
     
     const epText = epNum ? `Episode ${epNum}` : 'this episode';
 
     fallback.innerHTML = `
-        <div class="glass-panel p-6 md:p-8 rounded-3xl border max-w-md w-full flex flex-col items-center gap-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative overflow-hidden" style="border-color: var(--anime-accent-color, #f59e0b);">
-            <!-- Cute Anime Reaction Face / SVG -->
-            <div class="relative w-20 h-20 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 shadow-inner">
-                <span class="text-4xl animate-bounce tracking-tighter" style="color: var(--anime-accent-color, #f59e0b);">(>_<)</span>
-                <div class="absolute -top-3 -left-2 text-xs opacity-70 font-mono" style="color: var(--anime-accent-color, #f59e0b);">/\\</div>
-                <div class="absolute -top-3 -right-2 text-xs opacity-70 font-mono" style="color: var(--anime-accent-color, #f59e0b);">/\\</div>
+        <div class="glass-crystal p-8 md:p-10 rounded-3xl max-w-md w-full flex flex-col items-center gap-6 shadow-2xl relative overflow-hidden">
+            <!-- Minimalist Line-Art Anime Reaction Sticker in Soft White -->
+            <div class="relative w-16 h-16 flex items-center justify-center rounded-2xl bg-white/[0.04] border border-white/10 shadow-inner">
+                <span class="text-3xl font-mono text-slate-200 tracking-tighter select-none font-semibold">(>_<)</span>
             </div>
 
             <!-- Header & Messages -->
             <div class="flex flex-col gap-2">
-                <span class="text-[10px] font-mono uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-amber-400 self-center">
-                    CLUSTER MIRROR SEARCH FAILED
+                <span class="text-[10px] font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-slate-300 self-center">
+                    STREAM UNAVAILABLE
                 </span>
-                <h3 class="text-xl md:text-2xl font-extrabold text-white tracking-tight mt-1">
-                    No Episodes Available to Serve
+                <h3 class="text-lg md:text-xl font-light text-white tracking-wide mt-1">
+                    Stream Segment Unresolved
                 </h3>
-                <p class="text-xs md:text-sm text-steelGray leading-relaxed max-w-sm">
-                    Neither Sub nor Dub streams could be resolved for <strong class="text-white">${epText}</strong>. Our cluster workers are searching for alternative mirrors.
+                <p class="text-xs md:text-sm text-slate-300 leading-relaxed font-light max-w-xs">
+                    Neither Sub nor Dub segments could be resolved for <strong class="text-white font-medium">${epText}</strong>.
                 </p>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="flex items-center gap-3 w-full mt-2">
-                <button onclick="if(typeof window.loadEpisodeStream === 'function'){ window.loadEpisodeStream(${epNum || 1}); }" class="flex-1 py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-[#08080c] transition-all duration-300 transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 shadow-lg" style="background: var(--anime-accent-color, #f59e0b); box-shadow: 0 0 20px rgba(var(--anime-accent-rgb, 245, 158, 11), 0.4);">
-                    <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                    Try Refreshing
+            <!-- Action Buttons in Crystal Glass -->
+            <div class="flex items-center gap-3 w-full mt-1">
+                <button onclick="if(typeof window.loadEpisodeStream === 'function'){ window.loadEpisodeStream(${epNum || 1}); }" class="btn-crystal flex-1 py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <svg class="w-3.5 h-3.5 fill-current opacity-80" viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                    Retry Cluster
                 </button>
-                <button onclick="if(window.showData){ const slug = (typeof window.slugify === 'function' ? window.slugify(window.showData.title.english || window.showData.title.romaji) : 'anime'); window.history.pushState({}, '', '/anime/' + slug + '-' + window.showData.id); handleSpaRouting(); } else { window.history.pushState({}, '', '/home'); handleSpaRouting(); }" class="py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider text-white bg-white/5 border border-white/10 hover:bg-white/15 transition-all duration-300">
+                <button onclick="if(window.showData){ const slug = (typeof window.slugify === 'function' ? window.slugify(window.showData.title.english || window.showData.title.romaji) : 'anime'); window.history.pushState({}, '', '/anime/' + slug + '-' + window.showData.id); handleSpaRouting(); } else { window.history.pushState({}, '', '/home'); handleSpaRouting(); }" class="btn-crystal py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider">
                     Go Back
                 </button>
             </div>
