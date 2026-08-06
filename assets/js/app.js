@@ -1496,6 +1496,7 @@ function setupWatchGlobalFunctions() {
     if (video) {
         video.addEventListener('timeupdate', () => {
             const currentTime = video.currentTime;
+            const prefs = getUserPreferences();
 
             if (video.duration && Math.abs(currentTime - window.lastSavedTime) > 8) {
                 const percentage = (currentTime / video.duration) * 100;
@@ -1503,49 +1504,56 @@ function setupWatchGlobalFunctions() {
                 window.lastSavedTime = currentTime;
             }
 
+            // 1. AUTO SKIP INTRO
+            if (prefs.autoSkipIntro && window.introTimes && window.introTimes.end > 0) {
+                if (currentTime >= window.introTimes.start && currentTime < (window.introTimes.end - 0.5)) {
+                    console.log(`[Auto Skip Intro] Jumping from ${currentTime.toFixed(2)}s to ${window.introTimes.end}s`);
+                    video.currentTime = window.introTimes.end;
+                    return;
+                }
+            }
+
+            // 2. AUTO SKIP OUTRO
+            if (prefs.autoSkipOutro && window.outroTimes && window.outroTimes.end > 0) {
+                if (currentTime >= window.outroTimes.start && currentTime < (window.outroTimes.end - 0.5)) {
+                    console.log(`[Auto Skip Outro] Jumping from ${currentTime.toFixed(2)}s to ${window.outroTimes.end}s`);
+                    video.currentTime = window.outroTimes.end;
+                    return;
+                }
+            }
+
+            // 3. MANUAL SKIP BUTTONS VISIBILITY SYNC
             if (!video.paused && video.duration > 0 && currentTime > 0) {
                 if (skipBtnsContainer) {
                     skipBtnsContainer.style.setProperty('display', 'flex', 'important');
                 }
 
-                if (window.introTimes && window.introTimes.start > 0 && currentTime >= window.introTimes.start && currentTime <= window.introTimes.end) {
+                // Intro Skip Button
+                if (window.introTimes && window.introTimes.start > 0 && window.introTimes.end > 0 &&
+                    currentTime >= window.introTimes.start && currentTime < (window.introTimes.end - 0.5)) {
                     if (skipIntroBtn) {
                         skipIntroBtn.style.setProperty('display', 'block', 'important');
-                        setTimeout(() => {
-                            skipIntroBtn.classList.remove('opacity-0', 'pointer-events-none');
-                            skipIntroBtn.classList.add('opacity-100');
-                        }, 10);
+                        skipIntroBtn.classList.remove('opacity-0', 'pointer-events-none');
+                        skipIntroBtn.classList.add('opacity-100');
                     }
-                } else {
-                    if (skipIntroBtn) {
-                        skipIntroBtn.classList.remove('opacity-100');
-                        skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
-                        setTimeout(() => {
-                            if (skipIntroBtn.classList.contains('opacity-0')) {
-                                skipIntroBtn.style.setProperty('display', 'none', 'important');
-                            }
-                        }, 300);
-                    }
+                } else if (skipIntroBtn) {
+                    skipIntroBtn.classList.remove('opacity-100');
+                    skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+                    skipIntroBtn.style.setProperty('display', 'none', 'important');
                 }
 
-                if (window.outroTimes && window.outroTimes.start > 0 && currentTime >= window.outroTimes.start && currentTime <= window.outroTimes.end) {
+                // Outro Skip Button
+                if (window.outroTimes && window.outroTimes.start > 0 && window.outroTimes.end > 0 &&
+                    currentTime >= window.outroTimes.start && currentTime < (window.outroTimes.end - 0.5)) {
                     if (skipOutroBtn) {
                         skipOutroBtn.style.setProperty('display', 'block', 'important');
-                        setTimeout(() => {
-                            skipOutroBtn.classList.remove('opacity-0', 'pointer-events-none');
-                            skipOutroBtn.classList.add('opacity-100');
-                        }, 10);
+                        skipOutroBtn.classList.remove('opacity-0', 'pointer-events-none');
+                        skipOutroBtn.classList.add('opacity-100');
                     }
-                } else {
-                    if (skipOutroBtn) {
-                        skipOutroBtn.classList.remove('opacity-100');
-                        skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
-                        setTimeout(() => {
-                            if (skipOutroBtn.classList.contains('opacity-0')) {
-                                skipOutroBtn.style.setProperty('display', 'none', 'important');
-                            }
-                        }, 300);
-                    }
+                } else if (skipOutroBtn) {
+                    skipOutroBtn.classList.remove('opacity-100');
+                    skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
+                    skipOutroBtn.style.setProperty('display', 'none', 'important');
                 }
             } else {
                 if (skipBtnsContainer) {
@@ -1560,6 +1568,18 @@ function setupWatchGlobalFunctions() {
                     skipOutroBtn.classList.remove('opacity-100');
                     skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
                     skipOutroBtn.style.setProperty('display', 'none', 'important');
+                }
+            }
+        });
+
+        // 4. AUTO NEXT EPISODE LOGIC
+        video.addEventListener('ended', () => {
+            const prefs = getUserPreferences();
+            if (prefs.autoNext && window.showData) {
+                const totalEps = getActualEpisodeCount(window.showData);
+                if (window.currentEp && window.currentEp < totalEps) {
+                    console.log(`[Auto Next] Episode ${window.currentEp} completed. Advancing to Episode ${window.currentEp + 1}...`);
+                    window.changeEpisode(window.currentEp + 1);
                 }
             }
         });
