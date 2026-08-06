@@ -510,11 +510,24 @@ function setupMobileBottomNav() {
 
 async function initApp() {
     console.log('[BlackLeg Init] Initializing SPA router...');
-    populateYearDropdown();
-    setupDropdownListeners();
-    setupLanguageListeners();
-    setupMobileBottomNav();
-    updateLanguageSelectionUI();
+
+    try {
+        if (typeof populateYearDropdown === 'function') populateYearDropdown();
+        if (typeof setupDropdownListeners === 'function') setupDropdownListeners();
+
+        if (typeof window.setupLanguageListeners === 'function') {
+            window.setupLanguageListeners();
+        } else if (typeof setupLanguageListeners === 'function') {
+            setupLanguageListeners();
+        } else {
+            console.warn('[Init] setupLanguageListeners not found on window context.');
+        }
+
+        if (typeof setupMobileBottomNav === 'function') setupMobileBottomNav();
+        if (typeof updateLanguageSelectionUI === 'function') updateLanguageSelectionUI();
+    } catch (err) {
+        console.warn('[Init] Non-fatal error during UI listener setup:', err);
+    }
 
     window.addEventListener('popstate', () => {
         handleSpaRouting();
@@ -534,7 +547,11 @@ async function initApp() {
     });
 
     // Run the routing handler
-    await handleSpaRouting();
+    try {
+        await handleSpaRouting();
+    } catch (err) {
+        console.error('[Init] Error during SPA routing execution:', err);
+    }
 }
 
 async function handleSpaRouting() {
