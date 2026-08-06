@@ -1260,45 +1260,36 @@ function setupWatchGlobalFunctions() {
             if (window.currentLang === 'dub') {
                 if (dubData) {
                     activeData = dubData;
-                    if (playerSubdubToggle) {
-                        playerSubdubToggle.removeAttribute('title');
-                        playerSubdubToggle.classList.remove('opacity-50');
-                    }
+                    window.dubUnavailable = false;
                 } else if (subData) {
                     // Fallback to Sub if Dub is unavailable for this episode
                     activeData = subData;
                     window.currentLang = 'sub';
-                    localStorage.setItem(`lang_${window.showData.id}`, 'sub');
+                    window.dubUnavailable = true;
+                    if (window.showData?.id) {
+                        localStorage.setItem(`lang_${window.showData.id}`, 'sub');
+                    }
                     toggleUserPreference('preferredLang', 'sub');
-                    if (window.updateLanguageDisplay) window.updateLanguageDisplay();
-
-                    if (playerSubdubToggle) {
-                        playerSubdubToggle.setAttribute('title', `Dub not available for Episode ${epNum}`);
-                        playerSubdubToggle.classList.add('opacity-50');
-                    }
-                    if (langToggleBtn) {
-                        langToggleBtn.setAttribute('title', `Dub not available for Episode ${epNum}`);
-                    }
                 }
             } else {
                 // User requested Sub
                 if (subData) {
                     activeData = subData;
+                    window.dubUnavailable = !dubData;
                 } else if (dubData) {
+                    // Fallback to Dub if Sub is unavailable
                     activeData = dubData;
                     window.currentLang = 'dub';
-                    localStorage.setItem(`lang_${window.showData.id}`, 'dub');
+                    window.dubUnavailable = false;
+                    if (window.showData?.id) {
+                        localStorage.setItem(`lang_${window.showData.id}`, 'dub');
+                    }
                     toggleUserPreference('preferredLang', 'dub');
-                    if (window.updateLanguageDisplay) window.updateLanguageDisplay();
                 }
+            }
 
-                if (!dubData && playerSubdubToggle) {
-                    playerSubdubToggle.setAttribute('title', `Dub not available for Episode ${epNum}`);
-                    playerSubdubToggle.classList.add('opacity-50');
-                } else if (dubData && playerSubdubToggle) {
-                    playerSubdubToggle.removeAttribute('title');
-                    playerSubdubToggle.classList.remove('opacity-50');
-                }
+            if (window.updateSubDubButtonsUI) {
+                window.updateSubDubButtonsUI();
             }
 
             if (!activeData) {
@@ -1313,7 +1304,8 @@ function setupWatchGlobalFunctions() {
 
             console.log('[HLS Engine] Active Worker Proxy URL:', data.proxy || (typeof NODE_REGISTRY !== 'undefined' ? NODE_REGISTRY[0] : window.location.origin));
 
-            await loadSubtitles(data.subtitles || []);
+            // Synchronized Subtitle track injection BEFORE HLS segment attachment
+            await loadSubtitles(data.subtitles || [], video);
 
             const manifestText = data.manifest;
             const blob = new Blob([manifestText], { type: 'application/x-mpegURL' });
@@ -1386,14 +1378,16 @@ function setupWatchGlobalFunctions() {
         }
     };
 
-    async function loadSubtitles(trackList) {
-        if (!video) return;
-        const existingTracks = video.querySelectorAll('track');
+    async function loadSubtitles(trackList, targetVideo) {
+        const videoEl = targetVideo || document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
+        if (!videoEl) return;
+
+        const existingTracks = videoEl.querySelectorAll('track');
         existingTracks.forEach(t => t.remove());
 
         if (!trackList || trackList.length === 0) return;
 
-        const activeUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
+        const activeUrl = typeof decodeRegistryUrl === 'function' ? decodeRegistryUrl(NODE_REGISTRY[0]) : (typeof NODE_REGISTRY !== 'undefined' ? NODE_REGISTRY[0] : window.location.origin);
 
         for (let track of trackList) {
             if (!track.file && !track.content) continue;
@@ -1422,7 +1416,7 @@ function setupWatchGlobalFunctions() {
                     trackEl.default = true;
                 }
 
-                video.appendChild(trackEl);
+                videoEl.appendChild(trackEl);
             } catch (err) {
                 console.warn(`[Subtitles Fallback] CORS track fetch failure: ${track.label}. Loading via proxy directly.`);
                 const proxyUrl = track.file ? `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}` : '';
@@ -1431,23 +1425,23 @@ function setupWatchGlobalFunctions() {
                 trackEl.label = track.label || 'Subtitles';
                 trackEl.srclang = 'en';
                 trackEl.src = proxyUrl;
-                video.appendChild(trackEl);
+                videoEl.appendChild(trackEl);
             }
         }
 
-        enableDefaultTextTrack();
+        enableDefaultTextTrack(videoEl);
     }
 
-    function enableDefaultTextTrack() {
+    function enableDefaultTextTrack(videoEl) {
         setTimeout(() => {
-            if (!video) return;
-            const textTracks = video.textTracks;
+            if (!videoEl) return;
+            const textTracks = videoEl.textTracks;
             if (!textTracks || textTracks.length === 0) return;
 
             let defaultIndex = -1;
             for (let i = 0; i < textTracks.length; i++) {
                 const track = textTracks[i];
-                if (track.language.includes('en') || track.label.toLowerCase().includes('eng') || track.label.toLowerCase().includes('en')) {
+                if ((track.language && track.language.includes('en')) || (track.label && (track.label.toLowerCase().includes('eng') || track.label.toLowerCase().includes('en')))) {
                     defaultIndex = i;
                     break;
                 }
@@ -2093,9 +2087,10 @@ async function renderAnimeDetailsView() {
             } else {
                 btnClasses += "text-white border-white/5 hover:border-white/20 hover:text-[var(--anime-accent-color,#f59e0b)] bg-white/5 ";
             }
+            const currentDetailsLang = detailsLangSelector ? detailsLangSelector.value : activeLang;
             const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
             html += `
-                <button onclick="navigateWatchEpisode(${i})" title="${titleAttr}" class="${btnClasses}">
+                <button onclick="navigateWatchEpisode(${i}, '${currentDetailsLang}')" title="${titleAttr}" class="${btnClasses}">
                     ${i}
                 </button>
             `;
@@ -2122,8 +2117,17 @@ async function renderAnimeDetailsView() {
     };
 }
 
-window.navigateWatchEpisode = function(epNum) {
+window.navigateWatchEpisode = function(epNum, forcedLang) {
     const show = window.showData;
+    const detailsLangSelector = document.getElementById('details-lang-selector');
+    const selectedLang = forcedLang || (detailsLangSelector ? detailsLangSelector.value : null) || window.currentLang || 'sub';
+    window.currentLang = selectedLang;
+    if (show && show.id) {
+        localStorage.setItem(`lang_${show.id}`, selectedLang);
+    }
+    if (typeof toggleUserPreference === 'function') {
+        toggleUserPreference('preferredLang', selectedLang);
+    }
     const slug = window.slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     window.history.pushState({}, '', `/watch/anime/${slug}-${show.id}?ep=${epNum}`);
     handleSpaRouting();
