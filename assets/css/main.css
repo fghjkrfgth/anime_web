@@ -120,11 +120,13 @@ body {
 
 /* Subtitle / Caption Positioning & Styling Overrides */
 video::cue {
-    background: rgba(8, 8, 12, 0.75);
-    color: #ffffff;
-    font-family: 'Outfit', sans-serif;
-    font-size: 14px;
-    text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
-    margin-bottom: 12%;
+    background: rgba(8, 8, 12, 0.75) !important;
+    color: #ffffff !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 15px !important;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.9) !important;
+    line-height: 1.4 !important;
+    margin-bottom: 15% !important;
 }
+
 
