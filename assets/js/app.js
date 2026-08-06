@@ -1460,6 +1460,7 @@ function setupWatchGlobalFunctions() {
             overlay.classList.add('opacity-0', 'pointer-events-none');
         }
 
+        const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
         if (video) {
             video.play()
                 .then(() => {
@@ -1468,10 +1469,15 @@ function setupWatchGlobalFunctions() {
                 .catch(err => {
                     console.warn("[Autoplay Matrix] Playback blocked, trying muted...", err);
                     video.muted = true;
-                    video.play();
+                    video.play().catch(() => {});
                 });
         }
     };
+
+    const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+    const skipBtnsContainer = document.getElementById('skip-buttons-container');
+    const skipIntroBtn = document.getElementById('skip-intro-btn');
+    const skipOutroBtn = document.getElementById('skip-outro-btn');
 
     if (video) {
         video.addEventListener('timeupdate', () => {
@@ -1547,8 +1553,9 @@ function setupWatchGlobalFunctions() {
 
     if (skipIntroBtn) {
         skipIntroBtn.addEventListener('click', () => {
-            if (window.introTimes && video) {
-                video.currentTime = window.introTimes.end;
+            const v = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+            if (window.introTimes && v) {
+                v.currentTime = window.introTimes.end;
                 skipIntroBtn.classList.remove('opacity-100');
                 skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
                 skipIntroBtn.style.setProperty('display', 'none', 'important');
@@ -1558,8 +1565,9 @@ function setupWatchGlobalFunctions() {
 
     if (skipOutroBtn) {
         skipOutroBtn.addEventListener('click', () => {
-            if (window.outroTimes && video) {
-                video.currentTime = window.outroTimes.end;
+            const v = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+            if (window.outroTimes && v) {
+                v.currentTime = window.outroTimes.end;
                 skipOutroBtn.classList.remove('opacity-100');
                 skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
                 skipOutroBtn.style.setProperty('display', 'none', 'important');
