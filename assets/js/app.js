@@ -632,7 +632,7 @@ async function renderWatchView() {
         <div class="flex-grow max-w-7xl mx-auto w-full py-6 z-10 grid grid-cols-12 gap-6 relative">
             <div class="col-span-12 lg:col-span-8 flex flex-col gap-6">
                 <div class="relative w-full aspect-video rounded-2xl overflow-hidden glass-panel border border-white/5 shadow-2xl group">
-                    <video id="main-video-player" class="w-full h-full object-contain" controls playsinline></video>
+                    <video id="main-video-player" class="w-full h-full object-contain" playsinline></video>
                     <div id="autoplay-handshake-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-opacity duration-500">
                         <div class="glass-panel p-6 md:p-10 rounded-2xl border border-white/10 max-w-md text-center flex flex-col items-center gap-6 shadow-2xl">
                             <div class="w-16 h-16 rounded-full border-2 border-themeCyan flex items-center justify-center animate-pulse">
