@@ -5,7 +5,7 @@
 let overlayHideTimeout = null;
 
 function initPlayerControls() {
-    const video = document.getElementById('main-video-player');
+    const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
     if (!video) return;
 
     const container = video.parentElement;
@@ -210,7 +210,7 @@ function setupPlayerKeyboardShortcuts() {
             return;
         }
 
-        const video = document.getElementById('main-video-player');
+        const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
         if (!video) return;
 
         const code = e.code;
