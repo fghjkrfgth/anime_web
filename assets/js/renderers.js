@@ -626,47 +626,47 @@ window.renderLandingView = function() {
 
     landingLayout.innerHTML = `
         <!-- HERO HEADER SECTION -->
-        <div class="glass-crystal relative w-full rounded-3xl p-10 md:p-20 flex flex-col items-center text-center gap-10 mt-2">
+        <div class="glass-crystal relative w-full rounded-3xl p-6 sm:p-10 md:p-20 flex flex-col items-center text-center gap-8 md:gap-10 mt-2">
             <!-- Subtle ambient refraction -->
             <div class="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none rounded-3xl"></div>
 
             <!-- Top Monospaced Tag -->
-            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-slate-300 text-[11px] font-mono tracking-[0.2em] uppercase">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-slate-300 text-[10px] sm:text-[11px] font-mono tracking-[0.15em] sm:tracking-[0.2em] uppercase">
                 <span>SYSTEM VERSION 3.0</span>
                 <span class="w-1.5 h-1.5 rounded-full bg-white/60"></span>
                 <span>DECENTRALIZED CORE</span>
             </div>
 
             <!-- Main Title & Subtitle -->
-            <div class="flex flex-col gap-5 max-w-3xl z-10">
-                <h1 class="text-4xl sm:text-6xl md:text-7xl font-extralight text-white tracking-[0.25em] uppercase leading-none">
+            <div class="flex flex-col gap-4 sm:gap-5 max-w-3xl z-10">
+                <h1 class="text-3xl sm:text-6xl md:text-7xl font-extralight text-white tracking-[0.2em] sm:tracking-[0.25em] uppercase leading-none break-all sm:break-normal">
                     ANIMEFLOW
                 </h1>
-                <p class="text-base sm:text-lg md:text-xl text-slate-300 font-light tracking-wide max-w-xl mx-auto leading-relaxed">
+                <p class="text-sm sm:text-lg md:text-xl text-slate-300 font-light tracking-wide max-w-xl mx-auto leading-relaxed px-2">
                     A minimal, high-speed anime streaming platform engineered for zero latency, zero ads, and pure content presentation.
                 </p>
             </div>
 
             <!-- Primary Crystal CTA Button -->
-            <div class="z-10 mt-2">
-                <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="btn-crystal px-9 py-4 rounded-2xl text-sm font-semibold tracking-[0.15em] uppercase flex items-center gap-3">
+            <div class="z-10 mt-2 w-full flex justify-center">
+                <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="btn-crystal w-full sm:w-auto min-h-[52px] px-9 py-4 rounded-2xl text-sm font-semibold tracking-[0.15em] uppercase flex items-center justify-center gap-3">
                     Enter Experience <span class="text-lg">→</span>
                 </button>
             </div>
         </div>
 
         <!-- TRIBUTE & LEGACY SECTION -->
-        <div class="w-full flex flex-col items-center gap-8 text-center px-4 max-w-5xl mx-auto">
+        <div class="w-full flex flex-col items-center gap-8 text-center px-2 sm:px-4 max-w-5xl mx-auto">
             <div class="flex flex-col items-center gap-2">
                 <span class="text-slate-400 text-xs font-mono tracking-[0.2em] uppercase">HONORING THE FOUNDATIONS</span>
-                <h2 class="text-2xl md:text-3xl font-light text-white tracking-[0.15em] uppercase">
+                <h2 class="text-xl sm:text-2xl md:text-3xl font-light text-white tracking-[0.15em] uppercase">
                     Built in Memory of the Giants
                 </h2>
                 <div class="h-[1px] w-16 bg-white/20 mt-3"></div>
             </div>
 
             <!-- Frosted Glass Tribute Grid -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5 w-full">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-5 w-full">
                 <!-- Zoro.to -->
                 <div class="glass-crystal-card p-6 rounded-2xl flex flex-col items-center justify-center gap-1.5">
                     <span class="text-xl font-medium text-white tracking-wider">Zoro.to</span>
