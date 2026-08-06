@@ -479,12 +479,12 @@ async function initApp() {
         handleSpaRouting();
     });
 
-    // Intercept clicks on links starting with /home, /watch/ or /anime/ to keep SPA routing pure
+    // Intercept clicks on links starting with /, /home, /watch/ or /anime/ to keep SPA routing pure
     document.addEventListener('click', (e) => {
         const anchor = e.target.closest('a');
         if (anchor) {
             const href = anchor.getAttribute('href');
-            if (href && (href.startsWith('/home') || href.startsWith('/watch/') || href.startsWith('/anime/'))) {
+            if (href && (href === '/' || href.startsWith('/home') || href.startsWith('/watch/') || href.startsWith('/anime/'))) {
                 e.preventDefault();
                 window.history.pushState(null, '', href);
                 handleSpaRouting();
@@ -498,14 +498,19 @@ async function initApp() {
 
 async function handleSpaRouting() {
     console.log('[BlackLeg Router] Current path:', window.location.pathname);
-    if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') {
-        window.history.replaceState(null, '', '/home' + window.location.search);
+
+    const pathname = window.location.pathname;
+    const isLanding = (pathname === '/' || pathname === '' || pathname.endsWith('/index.html'));
+    const isWatch = pathname.startsWith('/watch/');
+    const isDetails = pathname.startsWith('/anime/');
+
+    // Toggle views
+    const landing = document.getElementById('landing-page-layout');
+    if (landing) {
+        if (isLanding) landing.classList.remove('hidden');
+        else landing.classList.add('hidden');
     }
 
-    const isWatch = window.location.pathname.startsWith('/watch/');
-    const isDetails = window.location.pathname.startsWith('/anime/');
-    
-    // Toggle views
     const watch = document.getElementById('watch-page-layout');
     if (watch) {
         if (isWatch) watch.classList.remove('hidden');
@@ -521,7 +526,13 @@ async function handleSpaRouting() {
     const homepageWrapper = document.getElementById('homepage-sections-wrapper');
     const searchResultsLayout = document.getElementById('search-results-layout');
 
-    if (isWatch) {
+    if (isLanding) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        if (typeof window.renderLandingView === 'function') {
+            window.renderLandingView();
+        }
+    } else if (isWatch) {
         if (homepageWrapper) homepageWrapper.classList.add('hidden');
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
         await renderWatchView();
@@ -1374,7 +1385,9 @@ function setupWatchGlobalFunctions() {
         } catch (err) {
             console.error('[Stream Launch] Failed to load stream:', err);
             if (spinner) spinner.classList.add('hidden');
-            alert(`Playback Error: Failed to resolve streaming source. (${err.message})`);
+            if (typeof window.renderEmptyStreamFallback === 'function') {
+                window.renderEmptyStreamFallback(epNum);
+            }
         }
     };
 
