@@ -541,7 +541,10 @@ async function handleSpaRouting() {
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
         await renderAnimeDetailsView();
     } else {
-        if (homepageWrapper) homepageWrapper.classList.remove('hidden');
+        if (homepageWrapper) {
+            homepageWrapper.classList.remove('hidden');
+            homepageWrapper.classList.add('animate-crystal-in');
+        }
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
         
         checkUrlParamsAndSearch();
