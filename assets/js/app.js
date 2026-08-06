@@ -1305,15 +1305,20 @@ function setupWatchGlobalFunctions() {
                 throw new Error("Neither Sub nor Dub stream source could be resolved for this episode.");
             }
 
+            const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
+
             const data = activeData;
             window.introTimes = data.intro;
             window.outroTimes = data.outro;
+
+            console.log('[HLS Engine] Active Worker Proxy URL:', data.proxy || (typeof NODE_REGISTRY !== 'undefined' ? NODE_REGISTRY[0] : window.location.origin));
 
             await loadSubtitles(data.subtitles || []);
 
             const manifestText = data.manifest;
             const blob = new Blob([manifestText], { type: 'application/x-mpegURL' });
             const manifestBlobUrl = URL.createObjectURL(blob);
+            console.log('[HLS Engine] Manifest Blob URL:', manifestBlobUrl);
 
             if (window.hlsInstance) {
                 window.hlsInstance.destroy();
@@ -1321,22 +1326,30 @@ function setupWatchGlobalFunctions() {
 
             if (Hls.isSupported()) {
                 window.hlsInstance = new Hls({
-                    maxBufferLength: 30,          // Keep at least 30 seconds buffered
-                    maxMaxBufferLength: 60,       // Max buffer cap
-                    maxBufferSize: 30 * 1024 * 1024, // 30MB buffer footprint
-                    backBufferLength: 10,
                     enableWorker: true,
-                    lowLatencyMode: true
+                    lowLatencyMode: true,
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 60,
+                    maxBufferSize: 30 * 1024 * 1024,
+                    backBufferLength: 10,
+                    xhrSetup: function(xhr, url) {
+                        xhr.withCredentials = false;
+                    }
                 });
                 window.hlsInstance.loadSource(manifestBlobUrl);
-                window.hlsInstance.attachMedia(video);
+                if (video) window.hlsInstance.attachMedia(video);
 
                 window.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('[HLS Engine] Manifest parsed successfully. Segment streaming ready.');
                     if (spinner) spinner.classList.add('hidden');
-                    window.showCinemaHandshake();
+                    if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
+                    if (typeof window.initPlayerControls === 'function') {
+                        window.initPlayerControls();
+                    }
                 });
 
                 window.hlsInstance.on(Hls.Events.ERROR, (event, errorData) => {
+                    console.error('[HLS Error]', errorData);
                     if (errorData.fatal) {
                         switch (errorData.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
@@ -1348,8 +1361,7 @@ function setupWatchGlobalFunctions() {
                                 window.hlsInstance.recoverMediaError();
                                 break;
                             default:
-                                console.error("Fatal HLS playback crash. Re-initiating stream.");
-                                window.loadEpisodeStream(epNum);
+                                console.error("Fatal HLS playback crash.");
                                 break;
                         }
                     }
@@ -1358,7 +1370,10 @@ function setupWatchGlobalFunctions() {
                 video.src = manifestBlobUrl;
                 video.addEventListener('loadedmetadata', () => {
                     if (spinner) spinner.classList.add('hidden');
-                    window.showCinemaHandshake();
+                    if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
+                    if (typeof window.initPlayerControls === 'function') {
+                        window.initPlayerControls();
+                    }
                 });
             } else {
                 alert("This browser does not support HLS streaming.");
