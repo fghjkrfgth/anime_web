@@ -520,13 +520,13 @@ async function initApp() {
         } else if (typeof setupLanguageListeners === 'function') {
             setupLanguageListeners();
         } else {
-            console.warn('[Init] setupLanguageListeners not found on window context.');
+            console.warn('[Init] setupLanguageListeners not yet defined on window context.');
         }
 
         if (typeof setupMobileBottomNav === 'function') setupMobileBottomNav();
         if (typeof updateLanguageSelectionUI === 'function') updateLanguageSelectionUI();
     } catch (err) {
-        console.warn('[Init] Non-fatal error during UI listener setup:', err);
+        console.error('[Init Error] Non-fatal listener init error:', err);
     }
 
     window.addEventListener('popstate', () => {
