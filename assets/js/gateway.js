@@ -22,9 +22,11 @@ async function fetchAniListGraphQL(payload) {
 
 // 2. HOMEPAGE CATALOG QUERY (DIRECT FROM BROWSER)
 async function fetchHomeCatalog() {
+    const isMobile = window.innerWidth < 768;
+    const trendingLimit = isMobile ? 50 : 20;
     const query = `
       query {
-        trending: Page(page: 1, perPage: 12) {
+        trending: Page(page: 1, perPage: ${trendingLimit}) {
           media(sort: TRENDING_DESC, type: ANIME) {
             id
             title { romaji english native userPreferred }
@@ -37,7 +39,7 @@ async function fetchHomeCatalog() {
             nextAiringEpisode { episode }
           }
         }
-        popular: Page(page: 1, perPage: 12) {
+        popular: Page(page: 1, perPage: 20) {
           media(sort: POPULARITY_DESC, type: ANIME) {
             id
             title { romaji english native userPreferred }
