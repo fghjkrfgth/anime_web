@@ -495,6 +495,17 @@ function setupMobileBottomNav() {
             }
         };
     }
+
+    const schedBtn = document.querySelector('a[href="#airing-broadcast-section"]');
+    if (schedBtn) {
+        schedBtn.onclick = (e) => {
+            const scheduleSec = document.getElementById('airing-broadcast-section');
+            if (scheduleSec) {
+                scheduleSec.classList.remove('hidden');
+                scheduleSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+    }
 }
 
 async function initApp() {
