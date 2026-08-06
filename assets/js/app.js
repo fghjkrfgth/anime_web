@@ -1586,7 +1586,6 @@ function setupWatchGlobalFunctions() {
         history = history.slice(0, 10);
         localStorage.setItem('continueWatching', JSON.stringify(history));
     }
-}
 
 // Event Listeners setup
 const searchInputEl = document.getElementById('search-input');
