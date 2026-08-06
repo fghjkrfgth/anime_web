@@ -568,3 +568,39 @@ function renderFranchiseSectionsHTML(categories) {
 
 window.categorizeFranchiseItems = categorizeFranchiseItems;
 window.renderFranchiseSectionsHTML = renderFranchiseSectionsHTML;
+
+// DUAL SUB/DUB BUTTON RENDERER HELPER
+function renderDualSubDubButtonsHTML(activeLang, dubUnavailable = false) {
+    const isDub = (activeLang === 'dub');
+    const subActiveStyle = !isDub
+        ? "bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)] font-extrabold"
+        : "text-steelGray hover:text-white bg-transparent font-bold";
+    
+    let dubActiveStyle = "";
+    let dubDisabledAttr = "";
+    let dubText = "🎙️ DUB";
+
+    if (dubUnavailable) {
+        dubActiveStyle = "opacity-50 cursor-not-allowed text-steelGray/50 bg-transparent font-bold";
+        dubDisabledAttr = 'disabled title="Dub Unavailable for this Episode"';
+        dubText = "🎙️ DUB (Unavailable)";
+    } else if (isDub) {
+        dubActiveStyle = "bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)] font-extrabold";
+    } else {
+        dubActiveStyle = "text-steelGray hover:text-white bg-transparent font-bold";
+    }
+
+    return `
+        <div class="flex items-center gap-1.5 p-1 rounded-xl bg-[#121218] border border-white/10 select-none">
+            <button id="btn-sub-toggle" onclick="setAudioLanguage('sub')" class="px-3.5 py-1.5 text-xs rounded-lg uppercase tracking-wider transition-all duration-300 ${subActiveStyle}">
+                💬 SUB
+            </button>
+            <button id="btn-dub-toggle" onclick="setAudioLanguage('dub')" ${dubDisabledAttr} class="px-3.5 py-1.5 text-xs rounded-lg uppercase tracking-wider transition-all duration-300 ${dubActiveStyle}">
+                ${dubText}
+            </button>
+        </div>
+    `;
+}
+
+window.renderDualSubDubButtonsHTML = renderDualSubDubButtonsHTML;
+
