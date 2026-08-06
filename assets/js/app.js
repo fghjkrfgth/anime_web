@@ -468,11 +468,41 @@ function setupDropdownListeners() {
 
 window.homeCatalogFetched = false;
 
+function setupMobileBottomNav() {
+    const searchBtn = document.getElementById('mobile-nav-search-btn');
+    if (searchBtn) {
+        searchBtn.onclick = () => {
+            const url = new URL(window.location.href);
+            if (url.pathname !== '/home' && url.pathname !== '/') {
+                window.history.pushState({}, '', '/home');
+                handleSpaRouting();
+            }
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        };
+    }
+
+    const filterBtn = document.getElementById('dock-filter-btn');
+    if (filterBtn) {
+        filterBtn.onclick = () => {
+            const filterContainer = document.getElementById('filter-dropdowns-container');
+            if (filterContainer) {
+                filterContainer.classList.toggle('hidden');
+                filterContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        };
+    }
+}
+
 async function initApp() {
     console.log('[BlackLeg Init] Initializing SPA router...');
     populateYearDropdown();
     setupDropdownListeners();
     setupLanguageListeners();
+    setupMobileBottomNav();
     updateLanguageSelectionUI();
 
     window.addEventListener('popstate', () => {
