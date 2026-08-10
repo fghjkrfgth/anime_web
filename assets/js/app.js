@@ -495,17 +495,6 @@ function setupMobileBottomNav() {
             }
         };
     }
-
-    const schedBtn = document.querySelector('a[href="#airing-broadcast-section"]');
-    if (schedBtn) {
-        schedBtn.onclick = (e) => {
-            const scheduleSec = document.getElementById('airing-broadcast-section');
-            if (scheduleSec) {
-                scheduleSec.classList.remove('hidden');
-                scheduleSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-        };
-    }
 }
 
 async function initApp() {
@@ -533,12 +522,12 @@ async function initApp() {
         handleSpaRouting();
     });
 
-    // Intercept clicks on links starting with /, /home, /watch/ or /anime/ to keep SPA routing pure
+    // Intercept clicks on links to keep SPA routing pure
     document.addEventListener('click', (e) => {
         const anchor = e.target.closest('a');
         if (anchor) {
             const href = anchor.getAttribute('href');
-            if (href && (href === '/' || href.startsWith('/home') || href.startsWith('/watch/') || href.startsWith('/anime/'))) {
+            if (href && (href === '/' || href.startsWith('/home') || href.startsWith('/watch/') || href.startsWith('/anime/') || href.startsWith('/explore') || href.startsWith('/schedule') || href.includes('#trending-section') || href.includes('#airing-broadcast-section'))) {
                 e.preventDefault();
                 window.history.pushState(null, '', href);
                 handleSpaRouting();
@@ -555,34 +544,31 @@ async function initApp() {
 }
 
 async function handleSpaRouting() {
-    console.log('[BlackLeg Router] Current path:', window.location.pathname);
+    console.log('[BlackLeg Router] Current path:', window.location.pathname, 'hash:', window.location.hash);
 
     const pathname = window.location.pathname;
-    const isLanding = (pathname === '/' || pathname === '' || pathname.endsWith('/index.html'));
+    const hash = window.location.hash;
+
+    const isLanding = (pathname === '/' || pathname === '' || pathname.endsWith('/index.html')) && (!hash || hash === '#');
     const isWatch = pathname.startsWith('/watch/');
     const isDetails = pathname.startsWith('/anime/');
+    const isExplore = pathname.startsWith('/explore') || hash === '#trending-section' || hash === '#/trending-section';
+    const isSchedule = pathname.startsWith('/schedule') || hash === '#airing-broadcast-section' || hash === '#/airing-broadcast-section';
 
     // Toggle views
     const landing = document.getElementById('landing-page-layout');
-    if (landing) {
-        if (isLanding) landing.classList.remove('hidden');
-        else landing.classList.add('hidden');
-    }
-
     const watch = document.getElementById('watch-page-layout');
-    if (watch) {
-        if (isWatch) watch.classList.remove('hidden');
-        else watch.classList.add('hidden');
-    }
-
     const details = document.getElementById('anime-details-layout');
-    if (details) {
-        if (isDetails) details.classList.remove('hidden');
-        else details.classList.add('hidden');
-    }
-
+    const trendingExplore = document.getElementById('trending-explore-layout');
+    const dedicatedSchedule = document.getElementById('dedicated-schedule-layout');
     const homepageWrapper = document.getElementById('homepage-sections-wrapper');
     const searchResultsLayout = document.getElementById('search-results-layout');
+
+    if (landing) landing.classList.toggle('hidden', !isLanding);
+    if (watch) watch.classList.toggle('hidden', !isWatch);
+    if (details) details.classList.toggle('hidden', !isDetails);
+    if (trendingExplore) trendingExplore.classList.toggle('hidden', !isExplore);
+    if (dedicatedSchedule) dedicatedSchedule.classList.toggle('hidden', !isSchedule);
 
     if (isLanding) {
         if (homepageWrapper) homepageWrapper.classList.add('hidden');
@@ -598,6 +584,18 @@ async function handleSpaRouting() {
         if (homepageWrapper) homepageWrapper.classList.add('hidden');
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
         await renderAnimeDetailsView();
+    } else if (isExplore) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        if (typeof window.renderTrendingExploreView === 'function') {
+            await window.renderTrendingExploreView();
+        }
+    } else if (isSchedule) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        if (typeof window.renderDedicatedScheduleView === 'function') {
+            await window.renderDedicatedScheduleView();
+        }
     } else {
         if (homepageWrapper) {
             homepageWrapper.classList.remove('hidden');
