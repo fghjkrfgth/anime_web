@@ -355,6 +355,7 @@ function renderThumbnailRow(containerId, shows) {
         container.innerHTML = `<div class="text-steelGray py-8">No titles available.</div>`;
         return;
     }
+    container.className = "flex flex-nowrap overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-none gap-3 pb-4 touch-pan-x";
     container.innerHTML = shows.map(show => createCardHTML(show)).join('');
 }
 
