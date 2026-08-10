@@ -331,7 +331,7 @@ function createCardHTML(show) {
         : `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-md rounded text-[8px] font-bold text-[#a0a5b5] uppercase tracking-wider border border-white/5">${displayBadgeText}</div>`;
 
     return `
-        <div class="anime-card flex-none w-[140px] md:w-[185px] bg-[#121218]/45 rounded-2xl overflow-hidden border border-[#bd00ff]/20 hover:border-[#00f5ff] relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_20px_rgba(0,245,255,0.25)] snap-start snap-item touch-pan-x" onclick="watchShow(${stringifiedShow})" data-anime-data="${stringifiedShow}">
+        <div class="anime-card flex-none w-[145px] md:w-[185px] bg-[#121218]/45 rounded-2xl overflow-hidden border border-[#bd00ff]/20 hover:border-[#00f5ff] relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_20px_rgba(0,245,255,0.25)] snap-start touch-pan-x" onclick="watchShow(${stringifiedShow})" data-anime-data="${stringifiedShow}">
             <div class="relative aspect-[3/4] w-full overflow-hidden">
                 <img src="${coverUrl}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
                 <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-black/80 backdrop-blur-md rounded text-[9px] md:text-[11px] font-bold text-[#00f5ff] border border-[#00f5ff]/20">
@@ -355,7 +355,7 @@ function renderThumbnailRow(containerId, shows) {
         container.innerHTML = `<div class="text-steelGray py-8">No titles available.</div>`;
         return;
     }
-    container.className = "flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-3 pb-4 touch-pan-x scroll-smooth";
+    container.className = "flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-3 pb-4 touch-pan-x";
     container.innerHTML = shows.map(show => createCardHTML(show)).join('');
 }
 
