@@ -213,7 +213,7 @@ video::cue {
         max-height: calc(100vh - 80px);
     }
 }
-/* Touch-Scrollable Carousel Helpers */
+/* Touch-Scrollable Carousel Helpers & Gesture Physics */
 .scrollbar-none::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
@@ -224,17 +224,47 @@ video::cue {
     scrollbar-width: none !important;
 }
 .touch-pan-y {
-    touch-action: pan-y;
+    touch-action: pan-y !important;
 }
 .touch-pan-x {
-    touch-action: pan-x;
+    touch-action: pan-y pan-x !important;
 }
 html, body {
     touch-action: manipulation;
 }
 
 /* Anime Card Touch Gesture Overrides */
-.anime-card, .anime-card *, .anime-card img {
-    touch-action: pan-x pan-y !important;
+.anime-card, .anime-card img, .anime-card * {
+    touch-action: pan-y pan-x !important;
+    user-select: none;
     -webkit-user-drag: none;
+    pointer-events: auto;
+}
+
+/* Horizontal Track Carousel Overrides */
+#trending-container,
+#popular-container,
+#recent-container,
+#action-extremes-container,
+#drama-container,
+#hidden-gems-container,
+#continue-watching-container {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: visible;
+    touch-action: pan-y pan-x !important;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+}
+
+#trending-container .anime-card,
+#popular-container .anime-card,
+#recent-container .anime-card,
+#action-extremes-container .anime-card,
+#drama-container .anime-card,
+#hidden-gems-container .anime-card,
+#continue-watching-container .anime-card {
+    flex: 0 0 auto;
+    width: 140px;
+    scroll-snap-align: start;
 }
