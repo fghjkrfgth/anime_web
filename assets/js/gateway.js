@@ -56,6 +56,29 @@ async function fetchHomeCatalog() {
     return await fetchAniListGraphQL({ query });
 }
 
+async function fetchTrendingExplore() {
+    const query = `
+      query {
+        Page(page: 1, perPage: 50) {
+          media(sort: TRENDING_DESC, type: ANIME) {
+            id
+            title { romaji english native userPreferred }
+            coverImage { large extraLarge }
+            bannerImage
+            description
+            meanScore
+            format
+            status
+            genres
+            episodes
+            nextAiringEpisode { episode }
+          }
+        }
+      }
+    `;
+    return await fetchAniListGraphQL({ query });
+}
+
 // 3. WORKER PROXY ENGINE (STEALTH COMMUNITY ROUTES)
 async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
     const isPost = !!bodyPayload;
