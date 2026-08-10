@@ -247,13 +247,14 @@ html, body {
 #drama-container,
 #hidden-gems-container,
 #continue-watching-container {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    touch-action: pan-y pan-x;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-snap-type: x mandatory !important;
+    touch-action: pan-x pan-y !important;
 }
 
 #trending-container .anime-card,
@@ -263,7 +264,8 @@ html, body {
 #drama-container .anime-card,
 #hidden-gems-container .anime-card,
 #continue-watching-container .anime-card {
-    flex: 0 0 auto;
-    width: 140px;
-    scroll-snap-align: start;
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    width: 140px !important;
+    scroll-snap-align: start !important;
 }
