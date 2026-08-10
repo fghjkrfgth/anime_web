@@ -278,9 +278,33 @@ html, body {
 #drama-container .anime-card,
 #hidden-gems-container .anime-card,
 #continue-watching-container .anime-card {
-    flex: 0 0 140px !important;
+    flex: 0 0 auto !important;
     flex-shrink: 0 !important;
-    width: 140px !important;
-    max-width: 140px !important;
     scroll-snap-align: start !important;
+}
+
+.anime-card {
+    width: 140px !important;
+    min-width: 140px !important;
+    max-width: 140px !important;
+}
+
+@media (min-width: 768px) {
+    .anime-card {
+        width: 185px !important;
+        min-width: 185px !important;
+        max-width: 185px !important;
+    }
+}
+
+.anime-title-text {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    line-height: 1.3 !important;
+    max-height: 3.9em !important;
+    word-break: break-word !important;
 }
