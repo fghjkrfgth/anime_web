@@ -58,11 +58,11 @@ function getShowTitle(show) {
 window.getShowTitle = getShowTitle;
 
 function updateAllRenderedTitles() {
-    // Update standard thumbnail cards
+    // Update standard thumbnail cards, explore cards, and search cards
     document.querySelectorAll('[data-anime-data]').forEach(el => {
         try {
             const show = JSON.parse(el.getAttribute('data-anime-data'));
-            const titleTextEl = el.querySelector('.anime-title-text');
+            const titleTextEl = el.querySelector('.anime-title-text, .continue-title-text, .search-title-text, .explore-title-text');
             if (show && titleTextEl) {
                 const newTitle = getShowTitle(show);
                 titleTextEl.innerText = newTitle;
@@ -79,7 +79,7 @@ function updateAllRenderedTitles() {
     document.querySelectorAll('[data-continue-show]').forEach(el => {
         try {
             const show = JSON.parse(el.getAttribute('data-continue-show'));
-            const titleTextEl = el.querySelector('.continue-title-text');
+            const titleTextEl = el.querySelector('.continue-title-text, .anime-title-text');
             if (show && titleTextEl) {
                 const newTitle = getShowTitle(show);
                 titleTextEl.innerText = newTitle;
@@ -379,8 +379,8 @@ function createCardHTML(show) {
                 </div>
                 ${badgeHTML}
             </div>
-            <div class="p-3 bg-gradient-to-t from-black/95 to-black/30">
-                <h3 class="anime-title-text text-white text-xs md:text-sm font-semibold truncate group-hover:text-[#00f5ff] transition-colors duration-300" title="${title}">
+            <div class="anime-card-title-box">
+                <h3 class="anime-title-text text-white text-xs md:text-sm font-semibold group-hover:text-[#00f5ff] transition-colors duration-300" title="${title}">
                     ${title}
                 </h3>
             </div>
@@ -606,7 +606,7 @@ function renderFranchiseSectionsHTML(categories) {
                                         ${item.type}
                                     </span>
                                 </div>
-                                <div class="text-[10px] md:text-xs font-semibold text-white mt-2 truncate group-hover:text-[var(--anime-accent-color,#f59e0b)] transition-colors">${item.title}</div>
+                                <div class="anime-title-text text-[10px] md:text-xs font-semibold text-white mt-2 group-hover:text-[var(--anime-accent-color,#f59e0b)] transition-colors" title="${item.title}">${item.title}</div>
                                 <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.type}</div>
                             </div>
                         `;
@@ -880,8 +880,8 @@ window.renderTrendingExploreView = async function() {
                             ${badgeText}
                         </div>
                     </div>
-                    <div class="p-3 bg-gradient-to-t from-black/95 to-black/40 flex-1 flex flex-col justify-between">
-                        <h3 class="anime-title-text text-white text-xs md:text-sm font-semibold truncate group-hover:text-[#00f5ff] transition-colors" title="${title}">
+                    <div class="anime-card-title-box">
+                        <h3 class="explore-title-text anime-title-text text-white text-xs md:text-sm font-semibold group-hover:text-[#00f5ff] transition-colors" title="${title}">
                             ${title}
                         </h3>
                     </div>
