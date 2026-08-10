@@ -257,9 +257,10 @@ html, body {
     overflow-y: hidden !important;
     width: 100% !important;
     max-width: 100% !important;
+    min-width: 0 !important;
     -webkit-overflow-scrolling: touch !important;
     scroll-snap-type: x mandatory !important;
-    touch-action: pan-x pan-y !important;
+    touch-action: pan-y pan-x !important;
 }
 
 #trending-container .anime-card,
@@ -270,6 +271,7 @@ html, body {
 #hidden-gems-container .anime-card,
 #continue-watching-container .anime-card {
     flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
     width: 140px !important;
     max-width: 140px !important;
     scroll-snap-align: start !important;
