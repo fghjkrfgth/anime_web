@@ -765,4 +765,205 @@ window.renderLandingView = function() {
     `;
 };
 
+window.renderTrendingExploreView = async function() {
+    const container = document.getElementById('trending-explore-layout');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="flex items-center justify-center py-16">
+            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-[#00f5ff]"></div>
+        </div>
+    `;
+
+    try {
+        const json = await fetchTrendingExplore();
+        const trendingList = json?.data?.Page?.media || window.trendingCache || [];
+
+        if (trendingList.length === 0) {
+            container.innerHTML = `<div class="text-center py-12 text-slate-400">No trending titles available right now.</div>`;
+            return;
+        }
+
+        const top1 = trendingList[0];
+        const top1Title = getShowTitle(top1);
+        const top1Banner = top1.bannerImage || top1.coverImage.extraLarge || top1.coverImage.large;
+        const top1Desc = top1.description ? top1.description.replace(/<[^>]*>?/gm, '') : '';
+        const top1Stringified = JSON.stringify(top1).replace(/"/g, '&quot;');
+
+        let heroHtml = `
+            <!-- HERO BANNER FOR #1 TRENDING -->
+            <div class="relative w-full rounded-3xl overflow-hidden mb-8 border border-white/10 glass-crystal shadow-2xl min-h-[300px] md:min-h-[360px] flex items-end p-6 md:p-10">
+                <div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 hover:scale-105" style="background-image: url('${top1Banner}');"></div>
+                <div class="absolute inset-0 bg-gradient-to-t from-[#08080c] via-[#08080c]/70 to-transparent"></div>
+                
+                <div class="relative z-10 flex flex-col gap-3 max-w-2xl">
+                    <div class="flex items-center gap-2">
+                        <span class="px-3 py-1 bg-[#00f5ff]/20 border border-[#00f5ff]/40 text-[#00f5ff] text-xs font-mono font-bold uppercase rounded-full tracking-wider flex items-center gap-1.5">
+                            🔥 #1 TRENDING WORLDWIDE
+                        </span>
+                        <span class="text-xs font-bold text-amber-400">★ ${top1.meanScore || 'N/A'}% Score</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
+                        ${top1Title}
+                    </h1>
+                    <p class="text-xs sm:text-sm text-slate-300 line-clamp-2 font-light max-w-xl">
+                        ${top1Desc}
+                    </p>
+                    <div class="flex items-center gap-3 mt-2">
+                        <button onclick="watchShow(${top1Stringified})" class="px-6 py-3 min-h-[44px] bg-[#00f5ff] hover:bg-[#00d8e6] text-[#08080c] font-bold text-xs md:text-sm rounded-xl transition-all transform hover:scale-105 active:scale-95 uppercase tracking-wider flex items-center gap-2 shadow-[0_0_20px_rgba(0,245,255,0.4)]">
+                            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            Watch Now
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        let gridCardsHtml = trendingList.map((show, idx) => {
+            const title = getShowTitle(show);
+            const coverUrl = show.coverImage.extraLarge || show.coverImage.large;
+            const rating = show.meanScore ? `${show.meanScore}%` : 'N/A';
+            const showStr = JSON.stringify(show).replace(/"/g, '&quot;');
+            const badgeText = show.format || 'ANIME';
+
+            return `
+                <div class="anime-card flex flex-col bg-[#121218]/50 rounded-2xl overflow-hidden border border-white/10 hover:border-[#00f5ff] relative cursor-pointer group transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,245,255,0.25)] min-h-[44px]" onclick="watchShow(${showStr})">
+                    <div class="relative aspect-[3/4] w-full overflow-hidden">
+                        <img src="${coverUrl}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                        <div class="absolute top-2 left-2 px-2 py-0.5 bg-black/80 backdrop-blur-md rounded text-[9px] font-mono font-extrabold text-amber-400 border border-amber-400/20">
+                            #${idx + 1}
+                        </div>
+                        <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-black/80 backdrop-blur-md rounded text-[9px] font-bold text-[#00f5ff] border border-[#00f5ff]/20">
+                            ★ ${rating}
+                        </div>
+                        <div class="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-md rounded text-[8px] font-bold text-slate-300 uppercase tracking-wider border border-white/5">
+                            ${badgeText}
+                        </div>
+                    </div>
+                    <div class="p-3 bg-gradient-to-t from-black/95 to-black/40 flex-1 flex flex-col justify-between">
+                        <h3 class="anime-title-text text-white text-xs md:text-sm font-semibold truncate group-hover:text-[#00f5ff] transition-colors" title="${title}">
+                            ${title}
+                        </h3>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        let mainHtml = `
+            <div class="flex flex-col gap-6">
+                ${heroHtml}
+                <div class="flex items-center justify-between border-l-4 border-[#00f5ff] pl-3 py-1">
+                    <h2 class="text-base md:text-xl font-bold tracking-widest text-white uppercase">
+                        Top 50 Trending Anime
+                    </h2>
+                    <span class="text-xs font-mono text-slate-400">50 Titles Loaded</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3.5 md:gap-4">
+                    ${gridCardsHtml}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = mainHtml;
+    } catch (err) {
+        console.error('[Trending Explore] Error rendering:', err);
+        container.innerHTML = `<div class="text-center py-12 text-rose-500 font-semibold">Failed to load top trending anime.</div>`;
+    }
+};
+
+window.renderDedicatedScheduleView = async function() {
+    const container = document.getElementById('dedicated-schedule-layout');
+    if (!container) return;
+
+    if (!window.airingScheduleData) {
+        container.innerHTML = `
+            <div class="flex items-center justify-center py-16">
+                <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-[#00f5ff]"></div>
+            </div>
+        `;
+        try {
+            const schedData = await fetchClusterNode({ action: 'schedule' });
+            window.airingScheduleData = schedData || [];
+        } catch (err) {
+            console.error('[Schedule View] Failed to fetch schedule:', err);
+        }
+    }
+
+    const dayGroups = window.airingScheduleData || [];
+    if (dayGroups.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 text-slate-400">Schedule unavailable.</div>`;
+        return;
+    }
+
+    let dayDockHtml = `<div class="flex items-center gap-2 overflow-x-auto pb-4 w-full scrollbar-none snap-x snap-mandatory touch-pan-x">`;
+    dayGroups.forEach((group, index) => {
+        const dayName = group.day;
+        const isSelected = index === activeScheduleDayIndex;
+        const isToday = index === 0;
+        const shortDay = dayName.length > 3 ? dayName.substring(0, 3) : dayName;
+        const displayLabel = isToday ? `Today (${shortDay})` : dayName;
+
+        const activeClass = isSelected
+            ? 'bg-[#00f5ff]/20 border-[#00f5ff]/60 text-white shadow-[0_0_20px_rgba(0,245,255,0.3)] font-bold'
+            : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white font-medium';
+
+        dayDockHtml += `
+            <button onclick="selectDedicatedScheduleDay(${index})" class="px-5 py-3 text-xs md:text-sm tracking-wider uppercase rounded-2xl border transition-all duration-300 ${activeClass} whitespace-nowrap snap-start shrink-0 min-h-[44px]">
+                ${displayLabel}
+            </button>
+        `;
+    });
+    dayDockHtml += `</div>`;
+
+    const currentGroup = dayGroups[activeScheduleDayIndex];
+    const shows = currentGroup ? currentGroup.shows || [] : [];
+
+    let showsListHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6 w-full">`;
+    if (shows.length === 0) {
+        showsListHtml += `<div class="col-span-full text-center py-12 text-slate-400 text-sm italic">No scheduled broadcasts for this day</div>`;
+    } else {
+        shows.forEach(show => {
+            const localTime = formatLocalTime(show.timestamp);
+            const searchParam = encodeURIComponent(show.title);
+
+            showsListHtml += `
+                <div class="flex items-center justify-between p-4 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#00f5ff]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px]" onclick="searchAndPlay('${searchParam}', '${show.slug}')">
+                    <div class="flex items-center gap-3 min-w-0 mr-3">
+                        <span class="text-xs font-extrabold text-[#00f5ff] whitespace-nowrap bg-[#00f5ff]/10 px-3 py-1.5 rounded-xl border border-[#00f5ff]/25 shadow-[0_0_10px_rgba(0,245,255,0.15)]">
+                            ${localTime}
+                        </span>
+                        <h4 class="text-white text-xs md:text-sm font-bold truncate group-hover:text-[#00f5ff] transition-colors" title="${show.title}">
+                            ${show.title}
+                        </h4>
+                    </div>
+                    <span class="text-[10px] font-extrabold text-white bg-[#00f5ff]/80 text-[#08080c] px-3 py-1 rounded-full whitespace-nowrap shadow-[0_0_10px_rgba(0,245,255,0.3)] font-mono">
+                        EP ${show.episode}
+                    </span>
+                </div>
+            `;
+        });
+    }
+    showsListHtml += `</div>`;
+
+    container.innerHTML = `
+        <div class="flex flex-col gap-6">
+            <div class="flex items-center justify-between border-l-4 border-[#00f5ff] pl-3 py-1">
+                <h1 class="text-xl md:text-3xl font-extrabold tracking-wider text-white uppercase">
+                    Weekly Airing Broadcast Schedule
+                </h1>
+                <span class="text-xs font-mono text-slate-400">Live Release Times</span>
+            </div>
+            ${dayDockHtml}
+            ${showsListHtml}
+        </div>
+    `;
+};
+
+window.selectDedicatedScheduleDay = function(index) {
+    activeScheduleDayIndex = index;
+    if (typeof window.renderDedicatedScheduleView === 'function') {
+        window.renderDedicatedScheduleView();
+    }
+};
+
 
