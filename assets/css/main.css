@@ -84,25 +84,27 @@ html, body {
         -webkit-backdrop-filter: blur(12px) !important;
     }
 
-    .anime-card {
+    .anime-card,
+    .anime-card img,
+    .anime-card:hover,
+    .anime-card:hover img,
+    .glass-crystal-card,
+    .glass-crystal-card:hover {
         transform: none !important;
         box-shadow: none !important;
         transition: none !important;
     }
 
-    .anime-card img {
+    /* Disable scale-down effects on non-hovered neighbor cards in horizontal rows */
+    #trending-container:hover .anime-card:not(:hover),
+    #popular-container:hover .anime-card:not(:hover),
+    #recent-container:hover .anime-card:not(:hover),
+    #action-extremes-container:hover .anime-card:not(:hover),
+    #drama-container:hover .anime-card:not(:hover),
+    #hidden-gems-container:hover .anime-card:not(:hover),
+    #continue-watching-container:hover .anime-card:not(:hover) {
         transform: none !important;
-        transition: none !important;
-    }
-
-    .anime-card:hover {
-        transform: none !important;
-        box-shadow: none !important;
-        border-color: rgba(189, 0, 255, 0.2) !important;
-    }
-
-    .anime-card:hover img {
-        transform: none !important;
+        opacity: 1 !important;
     }
 
     #spotlight-outer-container {
