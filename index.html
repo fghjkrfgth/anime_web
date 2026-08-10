@@ -322,10 +322,10 @@
                 </section>
 
                 <!-- RIGHT CONTENT HUB (60% Width: 7 columns on lg, 12 columns on mobile) -->
-                <div class="col-span-12 lg:col-span-7 flex flex-col gap-10">
+                <div class="col-span-12 lg:col-span-7 flex flex-col gap-10 min-w-0 w-full">
 
                     <!-- Continue Watching (If present) -->
-                    <section id="continue-watching-section" class="hidden flex flex-col gap-4">
+                    <section id="continue-watching-section" class="hidden flex flex-col gap-4 w-full min-w-0 overflow-hidden">
                         <h2
                             class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
                             Continue Watching
@@ -336,7 +336,7 @@
                     </section>
 
                     <!-- TOP PICKS THIS WEEK -->
-                    <section id="trending-section" class="flex flex-col gap-4">
+                    <section id="trending-section" class="flex flex-col gap-4 w-full min-w-0 overflow-hidden">
                         <div class="flex items-center justify-between">
                             <h2
                                 class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
@@ -351,7 +351,7 @@
                             </div>
                         </div>
                         <div id="trending-container"
-                            class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
+                            class="flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-3 pb-4 touch-pan-x">
                             <div class="w-full flex justify-center py-12">
                                 <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
                             </div>
