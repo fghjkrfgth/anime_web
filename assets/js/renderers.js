@@ -12,30 +12,48 @@ window.GENRE_MAPPING = GENRE_MAPPING;
 
 let activeScheduleDayIndex = 0;
 
-const LANG_CODE_MAP = {
-    english: 'EN',
-    romaji: 'JP',
-    native: 'JP',
-    spanish: 'ES',
-    french: 'FR',
-    german: 'DE'
+const LANGUAGE_MAP = {
+    'en': { label: 'EN', name: 'English' },
+    'x-jat': { label: 'JP', name: 'Romaji' },
+    'ja': { label: '日', name: 'Native Japanese' },
+    'zh-Hans': { label: '简', name: 'Simplified Chinese' },
+    'zh-Hant': { label: '繁', name: 'Traditional Chinese' },
+    'ar': { label: 'AR', name: 'Arabic' },
+    'cs': { label: 'CS', name: 'Czech' },
+    'de': { label: 'DE', name: 'German' },
+    'es': { label: 'ES', name: 'Spanish' },
+    'es-CA': { label: 'ES-CA', name: 'Spanish (Latin America)' },
+    'fr': { label: 'FR', name: 'French' },
+    'he': { label: 'HE', name: 'Hebrew' },
+    'hu': { label: 'HU', name: 'Hungarian' },
+    'it': { label: 'IT', name: 'Italian' },
+    'ko': { label: 'KO', name: 'Korean' },
+    'pl': { label: 'PL', name: 'Polish' },
+    'pt': { label: 'PT', name: 'Portuguese' },
+    'pt-BR': { label: 'PT-BR', name: 'Portuguese (Brazil)' },
+    'ro': { label: 'RO', name: 'Romanian' },
+    'ru': { label: 'RU', name: 'Russian' },
+    'th': { label: 'TH', name: 'Thai' },
+    'tr': { label: 'TR', name: 'Turkish' },
+    'vi': { label: 'VI', name: 'Vietnamese' }
 };
+window.LANGUAGE_MAP = LANGUAGE_MAP;
 
 function getShowTitle(show) {
     if (!show || !show.title) return 'Unknown Title';
-    const pref = localStorage.getItem('userLanguagePref') || 'english';
-    
-    if (pref === 'english') {
+    const pref = localStorage.getItem('userLanguagePref') || 'en';
+
+    if (pref === 'en') {
         return show.title.english || show.title.romaji || show.title.userPreferred || 'Unknown Title';
-    } else if (pref === 'romaji') {
+    } else if (pref === 'x-jat') {
         return show.title.romaji || show.title.english || show.title.userPreferred || 'Unknown Title';
-    } else if (pref === 'native') {
-        return show.title.native || show.title.romaji || show.title.english || 'Unknown Title';
+    } else if (pref === 'ja' || pref === 'zh-Hans' || pref === 'zh-Hant') {
+        return show.title.native || show.title.romaji || show.title.english || show.title.userPreferred || 'Unknown Title';
     } else if (show.title[pref]) {
         return show.title[pref];
     }
-    
-    return show.title.userPreferred || show.title.romaji || show.title.english || 'Unknown Title';
+
+    return show.title.english || show.title.romaji || show.title.userPreferred || 'Unknown Title';
 }
 window.getShowTitle = getShowTitle;
 
@@ -85,10 +103,11 @@ function updateAllRenderedTitles() {
 window.updateAllRenderedTitles = updateAllRenderedTitles;
 
 function updateLanguageSelectionUI() {
-    const currentPref = localStorage.getItem('userLanguagePref') || 'english';
+    const currentPref = localStorage.getItem('userLanguagePref') || 'en';
     const langCodeEl = document.getElementById('current-lang-code');
+    const langInfo = LANGUAGE_MAP[currentPref] || LANGUAGE_MAP['en'];
     if (langCodeEl) {
-        langCodeEl.innerText = LANG_CODE_MAP[currentPref] || 'EN';
+        langCodeEl.innerText = langInfo ? langInfo.label : 'EN';
     }
 
     document.querySelectorAll('.lang-option').forEach(btn => {
