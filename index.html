@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <base href="/">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BlackLeg - Premium Anime Streaming</title>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
@@ -49,9 +49,9 @@
         </button>
 
         <!-- Center: ANIMEFLOW Logo -->
-        <a href="/home"
-            class="flex items-center gap-1.5 text-white font-extrabold text-lg md:text-2xl tracking-wider select-none absolute left-1/2 transform -translate-x-1/2 md:static md:transform-none">
-            ANIME<span class="text-themeCyan drop-shadow-[0_0_8px_rgba(0,255,204,0.4)]">FLOW</span>
+        <a href="/"
+            class="flex items-center gap-1 text-white font-extralight text-lg md:text-2xl tracking-[0.2em] select-none absolute left-1/2 transform -translate-x-1/2 md:static md:transform-none uppercase">
+            ANIME<span class="font-normal text-slate-300">FLOW</span>
         </a>
 
         <!-- Right: Search, Language & Filter Icons -->
@@ -149,44 +149,34 @@
     <!-- Drawer Overlay -->
     <div id="mobile-drawer-overlay" class="fixed inset-0 bg-black/60 z-[90] hidden md:hidden"></div>
 
-    <!-- Pinned Bottom Tab Dock (Mobile Only) -->
-    <div
-        class="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-[#0c0c12]/80 backdrop-blur-xl border-t border-white/5 px-4 py-2 flex items-center justify-between shadow-2xl">
-        <a href="/home" class="flex flex-col items-center gap-1 flex-1 py-1 text-center group text-[#00f5ff]">
-            <svg class="w-5 h-5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </svg>
-            <span class="text-[9px] font-bold tracking-wider uppercase">Home</span>
+    <!-- Pinned Mobile Bottom Application Dock -->
+    <nav id="mobile-bottom-nav" class="block md:hidden fixed bottom-0 left-0 right-0 z-50 glass-crystal border-t border-white/10 px-4 py-2 flex justify-around items-center shadow-2xl pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <a href="/home" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-white hover:text-white transition-colors">
+            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            <span class="text-[9px] font-mono tracking-widest uppercase">Home</span>
         </a>
-        <a href="#trending-section"
-            class="flex flex-col items-center gap-1 flex-1 py-1 text-center group text-steelGray hover:text-[#00f5ff] transition-colors">
-            <svg class="w-5 h-5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="text-[9px] font-bold tracking-wider uppercase">Explore</span>
-        </a>
-        <a href="#airing-broadcast-section"
-            class="flex flex-col items-center gap-1 flex-1 py-1 text-center group text-steelGray hover:text-[#00f5ff] transition-colors">
-            <svg class="w-5 h-5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span class="text-[9px] font-bold tracking-wider uppercase">Schedule</span>
-        </a>
-        <button id="dock-filter-btn"
-            class="flex flex-col items-center gap-1 flex-1 py-1 text-center group text-steelGray hover:text-[#00f5ff] transition-colors focus:outline-none">
-            <svg class="w-5 h-5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-            <span class="text-[9px] font-bold tracking-wider uppercase">Genres</span>
+        <button id="mobile-nav-search-btn" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span class="text-[9px] font-mono tracking-widest uppercase">Search</span>
         </button>
-    </div>
+        <a href="#trending-section" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+            <span class="text-[9px] font-mono tracking-widest uppercase">Library</span>
+        </a>
+        <button id="dock-filter-btn" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
+            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 6h16M4 12h16M4 18h7"/></svg>
+            <span class="text-[9px] font-mono tracking-widest uppercase">Settings</span>
+        </button>
+    </nav>
 
     <!-- Main Feed Content Container -->
-    <main id="main-content" class="px-4 md:px-8 pb-20 md:pb-16 max-w-7xl mx-auto w-full">
+    <main id="main-content" class="px-4 md:px-8 pb-24 md:pb-16 max-w-7xl mx-auto w-full">
+        <!-- Dedicated Trending Explore Layout Container -->
+        <div id="trending-explore-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6"></div>
+
+        <!-- Dedicated Airing Broadcast Schedule Layout Container -->
+        <div id="dedicated-schedule-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6"></div>
+
         <!-- Search Results Page Layout Container -->
         <div id="search-results-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6">
             <!-- Search Input and Filters Section -->
@@ -421,68 +411,6 @@
                     </div>
                 </section>
 
-                <!-- Weekly Airing Broadcast Schedule -->
-                <section id="airing-broadcast-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3 flex items-center gap-2">
-                            Weekly Airing Broadcast
-                        </h2>
-                    </div>
-                    <div id="airing-broadcast-columns"
-                        class="flex gap-6 overflow-x-auto pb-4 scrollbar-thin snap-x snap-mandatory scroll-smooth">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Action Extremes -->
-                <section id="action-extremes-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Action Extremes
-                        </h2>
-                        <!-- Track Navigators -->
-                        <div class="hidden md:flex items-center gap-2">
-                            <button onclick="scrollTrack('action-extremes-container', 'left')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                            <button onclick="scrollTrack('action-extremes-container', 'right')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                        </div>
-                    </div>
-                    <div id="action-extremes-container"
-                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Slice of Life & Drama -->
-                <section id="drama-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Slice of Life & Drama
-                        </h2>
-                        <!-- Track Navigators -->
-                        <div class="hidden md:flex items-center gap-2">
-                            <button onclick="scrollTrack('drama-container', 'left')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                            <button onclick="scrollTrack('drama-container', 'right')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                        </div>
-                    </div>
-                    <div id="drama-container"
-                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
-
                 <!-- Hidden Gems -->
                 <section id="hidden-gems-section" class="flex flex-col gap-4">
                     <div class="flex items-center justify-between">
@@ -505,6 +433,23 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- Weekly Airing Broadcast Schedule (Moved to Bottom) -->
+                <section id="airing-broadcast-section" class="flex flex-col gap-4">
+                    <div class="flex items-center justify-between">
+                        <h2
+                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3 flex items-center gap-2">
+                            Weekly Airing Broadcast
+                        </h2>
+                    </div>
+                    <div id="airing-broadcast-columns"
+                        class="flex gap-6 overflow-x-auto pb-4 scrollbar-thin snap-x snap-mandatory scroll-smooth">
+                        <div class="w-full flex justify-center py-12">
+                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
             </div>
     </main>
 
@@ -519,8 +464,7 @@
                 <span class="cursor-pointer hover:underline" onclick="toggleClusterModeDebug()">Cluster Mode Sync</span>
                 <span>&bull;</span>
                 <span class="text-white">Active Node: <span id="active-node-display"
-                        class="font-mono text-themeCyan bg-slate-900/60 px-2 py-0.5 rounded border border-white/5">Primary
-                        Node</span></span>
+                        class="font-mono text-themeCyan bg-slate-900/60 px-2 py-0.5 rounded border border-white/5">Primary Node</span></span>
             </div>
         </div>
     </footer>
