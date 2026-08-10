@@ -234,11 +234,9 @@ html, body {
 }
 
 /* Anime Card Touch Gesture Overrides */
-.anime-card, .anime-card img, .anime-card * {
-    touch-action: pan-y pan-x !important;
-    user-select: none;
+.anime-card img {
     -webkit-user-drag: none;
-    pointer-events: auto;
+    user-select: none;
 }
 
 /* Horizontal Track Carousel Overrides */
@@ -250,9 +248,10 @@ html, body {
 #hidden-gems-container,
 #continue-watching-container {
     display: flex;
+    flex-wrap: nowrap;
     overflow-x: auto;
-    overflow-y: visible;
-    touch-action: pan-y pan-x !important;
+    overflow-y: hidden;
+    touch-action: pan-y pan-x;
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x mandatory;
 }
