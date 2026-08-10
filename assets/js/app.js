@@ -501,6 +501,10 @@ async function initApp() {
     console.log('[BlackLeg Init] Initializing SPA router...');
 
     try {
+        if (!localStorage.getItem('userLanguagePref')) {
+            localStorage.setItem('userLanguagePref', 'en');
+        }
+
         if (typeof populateYearDropdown === 'function') populateYearDropdown();
         if (typeof setupDropdownListeners === 'function') setupDropdownListeners();
 
