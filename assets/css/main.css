@@ -242,6 +242,14 @@ html, body {
     user-select: none;
 }
 
+/* Fix grid/flex child expansion */
+#trending-section {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
 /* Horizontal Track Carousel Overrides */
 #trending-container,
 #popular-container,
@@ -253,14 +261,14 @@ html, body {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
     -webkit-overflow-scrolling: touch !important;
     scroll-snap-type: x mandatory !important;
-    touch-action: pan-y pan-x !important;
+    touch-action: pan-x pan-y !important;
 }
 
 #trending-container .anime-card,
@@ -270,7 +278,7 @@ html, body {
 #drama-container .anime-card,
 #hidden-gems-container .anime-card,
 #continue-watching-container .anime-card {
-    flex: 0 0 auto !important;
+    flex: 0 0 140px !important;
     flex-shrink: 0 !important;
     width: 140px !important;
     max-width: 140px !important;
