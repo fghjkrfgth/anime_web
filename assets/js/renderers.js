@@ -10,26 +10,34 @@ const GENRE_MAPPING = [
 ];
 window.GENRE_MAPPING = GENRE_MAPPING;
 
-window.setupLanguageListeners = function() {
-    const langSelector = document.querySelector('#details-lang-selector') || document.querySelector('#global-lang-selector');
-    if (langSelector) {
-        langSelector.addEventListener('change', (e) => {
-            window.currentLang = e.target.value;
-            console.log('[Lang Manager] Preferred language updated to:', window.currentLang);
-        });
-    }
-};
-
 let activeScheduleDayIndex = 0;
+
+const LANG_CODE_MAP = {
+    english: 'EN',
+    romaji: 'JP',
+    native: 'JP',
+    spanish: 'ES',
+    french: 'FR',
+    german: 'DE'
+};
 
 function getShowTitle(show) {
     if (!show || !show.title) return 'Unknown Title';
-    const pref = localStorage.getItem('userLanguagePref') || 'romaji';
-    if (show.title[pref]) {
+    const pref = localStorage.getItem('userLanguagePref') || 'english';
+    
+    if (pref === 'english') {
+        return show.title.english || show.title.romaji || show.title.userPreferred || 'Unknown Title';
+    } else if (pref === 'romaji') {
+        return show.title.romaji || show.title.english || show.title.userPreferred || 'Unknown Title';
+    } else if (pref === 'native') {
+        return show.title.native || show.title.romaji || show.title.english || 'Unknown Title';
+    } else if (show.title[pref]) {
         return show.title[pref];
     }
+    
     return show.title.userPreferred || show.title.romaji || show.title.english || 'Unknown Title';
 }
+window.getShowTitle = getShowTitle;
 
 function updateAllRenderedTitles() {
     // Update standard thumbnail cards
@@ -74,9 +82,15 @@ function updateAllRenderedTitles() {
         }
     }
 }
+window.updateAllRenderedTitles = updateAllRenderedTitles;
 
 function updateLanguageSelectionUI() {
-    const currentPref = localStorage.getItem('userLanguagePref') || 'romaji';
+    const currentPref = localStorage.getItem('userLanguagePref') || 'english';
+    const langCodeEl = document.getElementById('current-lang-code');
+    if (langCodeEl) {
+        langCodeEl.innerText = LANG_CODE_MAP[currentPref] || 'EN';
+    }
+
     document.querySelectorAll('.lang-option').forEach(btn => {
         const val = btn.getAttribute('data-value');
         if (val === currentPref) {
@@ -88,38 +102,45 @@ function updateLanguageSelectionUI() {
         }
     });
 }
+window.updateLanguageSelectionUI = updateLanguageSelectionUI;
 
 function setupLanguageListeners() {
     const langPrefBtn = document.getElementById('lang-pref-btn');
     const langPrefDropdown = document.getElementById('lang-pref-dropdown');
 
     if (langPrefBtn && langPrefDropdown) {
-        langPrefBtn.addEventListener('click', (e) => {
+        langPrefBtn.onclick = function(e) {
+            e.preventDefault();
             e.stopPropagation();
             langPrefDropdown.classList.toggle('hidden');
-        });
+        };
 
         document.addEventListener('click', (e) => {
-            if (!langPrefDropdown.contains(e.target) && e.target !== langPrefBtn) {
+            if (!langPrefDropdown.contains(e.target) && !langPrefBtn.contains(e.target)) {
                 langPrefDropdown.classList.add('hidden');
             }
         });
     }
 
     document.querySelectorAll('.lang-option').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             const val = btn.getAttribute('data-value');
-            localStorage.setItem('userLanguagePref', val);
-
-            updateAllRenderedTitles();
-            updateLanguageSelectionUI();
-
+            if (val) {
+                localStorage.setItem('userLanguagePref', val);
+                updateAllRenderedTitles();
+                updateLanguageSelectionUI();
+            }
             if (langPrefDropdown) {
                 langPrefDropdown.classList.add('hidden');
             }
-        });
+        };
     });
+
+    updateLanguageSelectionUI();
 }
+window.setupLanguageListeners = setupLanguageListeners;
 
 function cleanDescription(desc) {
     if (!desc) return 'No synopsis available.';
