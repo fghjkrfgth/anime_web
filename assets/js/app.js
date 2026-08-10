@@ -521,6 +521,9 @@ async function initApp() {
     window.addEventListener('popstate', () => {
         handleSpaRouting();
     });
+    window.addEventListener('hashchange', () => {
+        handleSpaRouting();
+    });
 
     // Intercept clicks on links to keep SPA routing pure
     document.addEventListener('click', (e) => {
