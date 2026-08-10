@@ -1,480 +1,274 @@
-<!DOCTYPE html>
-<html lang="en" class="h-full">
+html, body {
+    background-color: #08080c !important;
+    color: #ffffff !important;
+    font-family: 'Outfit', sans-serif;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    position: relative;
+    padding-bottom: env(safe-area-inset-bottom);
+}
 
-<head>
-    <meta charset="UTF-8">
-    <base href="/">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>BlackLeg - Premium Anime Streaming</title>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Outfit', 'sans-serif'],
-                    },
-                    colors: {
-                        themeBlack: '#08080c',
-                        themeGlass: 'rgba(18, 18, 24, 0.45)',
-                        themeCyan: '#00ffcc',
-                        themeCrimson: '#ff0055',
-                        steelGray: '#a0a5b5'
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Custom Modular CSS Stylesheet -->
-    <link rel="stylesheet" href="/assets/css/main.css">
-    <!-- Hls.js Engine Script -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
-</head>
+/* Zenith Glass Panels */
+.glass-panel {
+    background: rgba(18, 18, 24, 0.45);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
 
-<body class="h-full flex flex-col scrollbar-thin">
+/* Custom Scrollbars */
+.scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
 
-    <!-- Header Bar -->
-    <header
-        class="sticky top-0 z-50 w-full bg-[#08080c]/85 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
-        <!-- Left: Hamburger Menu (Mobile Drawer Toggle) -->
-        <button id="mobile-drawer-toggle"
-            class="p-2 text-white hover:text-[#00f5ff] transition-colors focus:outline-none md:hidden">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-        </button>
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
 
-        <!-- Center: ANIMEFLOW Logo -->
-        <a href="/"
-            class="flex items-center gap-1 text-white font-extralight text-lg md:text-2xl tracking-[0.2em] select-none absolute left-1/2 transform -translate-x-1/2 md:static md:transform-none uppercase">
-            ANIME<span class="font-normal text-slate-300">FLOW</span>
-        </a>
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 204, 0.25);
+    border-radius: 10px;
+    transition: background 0.3s;
+}
 
-        <!-- Right: Search, Language & Filter Icons -->
-        <div class="flex items-center gap-2 ml-auto md:ml-0 relative">
-            <!-- Language Preference Selector Popover -->
-            <div class="relative inline-block text-left">
-                <button id="lang-pref-btn"
-                    class="p-2 text-white hover:text-[#00f5ff] transition-colors focus:outline-none rounded-full bg-white/5 border border-white/10"
-                    title="Language Preference">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                </button>
-                <div id="lang-pref-dropdown"
-                    class="absolute right-0 mt-2 w-44 rounded-2xl bg-slate-950/90 border border-white/10 backdrop-blur-xl shadow-2xl hidden z-50 overflow-hidden transition-all duration-300">
-                    <div class="py-1">
-                        <button
-                            class="lang-option w-full text-left px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all"
-                            data-value="english">English</button>
-                        <button
-                            class="lang-option w-full text-left px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all"
-                            data-value="romaji">Romaji</button>
-                        <button
-                            class="lang-option w-full text-left px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all"
-                            data-value="native">Native</button>
-                        <button
-                            class="lang-option w-full text-left px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all"
-                            data-value="spanish">Spanish</button>
-                        <button
-                            class="lang-option w-full text-left px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all"
-                            data-value="french">French</button>
-                        <button
-                            class="lang-option w-full text-left px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all"
-                            data-value="german">German</button>
-                    </div>
-                </div>
-            </div>
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 204, 0.6);
+}
 
-            <!--
-            <button id="filter-toggle-btn" class="p-2 text-white hover:text-[#00f5ff] transition-colors focus:outline-none rounded-full bg-white/5 border border-white/10" title="Filter Catalog">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-                </svg>
-            </button>
-            -->
-            <button id="search-toggle-btn"
-                class="p-2 text-white hover:text-[#00f5ff] transition-colors focus:outline-none rounded-full bg-white/5 border border-white/10"
-                title="Search Catalog">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-            </button>
-        </div>
-    </header>
+/* Kinetic Fluidity & Component Animations */
+.anime-card {
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: transform, box-shadow;
+}
 
+.anime-card img {
+    transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: transform;
+}
 
+.anime-card:hover {
+    transform: scale(1.05) translateY(-4px);
+    box-shadow: 0 0 25px rgba(0, 245, 255, 0.35);
+    border-color: #00f5ff !important;
+    z-index: 10;
+}
 
-    <!-- Mobile Side Drawer -->
-    <div id="mobile-drawer"
-        class="fixed inset-y-0 left-0 w-64 bg-[#0c0c12]/95 backdrop-blur-2xl z-[100] border-r border-white/5 transform -translate-x-full transition-transform duration-300 ease-in-out md:hidden">
-        <div class="p-6 flex flex-col gap-6">
-            <div class="flex items-center justify-between">
-                <span class="text-white font-extrabold text-xl tracking-wider">FLOW MENU</span>
-                <button id="mobile-drawer-close" class="p-1 text-white hover:text-[#00f5ff]">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <nav class="flex flex-col gap-4 text-sm font-semibold text-steelGray">
-                <a href="/home" class="hover:text-white transition-colors py-2 border-b border-white/5">Home</a>
-                <a href="#trending-section"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5">Explore</a>
-                <a href="#airing-broadcast-section"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5">Schedule</a>
-                <a href="#" id="drawer-filter-trigger"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5 flex items-center justify-between">
-                    <span>Genres</span>
-                    <svg class="w-4 h-4 text-[#00f5ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                    </svg>
-                </a>
-                <a href="#" onclick="toggleClusterModeDebug()"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5 flex items-center justify-between">
-                    <span>Cluster</span>
-                    <span class="w-2.5 h-2.5 rounded-full bg-themeCyan animate-pulse"></span>
-                </a>
-            </nav>
-        </div>
-    </div>
-    <!-- Drawer Overlay -->
-    <div id="mobile-drawer-overlay" class="fixed inset-0 bg-black/60 z-[90] hidden md:hidden"></div>
+.anime-card:hover img {
+    transform: scale(1.08);
+}
 
-    <!-- Pinned Mobile Bottom Application Dock -->
-    <nav id="mobile-bottom-nav" class="block md:hidden fixed bottom-0 left-0 right-0 z-50 glass-crystal border-t border-white/10 px-4 py-2 flex justify-around items-center shadow-2xl pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        <a href="/home" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-white hover:text-white transition-colors">
-            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-            <span class="text-[9px] font-mono tracking-widest uppercase">Home</span>
-        </a>
-        <a href="#trending-section" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
-            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            <span class="text-[9px] font-mono tracking-widest uppercase">Explore</span>
-        </a>
-        <a href="#airing-broadcast-section" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
-            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            <span class="text-[9px] font-mono tracking-widest uppercase">Schedule</span>
-        </a>
-        <a href="#" onclick="return false;" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
-            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            <span class="text-[9px] font-mono tracking-widest uppercase">Settings</span>
-        </a>
-    </nav>
+/* Surrounding nodes slide back slightly */
+#trending-container:hover .anime-card:not(:hover),
+#popular-container:hover .anime-card:not(:hover) {
+    transform: scale(0.96);
+    opacity: 0.75;
+}
 
-    <!-- Main Feed Content Container -->
-    <main id="main-content" class="px-4 md:px-8 pb-24 md:pb-16 max-w-7xl mx-auto w-full">
-        <!-- Dedicated Trending Explore Layout Container -->
-        <div id="trending-explore-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6"></div>
+/* Mobile Touch-Swipe Momentum snap physics */
+.snap-track {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+}
 
-        <!-- Dedicated Airing Broadcast Schedule Layout Container -->
-        <div id="dedicated-schedule-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6"></div>
+.snap-item {
+    scroll-snap-align: start;
+}
 
-        <!-- Search Results Page Layout Container -->
-        <div id="search-results-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6">
-            <!-- Search Input and Filters Section -->
-            <div class="w-full mb-8 flex flex-col gap-4">
-                <h2 class="text-white text-xl md:text-2xl font-extrabold uppercase tracking-wider">Search Anime Catalog
-                </h2>
-                <div class="relative w-full">
-                    <svg class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-steelGray pointer-events-none"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <input id="search-input" type="text" placeholder="Type name, genre, or keywords..."
-                        class="w-full pl-12 pr-6 py-3.5 md:py-4 text-base md:text-lg text-white bg-slate-950/60 rounded-2xl border border-[#00f5ff]/20 outline-none transition-all duration-300 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 shadow-[0_0_15px_rgba(0,245,255,0.1)]">
-                </div>
+/* Mobile Performance Optimization & Smooth Rendering */
+@media (max-width: 768px) {
+    .glass-panel {
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+    }
 
-                <!-- Compact Dropdown Packed Filters inline -->
-                <div id="filter-dropdowns-container" class="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-2">
-                    <select id="filter-genre"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Any Genre</option>
-                        <option value="Action">Action</option>
-                        <option value="Adventure">Adventure</option>
-                        <option value="Comedy">Comedy</option>
-                        <option value="Drama">Drama</option>
-                        <option value="Fantasy">Fantasy</option>
-                        <option value="Horror">Horror</option>
-                        <option value="Mecha">Mecha</option>
-                        <option value="Music">Music</option>
-                        <option value="Mystery">Mystery</option>
-                        <option value="Romance">Romance</option>
-                        <option value="Sci-Fi">Sci-Fi</option>
-                        <option value="Slice of Life">Slice of Life</option>
-                        <option value="Sports">Sports</option>
-                        <option value="Supernatural">Supernatural</option>
-                        <option value="Thriller">Thriller</option>
-                    </select>
+    .anime-card {
+        transform: none !important;
+        box-shadow: none !important;
+        transition: none !important;
+    }
 
-                    <select id="filter-status"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Any Status</option>
-                        <option value="FINISHED">Finished</option>
-                        <option value="RELEASING">Releasing</option>
-                        <option value="NOT_YET_RELEASED">Not Yet Released</option>
-                        <option value="CANCELLED">Cancelled</option>
-                        <option value="HIATUS">Hiatus</option>
-                    </select>
+    .anime-card img {
+        transform: none !important;
+        transition: none !important;
+    }
 
-                    <select id="filter-format"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Any Format</option>
-                        <option value="TV">TV</option>
-                        <option value="TV_SHORT">TV Short</option>
-                        <option value="MOVIE">Movie</option>
-                        <option value="SPECIAL">Special</option>
-                        <option value="OVA">OVA</option>
-                        <option value="ONA">ONA</option>
-                    </select>
+    .anime-card:hover {
+        transform: none !important;
+        box-shadow: none !important;
+        border-color: rgba(189, 0, 255, 0.2) !important;
+    }
 
-                    <select id="filter-year"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Any Year</option>
-                    </select>
+    .anime-card:hover img {
+        transform: none !important;
+    }
 
-                    <select id="filter-sort"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Sort Order</option>
-                        <option value="POPULARITY_DESC">Most Popular</option>
-                        <option value="SCORE_DESC">Highest Score</option>
-                        <option value="TRENDING_DESC">Trending</option>
-                        <option value="SEARCH_MATCH">Relevance</option>
-                    </select>
-                </div>
-            </div>
+    #spotlight-outer-container {
+        box-shadow: none !important;
+        background: linear-gradient(135deg, rgba(0, 245, 255, 0.25), rgba(189, 0, 255, 0.25)) !important;
+    }
 
-            <!-- Search Results Grid Area -->
-            <div class="w-full">
-                <div id="search-overlay-results-header" class="mb-6 flex justify-between items-center hidden">
-                    <h3 id="search-overlay-title"
-                        class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-[#00f5ff] pl-3">
-                        Search Results
-                    </h3>
-                    <button id="search-overlay-clear"
-                        class="text-xs font-semibold px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-white transition-all">
-                        Back to Home
-                    </button>
-                </div>
+    /* Hide non-interactive background decorations/glows/spark overlays to reclaim draw call threads */
+    .particle-overlay,
+    .background-glow,
+    .glow-layer,
+    .spark-overlay,
+    .bg-sparks {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
 
-                <div id="search-results-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-6">
-                    <!-- Dynamic Results -->
-                </div>
-            </div>
-        </div>
+/* Subtitle / Caption Positioning & Styling Overrides */
+video::cue {
+    background: rgba(8, 8, 12, 0.75) !important;
+    color: #ffffff !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 15px !important;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.9) !important;
+    line-height: 1.4 !important;
+    margin-bottom: 15% !important;
+}
 
-        <div id="homepage-sections-wrapper">
-            <!-- SECTION 1: THE SPLIT COMMAND LAYER (TOP HALF) -->
-            <div class="flex flex-col lg:grid lg:grid-cols-12 lg:gap-8 my-8 items-start">
+/* MINIMALIST CRYSTAL GLASS DESIGN SYSTEM */
+.glass-crystal {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 1px 1px 0px 0px rgba(255, 255, 255, 0.1), 0 20px 40px 0 rgba(0, 0, 0, 0.4);
+}
 
-                <!-- LEFT SIDEBAR SPOTLIGHT (40% Width: 5 columns on lg, 12 columns on mobile) -->
-                <section class="col-span-12 lg:col-span-5 flex flex-col gap-4">
-                    <h2
-                        class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3 flex items-center gap-2">
-                        Spotlight <span class="w-1.5 h-1.5 rounded-full bg-themeCyan animate-ping"></span>
-                    </h2>
+.glass-crystal-card {
+    background: rgba(255, 255, 255, 0.025);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0px 1px 0px 0px rgba(255, 255, 255, 0.08), 0 12px 32px 0 rgba(0, 0, 0, 0.35);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
-                    <!-- Floating Spotlight Container with neon lightning border -->
-                    <div id="spotlight-outer-container"
-                        class="relative w-full aspect-[3/4] md:aspect-[4/5] rounded-3xl p-1 overflow-hidden transition-all duration-500 bg-gradient-to-br from-[#00f5ff] via-transparent to-[#bd00ff] shadow-[0_0_20px_rgba(0,245,255,0.15)] group/spotlight">
-                        <!-- Internal Card container with backdrop blur -->
-                        <div id="spotlight-card-content"
-                            class="relative w-full h-full rounded-[22px] overflow-hidden bg-slate-950/95 flex flex-col justify-end p-6 md:p-8 z-10 transition-opacity duration-300">
-                            <!-- Background Image Zoom -->
-                            <div id="spotlight-bg-img"
-                                class="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover/spotlight:scale-105"
-                                style="background-image: url('');"></div>
-                            <div
-                                class="absolute inset-0 bg-gradient-to-t from-[#08080c] via-[#08080c]/60 to-transparent">
-                            </div>
+.glass-crystal-card:hover {
+    background: rgba(255, 255, 255, 0.045);
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    border-left: 1px solid rgba(255, 255, 255, 0.18);
+    transform: translateY(-2px);
+    box-shadow: inset 0px 1px 0px 0px rgba(255, 255, 255, 0.15), 0 20px 40px 0 rgba(0, 0, 0, 0.5);
+}
 
-                            <!-- Overlay Details -->
-                            <div class="relative z-10 flex flex-col gap-4">
-                                <h1 id="spotlight-title"
-                                    class="text-2xl md:text-4xl font-extrabold text-white leading-tight tracking-tight drop-shadow-md transition-all duration-300">
-                                    Loading...
-                                </h1>
-                                <p id="spotlight-desc"
-                                    class="text-steelGray text-xs md:text-sm line-clamp-3 font-light transition-all duration-300">
-                                    Loading...
-                                </p>
-                                <div class="flex items-center gap-3 flex-wrap mt-2">
-                                    <button id="spotlight-watch-btn"
-                                        class="px-6 py-2.5 bg-gradient-to-r from-[#bd00ff] to-[#7a00cc] hover:from-[#d500ff] hover:to-[#9a00ff] text-white font-extrabold text-xs md:text-sm rounded-full shadow-lg shadow-purple-950/50 hover:shadow-[#bd00ff]/30 transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase tracking-widest">
-                                        Watch Now
-                                    </button>
-                                    <button id="spotlight-watchlist-btn"
-                                        class="px-5 py-2.5 glass-panel hover:bg-white/10 text-white font-bold text-xs md:text-sm rounded-full transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase border border-white/10">
-                                        Watchlist
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+.btn-crystal {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
-                <!-- RIGHT CONTENT HUB (60% Width: 7 columns on lg, 12 columns on mobile) -->
-                <div class="col-span-12 lg:col-span-7 flex flex-col gap-10">
+.btn-crystal:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.35);
+    border-top-color: rgba(255, 255, 255, 0.6);
+    transform: scale(1.02);
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.35);
+}
 
-                    <!-- Continue Watching (If present) -->
-                    <section id="continue-watching-section" class="hidden flex flex-col gap-4">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Continue Watching
-                        </h2>
-                        <div id="continue-watching-container" class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
-                            <!-- Dynamic Content -->
-                        </div>
-                    </section>
+.btn-crystal:active {
+    transform: scale(0.98);
+}
 
-                    <!-- TOP PICKS THIS WEEK -->
-                    <section id="trending-section" class="flex flex-col gap-4">
-                        <div class="flex items-center justify-between">
-                            <h2
-                                class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                                TOP PICKS THIS WEEK
-                            </h2>
-                            <!-- Track Navigators -->
-                            <div class="hidden md:flex items-center gap-2">
-                                <button onclick="scrollTrack('trending-container', 'left')"
-                                    class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                                <button onclick="scrollTrack('trending-container', 'right')"
-                                    class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                            </div>
-                        </div>
-                        <div id="trending-container"
-                            class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                            <div class="w-full flex justify-center py-12">
-                                <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                            </div>
-                        </div>
-                    </section>
+@keyframes fadeInCrystal {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.99);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
 
-                </div>
+.animate-crystal-in {
+    animation: fadeInCrystal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 
-            </div> <!-- End of Split Grid Container -->
+/* Mobile Video Player Captions & Responsive Touch Target Helpers */
+@media (max-width: 768px) {
+    video::cue, ::cue {
+        font-size: 13px !important;
+        line-height: 1.3 !important;
+        bottom: 18% !important;
+    }
 
-            <!-- SECTION 2: THE FULL-LENGTH UNDER-ROWS (BOTTOM HALF) -->
-            <div class="flex flex-col gap-10 my-8">
+    #player-container {
+        width: 100%;
+        max-height: calc(100vh - 80px);
+    }
+}
+/* Touch-Scrollable Carousel Helpers & Gesture Physics */
+.scrollbar-none::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+.scrollbar-none {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+.touch-pan-y {
+    touch-action: pan-y !important;
+}
+.touch-pan-x {
+    touch-action: pan-y pan-x !important;
+}
+html, body {
+    touch-action: manipulation;
+}
 
-                <!-- Popular All-Time -->
-                <section id="popular-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            POPULAR ALL-TIME
-                        </h2>
-                        <!-- Track Navigators -->
-                        <div class="hidden md:flex items-center gap-2">
-                            <button onclick="scrollTrack('popular-container', 'left')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                            <button onclick="scrollTrack('popular-container', 'right')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                        </div>
-                    </div>
-                    <div id="popular-container"
-                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
+/* Anime Card Touch Gesture Overrides */
+.anime-card img {
+    -webkit-user-drag: none;
+    user-select: none;
+}
 
-                <!-- Recently Updated -->
-                <section id="recent-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Recently Updated
-                        </h2>
-                        <!-- Track Navigators -->
-                        <div class="hidden md:flex items-center gap-2">
-                            <button onclick="scrollTrack('recent-container', 'left')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                            <button onclick="scrollTrack('recent-container', 'right')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                        </div>
-                    </div>
-                    <div id="recent-container"
-                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
+/* Horizontal Track Carousel Overrides */
+#trending-container,
+#popular-container,
+#recent-container,
+#action-extremes-container,
+#drama-container,
+#hidden-gems-container,
+#continue-watching-container {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-snap-type: x mandatory !important;
+    touch-action: pan-x pan-y !important;
+}
 
-                <!-- Hidden Gems -->
-                <section id="hidden-gems-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Hidden Gems
-                        </h2>
-                        <!-- Track Navigators -->
-                        <div class="hidden md:flex items-center gap-2">
-                            <button onclick="scrollTrack('hidden-gems-container', 'left')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                            <button onclick="scrollTrack('hidden-gems-container', 'right')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                        </div>
-                    </div>
-                    <div id="hidden-gems-container"
-                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Weekly Airing Broadcast Schedule (Moved to Bottom) -->
-                <section id="airing-broadcast-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3 flex items-center gap-2">
-                            Weekly Airing Broadcast
-                        </h2>
-                    </div>
-                    <div id="airing-broadcast-columns"
-                        class="flex gap-6 overflow-x-auto pb-4 scrollbar-thin snap-x snap-mandatory scroll-smooth">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-            </div>
-    </main>
-
-
-
-    <!-- Page Footer -->
-    <footer
-        class="mt-auto w-full bg-[#08080c] border-t border-white/5 py-8 text-center text-steelGray text-xs md:text-sm">
-        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p>&copy; 2026 BlackLeg Platform. Built for absolute zero-traffic efficiency.</p>
-            <div class="flex gap-4 text-themeCyan">
-                <span class="cursor-pointer hover:underline" onclick="toggleClusterModeDebug()">Cluster Mode Sync</span>
-                <span>&bull;</span>
-                <span class="text-white">Active Node: <span id="active-node-display"
-                        class="font-mono text-themeCyan bg-slate-900/60 px-2 py-0.5 rounded border border-white/5">Primary Node</span></span>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Modular Application JS Imports -->
-    <script src="/assets/js/config.js"></script>
-    <script src="/assets/js/gateway.js"></script>
-    <script src="/assets/js/renderers.js"></script>
-    <script src="/assets/js/player.js"></script>
-    <script src="/assets/js/app.js"></script>
-</body>
-
-</html>
+#trending-container .anime-card,
+#popular-container .anime-card,
+#recent-container .anime-card,
+#action-extremes-container .anime-card,
+#drama-container .anime-card,
+#hidden-gems-container .anime-card,
+#continue-watching-container .anime-card {
+    flex: 0 0 auto !important;
+    width: 140px !important;
+    max-width: 140px !important;
+    scroll-snap-align: start !important;
+}
