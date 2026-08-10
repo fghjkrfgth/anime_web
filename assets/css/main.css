@@ -221,3 +221,12 @@ video::cue {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+.touch-pan-y {
+    touch-action: pan-y;
+}
+.touch-pan-x {
+    touch-action: pan-x;
+}
+html, body {
+    touch-action: manipulation;
+}
