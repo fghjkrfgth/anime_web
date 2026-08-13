@@ -437,24 +437,36 @@ function initPlayerControls() {
     }
 
     if (progressContainer) {
+        let mouseMoveRafPending = false;
         progressContainer.onmousedown = (e) => {
             isSeeking = true;
             seekFromEvent(e);
         };
         window.addEventListener('mousemove', (e) => {
-            if (isSeeking) seekFromEvent(e);
+            if (isSeeking && !mouseMoveRafPending) {
+                mouseMoveRafPending = true;
+                requestAnimationFrame(() => {
+                    seekFromEvent(e);
+                    mouseMoveRafPending = false;
+                });
+            }
         });
         window.addEventListener('mouseup', () => {
             isSeeking = false;
         });
 
+        let tooltipRafPending = false;
         progressContainer.onmousemove = (e) => {
-            if (!video.duration || !progressTooltip) return;
+            if (!video.duration || !progressTooltip || tooltipRafPending) return;
+            tooltipRafPending = true;
             const rect = progressContainer.getBoundingClientRect();
-            const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            progressTooltip.innerText = formatTime(pos * video.duration);
-            progressTooltip.style.left = `${pos * 100}%`;
-            progressTooltip.classList.remove('opacity-0');
+            requestAnimationFrame(() => {
+                const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                progressTooltip.innerText = formatTime(pos * video.duration);
+                progressTooltip.style.left = `${pos * 100}%`;
+                progressTooltip.classList.remove('opacity-0');
+                tooltipRafPending = false;
+            });
         };
         progressContainer.onmouseleave = () => {
             if (progressTooltip) progressTooltip.classList.add('opacity-0');
@@ -625,9 +637,20 @@ function initPlayerControls() {
         };
     }
 
+    let timeUpdateRafPending = false;
+    function throttledUpdateTimeDisplay() {
+        if (!timeUpdateRafPending) {
+            timeUpdateRafPending = true;
+            requestAnimationFrame(() => {
+                updateTimeDisplay();
+                timeUpdateRafPending = false;
+            });
+        }
+    }
+
     video.onplay = updatePlayPauseIcons;
     video.onpause = updatePlayPauseIcons;
-    video.ontimeupdate = updateTimeDisplay;
+    video.ontimeupdate = throttledUpdateTimeDisplay;
     video.onloadedmetadata = updateTimeDisplay;
 
     function showOverlayTemporarily() {
