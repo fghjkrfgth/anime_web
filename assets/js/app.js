@@ -635,7 +635,20 @@ async function handleSpaRouting() {
             renderContinueWatching();
         }
     }
+
+    refreshAdManager();
 }
+
+function refreshAdManager() {
+    if (window.adManager && typeof window.adManager.refresh === 'function') {
+        try {
+            window.adManager.refresh();
+        } catch (e) {
+            console.warn('[AdManager] SPA refresh error:', e);
+        }
+    }
+}
+
 
 async function loadHomeCatalog() {
     try {
@@ -1410,71 +1423,63 @@ function setupWatchGlobalFunctions() {
             const manifestBlobUrl = URL.createObjectURL(blob);
             console.log('[HLS Engine] Manifest Blob URL:', manifestBlobUrl);
 
-            const launchHls = () => {
-                if (window.hlsInstance) {
-                    window.hlsInstance.destroy();
-                }
+            if (window.hlsInstance) {
+                window.hlsInstance.destroy();
+            }
 
-                if (Hls.isSupported()) {
-                    window.hlsInstance = new Hls({
-                        enableWorker: true,
-                        lowLatencyMode: true,
-                        maxBufferLength: 30,
-                        maxMaxBufferLength: 60,
-                        maxBufferSize: 30 * 1024 * 1024,
-                        backBufferLength: 10,
-                        xhrSetup: function(xhr, url) {
-                            xhr.withCredentials = false;
-                        }
-                    });
-                    window.hlsInstance.loadSource(manifestBlobUrl);
-                    if (video) window.hlsInstance.attachMedia(video);
+            if (Hls.isSupported()) {
+                window.hlsInstance = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 60,
+                    maxBufferSize: 30 * 1024 * 1024,
+                    backBufferLength: 10,
+                    xhrSetup: function(xhr, url) {
+                        xhr.withCredentials = false;
+                    }
+                });
+                window.hlsInstance.loadSource(manifestBlobUrl);
+                if (video) window.hlsInstance.attachMedia(video);
 
-                    window.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-                        console.log('[HLS Engine] Manifest parsed successfully. Segment streaming ready.');
-                        if (spinner) spinner.classList.add('hidden');
-                        if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
-                        if (typeof window.initPlayerControls === 'function') {
-                            window.initPlayerControls();
-                        }
-                    });
+                window.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                    console.log('[HLS Engine] Manifest parsed successfully. Segment streaming ready.');
+                    if (spinner) spinner.classList.add('hidden');
+                    if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
+                    if (typeof window.initPlayerControls === 'function') {
+                        window.initPlayerControls();
+                    }
+                });
 
-                    window.hlsInstance.on(Hls.Events.ERROR, (event, errorData) => {
-                        console.error('[HLS Error]', errorData);
-                        if (errorData.fatal) {
-                            switch (errorData.type) {
-                                case Hls.ErrorTypes.NETWORK_ERROR:
-                                    console.warn("Network HLS error, attempting to recover...");
-                                    window.hlsInstance.startLoad();
-                                    break;
-                                case Hls.ErrorTypes.MEDIA_ERROR:
-                                    console.warn("Media HLS error, attempting to recover...");
-                                    window.hlsInstance.recoverMediaError();
-                                    break;
-                                default:
-                                    console.error("Fatal HLS playback crash.");
-                                    break;
-                            }
+                window.hlsInstance.on(Hls.Events.ERROR, (event, errorData) => {
+                    console.error('[HLS Error]', errorData);
+                    if (errorData.fatal) {
+                        switch (errorData.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                console.warn("Network HLS error, attempting to recover...");
+                                window.hlsInstance.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                console.warn("Media HLS error, attempting to recover...");
+                                window.hlsInstance.recoverMediaError();
+                                break;
+                            default:
+                                console.error("Fatal HLS playback crash.");
+                                break;
                         }
-                    });
-                } else if (video && video.canPlayType('application/vnd.apple.mpegurl')) {
-                    video.src = manifestBlobUrl;
-                    video.addEventListener('loadedmetadata', () => {
-                        if (spinner) spinner.classList.add('hidden');
-                        if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
-                        if (typeof window.initPlayerControls === 'function') {
-                            window.initPlayerControls();
-                        }
-                    });
-                } else {
-                    alert("This browser does not support HLS streaming.");
-                }
-            };
-
-            if (typeof window.playVastPreRollAd === 'function' && window.VAST_AD_URL && window.VAST_AD_URL.trim() !== "") {
-                window.playVastPreRollAd(document.getElementById('player-container'), launchHls);
+                    }
+                });
+            } else if (video && video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = manifestBlobUrl;
+                video.addEventListener('loadedmetadata', () => {
+                    if (spinner) spinner.classList.add('hidden');
+                    if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
+                    if (typeof window.initPlayerControls === 'function') {
+                        window.initPlayerControls();
+                    }
+                });
             } else {
-                launchHls();
+                alert("This browser does not support HLS streaming.");
             }
 
         } catch (err) {
@@ -2043,7 +2048,7 @@ async function renderAnimeDetailsView() {
 
                 <!-- Sidebar Banner Ad Container -->
                 <div id="ad-slot-details-sidebar" class="w-full min-h-[250px] bg-slate-950/40 rounded-2xl border border-white/5 overflow-hidden flex justify-center items-center">
-                    <!-- Script/Iframe Slot -->
+                    <div data-banner-id="YOUR_BANNER_ID"></div>
                 </div>
             </div>
 
@@ -2118,7 +2123,7 @@ async function renderAnimeDetailsView() {
 
                 <!-- In-Page Details Ad Container -->
                 <div id="ad-slot-details-inpage" class="w-full my-6 flex justify-center items-center min-h-[90px] bg-slate-950/40 rounded-xl border border-white/5 overflow-hidden">
-                    <!-- Script/Iframe Slot -->
+                    <div data-inpage-id="452314"></div>
                 </div>
 
                 ${reviewsHtml}
