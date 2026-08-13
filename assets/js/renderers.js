@@ -715,7 +715,7 @@ window.renderLandingView = function() {
 
             <!-- Hero Banner Ad Container -->
             <div id="ad-slot-landing-hero" class="z-10 w-full max-w-4xl mx-auto mt-6 flex justify-center items-center min-h-[90px] bg-slate-950/40 rounded-xl border border-white/5 overflow-hidden">
-                <div data-banner-id="1498736"></div>
+                ${typeof window.getBannerAdHTML === 'function' ? window.getBannerAdHTML() : '<div data-banner-id="1498736"></div>'}
             </div>
         </div>
 
@@ -769,7 +769,7 @@ window.renderLandingView = function() {
 
         <!-- In-Page Editorial Ad Container -->
         <div id="ad-slot-landing-inpage" class="w-full max-w-5xl mx-auto my-8 flex justify-center items-center min-h-[250px] bg-slate-950/40 rounded-2xl border border-white/5 overflow-hidden">
-            <div data-banner-id="1498736"></div>
+            ${typeof window.getBannerAdHTML === 'function' ? window.getBannerAdHTML() : '<div data-banner-id="1498736"></div>'}
         </div>
 
         <!-- PLATFORM ARCHITECTURE EDITORIAL GRID -->
