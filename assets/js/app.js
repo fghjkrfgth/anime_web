@@ -577,6 +577,21 @@ async function handleSpaRouting() {
     if (trendingExplore) trendingExplore.classList.toggle('hidden', !isExplore);
     if (dedicatedSchedule) dedicatedSchedule.classList.toggle('hidden', !isSchedule);
 
+    // Stop background spotlight auto-rotator when leaving home view
+    const isHomeView = (!isLanding && !isWatch && !isDetails && !isExplore && !isSchedule);
+    if (!isHomeView && window.spotlightInterval) {
+        clearInterval(window.spotlightInterval);
+        window.spotlightInterval = null;
+    }
+
+    // Pause video player if leaving watch view to free main thread CPU/GPU resources
+    if (!isWatch) {
+        const videoPlayer = document.getElementById('main-video-player');
+        if (videoPlayer && !videoPlayer.paused) {
+            videoPlayer.pause();
+        }
+    }
+
     if (isLanding) {
         if (homepageWrapper) homepageWrapper.classList.add('hidden');
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
@@ -1896,7 +1911,7 @@ async function renderAnimeDetailsView() {
                         return `
                             <div class="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex justify-between items-center gap-3 transition-all duration-300 hover:border-themeCyan/30">
                                 <div class="flex items-center gap-3 min-w-0">
-                                    <img class="w-10 h-14 rounded-lg object-cover border border-white/10 flex-shrink-0" src="${charImage}" alt="${charName}" loading="lazy">
+                                    <img class="w-10 h-14 rounded-lg object-cover border border-white/10 flex-shrink-0" src="${charImage}" alt="${charName}" loading="lazy" decoding="async">
                                     <div class="min-w-0">
                                         <div class="text-xs font-bold text-white truncate">${charName}</div>
                                         <div class="text-[9px] text-steelGray uppercase tracking-wider mt-1">${charRole}</div>
@@ -1908,7 +1923,7 @@ async function renderAnimeDetailsView() {
                                             <div class="text-xs font-medium text-white truncate">${vaName}</div>
                                             <div class="text-[9px] text-themeCyan uppercase tracking-wider mt-1">Japanese</div>
                                         </div>
-                                        <img class="w-10 h-14 rounded-lg object-cover border border-white/10 flex-shrink-0" src="${vaImage}" alt="${vaName}" loading="lazy">
+                                        <img class="w-10 h-14 rounded-lg object-cover border border-white/10 flex-shrink-0" src="${vaImage}" alt="${vaName}" loading="lazy" decoding="async">
                                     </div>
                                 ` : `
                                     <div class="text-[10px] text-steelGray italic pr-3">No VA Listed</div>
@@ -1939,7 +1954,7 @@ async function renderAnimeDetailsView() {
                             <div class="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex flex-col gap-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-3">
-                                        <img class="w-10 h-10 rounded-full border border-white/10 object-cover" src="${avatarUrl}" alt="${username}">
+                                        <img class="w-10 h-10 rounded-full border border-white/10 object-cover" src="${avatarUrl}" alt="${username}" loading="lazy" decoding="async">
                                         <div>
                                             <div class="text-sm font-semibold text-white">${username}</div>
                                             <div class="text-[10px] text-steelGray">BlackLeg Critic</div>
@@ -2002,7 +2017,7 @@ async function renderAnimeDetailsView() {
             <!-- Left Column: Poster & Episodes -->
             <div class="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-6">
                 <div class="details-poster-card w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10">
-                    <img class="w-full h-full object-cover" src="${posterImg}" alt="${title}">
+                    <img class="w-full h-full object-cover" src="${posterImg}" alt="${title}" loading="lazy" decoding="async">
                 </div>
                 <!-- Episode Grid & Selector -->
                 <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 max-h-[500px] overflow-y-auto scrollbar-thin">
