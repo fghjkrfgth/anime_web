@@ -398,16 +398,41 @@ function initPlayerControls() {
         video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
     }
 
+    function handleFullscreenChange() {
+        const isFS = !!document.fullscreenElement || !!document.webkitFullscreenElement || !!document.mozFullScreenElement || !!document.msFullscreenElement;
+        if (isFS) {
+            if (screen.orientation && screen.orientation.lock) {
+                screen.orientation.lock('landscape').catch((err) => {
+                    console.warn('[Player] Landscape lock not supported or denied:', err);
+                });
+            }
+        } else {
+            if (screen.orientation && screen.orientation.unlock) {
+                screen.orientation.unlock();
+            }
+        }
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
     function toggleFullscreen() {
-        if (!document.fullscreenElement) {
+        const isFS = !!document.fullscreenElement || !!document.webkitFullscreenElement || !!document.mozFullScreenElement || !!document.msFullscreenElement;
+        if (!isFS) {
             if (container.requestFullscreen) {
                 container.requestFullscreen();
             } else if (video.requestFullscreen) {
                 video.requestFullscreen();
+            } else if (video.webkitRequestFullscreen) {
+                video.webkitRequestFullscreen();
             }
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
             }
         }
     }
@@ -653,24 +678,57 @@ function initPlayerControls() {
     video.ontimeupdate = throttledUpdateTimeDisplay;
     video.onloadedmetadata = updateTimeDisplay;
 
+    function hideOverlay() {
+        overlay.classList.remove('opacity-100', 'pointer-events-auto');
+        overlay.classList.add('opacity-0', 'pointer-events-none');
+        if (window.overlayHideTimeout) clearTimeout(window.overlayHideTimeout);
+        if (captionsPopover) captionsPopover.classList.add('hidden');
+        if (speedPopover) speedPopover.classList.add('hidden');
+        if (autoPopover) autoPopover.classList.add('hidden');
+    }
+
     function showOverlayTemporarily() {
         overlay.classList.remove('opacity-0', 'pointer-events-none');
         overlay.classList.add('opacity-100', 'pointer-events-auto');
         if (window.overlayHideTimeout) clearTimeout(window.overlayHideTimeout);
-        window.overlayHideTimeout = setTimeout(() => {
-            if (!video.paused) {
-                overlay.classList.remove('opacity-100', 'pointer-events-auto');
-                overlay.classList.add('opacity-0', 'pointer-events-none');
-            }
-        }, 3000);
+        if (!video.paused) {
+            window.overlayHideTimeout = setTimeout(() => {
+                hideOverlay();
+            }, 3000);
+        }
     }
 
-    container.onmousemove = showOverlayTemporarily;
+    function handleOverlayTap(e) {
+        if (e.target.closest('button, input, select, #player-captions-popover, #player-speed-popover, #player-auto-popover, #player-progress-container')) {
+            return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+
+        const isVisible = overlay.classList.contains('opacity-100');
+        if (isVisible) {
+            hideOverlay();
+        } else {
+            showOverlayTemporarily();
+        }
+    }
+
+    overlay.addEventListener('click', handleOverlayTap);
+    container.addEventListener('click', (e) => {
+        if (overlay.classList.contains('opacity-0')) {
+            handleOverlayTap(e);
+        }
+    });
+
+    container.onmousemove = () => {
+        if (!overlay.classList.contains('opacity-100')) {
+            showOverlayTemporarily();
+        }
+    };
     container.onmouseenter = showOverlayTemporarily;
     container.onmouseleave = () => {
         if (!video.paused) {
-            overlay.classList.remove('opacity-100', 'pointer-events-auto');
-            overlay.classList.add('opacity-0', 'pointer-events-none');
+            hideOverlay();
         }
     };
 }
