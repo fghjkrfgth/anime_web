@@ -2123,7 +2123,7 @@ async function renderAnimeDetailsView() {
 
                 <!-- In-Page Details Ad Container -->
                 <div id="ad-slot-details-inpage" class="w-full my-6 flex justify-center items-center min-h-[90px] bg-slate-950/40 rounded-xl border border-white/5 overflow-hidden">
-                    <div data-inpage-id="452314"></div>
+                    <div data-inpage-id="452319"></div>
                 </div>
 
                 ${reviewsHtml}
