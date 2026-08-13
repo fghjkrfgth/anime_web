@@ -219,7 +219,11 @@ function rotateSpotlight(clickedIdx) {
             document.getElementById('spotlight-desc').innerText = desc;
 
             const stringifiedShow = JSON.stringify(centerItem).replace(/"/g, '&quot;');
-            document.getElementById('spotlight-watch-btn').setAttribute('onclick', `watchShow(${stringifiedShow})`);
+            const spotlightBtn = document.getElementById('spotlight-watch-btn');
+            if (spotlightBtn) {
+                spotlightBtn.innerText = 'Details';
+                spotlightBtn.setAttribute('onclick', `watchShow(${stringifiedShow})`);
+            }
             document.getElementById('spotlight-watchlist-btn').onclick = () => {
                 alert(`Added "${title}" to watchlist!`);
             };
