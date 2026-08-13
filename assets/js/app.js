@@ -712,7 +712,8 @@ async function renderWatchView() {
         <div id="banner-backdrop"
             class="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-[0.06] blur-2xl pointer-events-none z-0"></div>
         <div class="flex-grow max-w-7xl mx-auto w-full py-6 z-10 grid grid-cols-12 gap-6 relative">
-            <div class="col-span-12 lg:col-span-8 flex flex-col gap-6">
+            <!-- 1. Video Player & 2. Player Controls / Sub-Dub Toggle / Auto Skip Bar -->
+            <div class="col-span-12 lg:col-span-8 flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
                 <div class="relative w-full aspect-video rounded-2xl overflow-hidden glass-panel border border-white/5 shadow-2xl group">
                     <video id="main-video-player" class="w-full h-full object-contain" playsinline></video>
                     <div id="autoplay-handshake-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-opacity duration-500">
@@ -779,8 +780,22 @@ async function renderWatchView() {
                         </label>
                     </div>
                 </div>
+            </div>
 
-                <!-- Metadata/Details Block -->
+            <!-- 3. Episode Selector & Grid Container (Sits directly under controls on mobile, right column on desktop) -->
+            <div class="col-span-12 lg:col-span-4 flex flex-col gap-6 lg:col-start-9 lg:row-start-1 lg:row-span-3">
+                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 pl-2.5" style="border-color: var(--anime-accent-color,#f59e0b);">Episodes</h2>
+                    </div>
+                    <hr class="border-white/5">
+                    <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
+                    <div id="episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
+                </div>
+            </div>
+
+            <!-- 4. Details & Synopsis Block -->
+            <div class="col-span-12 lg:col-span-8 flex flex-col gap-6 lg:col-start-1 lg:row-start-2">
                 <div class="glass-panel p-5 md:p-8 rounded-2xl border border-white/5 flex flex-col gap-4">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <h1 id="show-title" class="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">Loading Title...</h1>
@@ -816,19 +831,10 @@ async function renderWatchView() {
                         </div>
                     </div>
                 </div>
-                <!-- Separate Related Adaptations / Similar Anime container -->
-                <div id="watch-related-container" class="mt-4 flex flex-col gap-6 hidden"></div>
             </div>
-            <div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
-                <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 pl-2.5" style="border-color: var(--anime-accent-color,#f59e0b);">Episodes</h2>
-                    </div>
-                    <hr class="border-white/5">
-                    <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
-                    <div id="episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
-                </div>
-            </div>
+
+            <!-- 5. Related Adaptations Container -->
+            <div id="watch-related-container" class="col-span-12 lg:col-span-8 flex flex-col gap-6 hidden lg:col-start-1 lg:row-start-3"></div>
         </div>
     `;
 
@@ -1995,7 +2001,7 @@ async function renderAnimeDetailsView() {
         <div class="relative z-10 grid grid-cols-12 gap-8 mt-6">
             <!-- Left Column: Poster & Episodes -->
             <div class="col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-6">
-                <div class="w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+                <div class="details-poster-card w-full aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                     <img class="w-full h-full object-cover" src="${posterImg}" alt="${title}">
                 </div>
                 <!-- Episode Grid & Selector -->
