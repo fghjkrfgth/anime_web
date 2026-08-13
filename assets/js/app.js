@@ -636,16 +636,8 @@ async function handleSpaRouting() {
         }
     }
 
-    refreshAdManager();
-}
-
-function refreshAdManager() {
-    if (window.adManager && typeof window.adManager.refresh === 'function') {
-        try {
-            window.adManager.refresh();
-        } catch (e) {
-            console.warn('[AdManager] SPA refresh error:', e);
-        }
+    if (typeof window.refreshAllAdSlots === 'function') {
+        window.refreshAllAdSlots();
     }
 }
 
@@ -2048,7 +2040,7 @@ async function renderAnimeDetailsView() {
 
                 <!-- Sidebar Banner Ad Container -->
                 <div id="ad-slot-details-sidebar" class="w-full min-h-[250px] bg-slate-950/40 rounded-2xl border border-white/5 overflow-hidden flex justify-center items-center">
-                    <div data-banner-id="YOUR_BANNER_ID"></div>
+                    ${typeof window.getBannerAdHTML === 'function' ? window.getBannerAdHTML() : '<div data-banner-id="1498736"></div>'}
                 </div>
             </div>
 
@@ -2123,7 +2115,7 @@ async function renderAnimeDetailsView() {
 
                 <!-- In-Page Details Ad Container -->
                 <div id="ad-slot-details-inpage" class="w-full my-6 flex justify-center items-center min-h-[90px] bg-slate-950/40 rounded-xl border border-white/5 overflow-hidden">
-                    <div data-inpage-id="452319"></div>
+                    <div data-inpage-id="YOUR_INPAGE_ID"></div>
                 </div>
 
                 ${reviewsHtml}
