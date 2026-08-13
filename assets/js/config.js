@@ -46,3 +46,7 @@ let currentHost = "Local Node";
 function decodeRegistryUrl(encodedStr) {
     return atob(encodedStr);
 }
+
+// Global VAST Pre-Roll Video Ad Engine Config
+window.VAST_AD_URL = ""; // Paste VAST URL here
+
