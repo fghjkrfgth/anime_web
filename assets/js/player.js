@@ -516,6 +516,7 @@ function initPlayerControls() {
                 const isHidden = autoPopover.classList.contains('hidden');
                 if (isHidden) syncAutoTogglesUI();
                 autoPopover.classList.toggle('hidden');
+                showOverlayTemporarily();
             }
         };
     }
@@ -585,6 +586,7 @@ function initPlayerControls() {
                 const isHidden = captionsPopover.classList.contains('hidden');
                 if (isHidden) populateCaptionsMenu();
                 captionsPopover.classList.toggle('hidden');
+                showOverlayTemporarily();
             }
         };
     }
@@ -608,6 +610,7 @@ function initPlayerControls() {
             if (autoPopover) autoPopover.classList.add('hidden');
             if (speedPopover) {
                 speedPopover.classList.toggle('hidden');
+                showOverlayTemporarily();
             }
         };
     }
@@ -623,26 +626,34 @@ function initPlayerControls() {
                 });
                 btn.classList.add('font-bold', 'text-themeCyan');
                 speedPopover.classList.add('hidden');
+                showOverlayTemporarily();
             };
         });
     }
 
     // Auto-close popovers on outside click
     document.onclick = (e) => {
+        let popoverClosed = false;
         if (captionsPopover && !captionsPopover.classList.contains('hidden')) {
             if (!captionsPopover.contains(e.target) && !btnCaptions.contains(e.target)) {
                 captionsPopover.classList.add('hidden');
+                popoverClosed = true;
             }
         }
         if (speedPopover && !speedPopover.classList.contains('hidden')) {
             if (!speedPopover.contains(e.target) && !btnSpeed.contains(e.target)) {
                 speedPopover.classList.add('hidden');
+                popoverClosed = true;
             }
         }
         if (autoPopover && !autoPopover.classList.contains('hidden')) {
             if (!autoPopover.contains(e.target) && !btnAuto.contains(e.target)) {
                 autoPopover.classList.add('hidden');
+                popoverClosed = true;
             }
+        }
+        if (popoverClosed) {
+            showOverlayTemporarily();
         }
     };
 
@@ -678,6 +689,12 @@ function initPlayerControls() {
     video.ontimeupdate = throttledUpdateTimeDisplay;
     video.onloadedmetadata = updateTimeDisplay;
 
+    function isAnyPopoverOpen() {
+        return (captionsPopover && !captionsPopover.classList.contains('hidden')) ||
+               (speedPopover && !speedPopover.classList.contains('hidden')) ||
+               (autoPopover && !autoPopover.classList.contains('hidden'));
+    }
+
     function hideOverlay() {
         overlay.classList.remove('opacity-100', 'pointer-events-auto');
         overlay.classList.add('opacity-0', 'pointer-events-none');
@@ -691,19 +708,35 @@ function initPlayerControls() {
         overlay.classList.remove('opacity-0', 'pointer-events-none');
         overlay.classList.add('opacity-100', 'pointer-events-auto');
         if (window.overlayHideTimeout) clearTimeout(window.overlayHideTimeout);
+
+        // Lock controls visible while any popover menu is active
+        if (isAnyPopoverOpen()) {
+            return;
+        }
+
         if (!video.paused) {
             window.overlayHideTimeout = setTimeout(() => {
-                hideOverlay();
+                if (!isAnyPopoverOpen()) {
+                    hideOverlay();
+                }
             }, 3000);
         }
     }
 
     function toggleOverlayVisibility(e) {
-        if (e.target.closest('.pointer-events-auto') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+        if (e.target.closest('.pointer-events-auto, button, input, select, option, label, #player-captions-popover, #player-speed-popover, #player-auto-popover, #player-progress-container')) {
             return;
         }
 
         if (!overlay) return;
+
+        if (isAnyPopoverOpen()) {
+            document.getElementById('player-captions-popover')?.classList.add('hidden');
+            document.getElementById('player-speed-popover')?.classList.add('hidden');
+            document.getElementById('player-auto-popover')?.classList.add('hidden');
+            showOverlayTemporarily();
+            return;
+        }
 
         const isVisible = overlay.classList.contains('opacity-100');
 
@@ -724,7 +757,7 @@ function initPlayerControls() {
     };
     playerContainer.onmouseenter = showOverlayTemporarily;
     playerContainer.onmouseleave = () => {
-        if (!video.paused) {
+        if (!video.paused && !isAnyPopoverOpen()) {
             hideOverlay();
         }
     };
