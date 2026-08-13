@@ -222,7 +222,9 @@ function rotateSpotlight(clickedIdx) {
             const spotlightBtn = document.getElementById('spotlight-watch-btn');
             if (spotlightBtn) {
                 spotlightBtn.innerText = 'Details';
-                spotlightBtn.setAttribute('onclick', `watchShow(${stringifiedShow})`);
+                spotlightBtn.onclick = function() {
+                    watchShow(centerItem);
+                };
             }
             document.getElementById('spotlight-watchlist-btn').onclick = () => {
                 alert(`Added "${title}" to watchlist!`);
