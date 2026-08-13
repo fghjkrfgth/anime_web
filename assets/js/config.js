@@ -48,5 +48,5 @@ function decodeRegistryUrl(encodedStr) {
 }
 
 // Global VAST Pre-Roll Video Ad Engine Config
-window.VAST_AD_URL = ""; // Paste VAST URL here
+window.VAST_AD_URL = "https://vast.yomeno.xyz/vast?spot_id=1498734"; // Paste VAST URL here
 
