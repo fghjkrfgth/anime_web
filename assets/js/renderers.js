@@ -712,6 +712,11 @@ window.renderLandingView = function() {
                     Enter Experience <span class="text-lg">→</span>
                 </button>
             </div>
+
+            <!-- Hero Banner Ad Container -->
+            <div id="ad-slot-landing-hero" class="z-10 w-full max-w-4xl mx-auto mt-6 flex justify-center items-center min-h-[90px] bg-slate-950/40 rounded-xl border border-white/5 overflow-hidden">
+                <!-- Script/Iframe Slot -->
+            </div>
         </div>
 
         <!-- TRIBUTE & LEGACY SECTION -->
@@ -760,6 +765,11 @@ window.renderLandingView = function() {
                     </p>
                 </div>
             </div>
+        </div>
+
+        <!-- In-Page Editorial Ad Container -->
+        <div id="ad-slot-landing-inpage" class="w-full max-w-5xl mx-auto my-8 flex justify-center items-center min-h-[250px] bg-slate-950/40 rounded-2xl border border-white/5 overflow-hidden">
+            <!-- In-Page Script Slot -->
         </div>
 
         <!-- PLATFORM ARCHITECTURE EDITORIAL GRID -->
