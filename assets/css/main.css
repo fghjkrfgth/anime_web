@@ -364,3 +364,9 @@ html, body {
         aspect-ratio: 2/3 !important;
     }
 }
+
+/* Ad Slot Containers Responsive Collapse */
+[id^="ad-slot-"]:empty {
+    display: none !important;
+}
+
