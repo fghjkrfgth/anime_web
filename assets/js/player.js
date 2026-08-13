@@ -682,9 +682,9 @@ function initPlayerControls() {
         overlay.classList.remove('opacity-100', 'pointer-events-auto');
         overlay.classList.add('opacity-0', 'pointer-events-none');
         if (window.overlayHideTimeout) clearTimeout(window.overlayHideTimeout);
-        if (captionsPopover) captionsPopover.classList.add('hidden');
-        if (speedPopover) speedPopover.classList.add('hidden');
-        if (autoPopover) autoPopover.classList.add('hidden');
+        document.getElementById('player-captions-popover')?.classList.add('hidden');
+        document.getElementById('player-speed-popover')?.classList.add('hidden');
+        document.getElementById('player-auto-popover')?.classList.add('hidden');
     }
 
     function showOverlayTemporarily() {
@@ -698,14 +698,15 @@ function initPlayerControls() {
         }
     }
 
-    function handleOverlayTap(e) {
-        if (e.target.closest('button, input, select, #player-captions-popover, #player-speed-popover, #player-auto-popover, #player-progress-container')) {
+    function toggleOverlayVisibility(e) {
+        if (e.target.closest('.pointer-events-auto') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
             return;
         }
-        e.preventDefault();
-        e.stopPropagation();
+
+        if (!overlay) return;
 
         const isVisible = overlay.classList.contains('opacity-100');
+
         if (isVisible) {
             hideOverlay();
         } else {
@@ -713,20 +714,16 @@ function initPlayerControls() {
         }
     }
 
-    overlay.addEventListener('click', handleOverlayTap);
-    container.addEventListener('click', (e) => {
-        if (overlay.classList.contains('opacity-0')) {
-            handleOverlayTap(e);
-        }
-    });
+    const playerContainer = document.getElementById('player-container') || video.parentElement;
+    playerContainer.onclick = toggleOverlayVisibility;
 
-    container.onmousemove = () => {
+    playerContainer.onmousemove = () => {
         if (!overlay.classList.contains('opacity-100')) {
             showOverlayTemporarily();
         }
     };
-    container.onmouseenter = showOverlayTemporarily;
-    container.onmouseleave = () => {
+    playerContainer.onmouseenter = showOverlayTemporarily;
+    playerContainer.onmouseleave = () => {
         if (!video.paused) {
             hideOverlay();
         }
