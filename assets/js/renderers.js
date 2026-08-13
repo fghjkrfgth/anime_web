@@ -239,7 +239,7 @@ function renderGenreSpotlight() {
     container.innerHTML = GENRE_MAPPING.map(g => `
         <div onclick="searchGenre('${g.genre}')" class="flex flex-col sm:flex-row h-auto sm:h-24 md:h-28 rounded-2xl overflow-hidden border border-white/5 hover:border-[#00f5ff]/40 bg-[#121218]/45 hover:bg-[#121218]/70 transition-all duration-500 cursor-pointer group shadow-lg hover:shadow-[#00f5ff]/5">
             <div class="w-full sm:w-1/3 md:w-1/4 h-32 sm:h-full overflow-hidden relative">
-                <img src="${g.banner}" alt="${g.name}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                <img src="${g.banner}" alt="${g.name}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
                 <div class="absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-r from-transparent to-[#121218]"></div>
             </div>
             <div class="w-full sm:w-2/3 md:w-3/4 p-4 flex flex-col justify-center">
@@ -377,7 +377,7 @@ function createCardHTML(show) {
     return `
         <div class="anime-card flex-none w-[140px] md:w-[185px] bg-[#121218]/45 rounded-2xl overflow-hidden border border-[#bd00ff]/20 hover:border-[#00f5ff] relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_20px_rgba(0,245,255,0.25)] snap-start" onclick="watchShow(${stringifiedShow})" data-anime-data="${stringifiedShow}">
             <div class="relative aspect-[3/4] w-full overflow-hidden">
-                <img src="${coverUrl}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
                 <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-black/80 backdrop-blur-md rounded text-[9px] md:text-[11px] font-bold text-[#00f5ff] border border-[#00f5ff]/20">
                     ★ ${rating}
                 </div>
@@ -435,7 +435,7 @@ function renderContinueWatching() {
         return `
             <div class="anime-card flex-none w-[180px] md:w-[220px] bg-[#121218]/45 rounded-xl overflow-hidden border border-white/5 relative cursor-pointer group" onclick="watchShowProgress(${stringifiedShow}, ${epNum})" data-continue-show="${stringifiedShow}">
                 <div class="relative h-[95px] md:h-[120px] overflow-hidden">
-                    <img src="${show.banner || show.bannerImage || coverUrl}" alt="${title}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
+                    <img src="${show.banner || show.bannerImage || coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex flex-col justify-end p-2.5">
                         <span class="continue-title-text text-white text-xs md:text-sm font-semibold truncate group-hover:text-themeCyan transition-colors duration-300">
                             ${title}
@@ -605,7 +605,7 @@ function renderFranchiseSectionsHTML(categories) {
                         return `
                             <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow('${item.anilistId}')">
                                 <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-[var(--anime-accent-color,#f59e0b)] transition-all duration-300">
-                                    <img class="w-full h-full object-cover" src="${posterUrl}" alt="${item.title}" loading="lazy">
+                                    <img class="w-full h-full object-cover" src="${posterUrl}" alt="${item.title}" loading="lazy" decoding="async">
                                     <span class="absolute top-1.5 right-1.5 bg-themeBlack/80 text-[8px] font-bold text-[var(--anime-accent-color,#f59e0b)] px-1.5 py-0.5 rounded border border-[var(--anime-accent-color,#f59e0b)]/20 uppercase tracking-widest">
                                         ${item.type}
                                     </span>
@@ -873,7 +873,7 @@ window.renderTrendingExploreView = async function() {
             return `
                 <div class="anime-card flex flex-col bg-[#121218]/50 rounded-2xl overflow-hidden border border-white/10 hover:border-[#00f5ff] relative cursor-pointer group transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,245,255,0.25)] min-h-[44px]" onclick="watchShow(${showStr})">
                     <div class="relative aspect-[3/4] w-full overflow-hidden">
-                        <img src="${coverUrl}" alt="${title}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                        <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
                         <div class="absolute top-2 left-2 px-2 py-0.5 bg-black/80 backdrop-blur-md rounded text-[9px] font-mono font-extrabold text-amber-400 border border-amber-400/20">
                             #${idx + 1}
                         </div>
