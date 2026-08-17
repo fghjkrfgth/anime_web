@@ -636,8 +636,9 @@ async function handleSpaRouting() {
         }
     }
 
-    if (typeof window.refreshAllAdSlots === 'function') {
-        window.refreshAllAdSlots();
+    if (typeof window.mountPageAds === 'function') {
+        const pageType = isWatch ? 'watch' : (isDetails ? 'details' : (isLanding ? 'landing' : 'home'));
+        window.mountPageAds(pageType);
     }
 }
 
@@ -734,7 +735,7 @@ async function renderWatchView() {
         <div class="flex-grow max-w-7xl mx-auto w-full py-6 z-10 grid grid-cols-12 gap-6 relative">
             <!-- 1. Video Player & 2. Player Controls / Sub-Dub Toggle / Auto Skip Bar -->
             <div class="col-span-12 lg:col-span-8 flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
-                <div class="relative w-full aspect-video rounded-2xl overflow-hidden glass-panel border border-white/5 shadow-2xl group">
+                <div id="player-container" class="relative w-full aspect-video rounded-2xl overflow-hidden glass-panel border border-white/5 shadow-2xl group">
                     <video id="main-video-player" class="w-full h-full object-contain" playsinline></video>
                     <div id="autoplay-handshake-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-opacity duration-500">
                         <div class="glass-panel p-6 md:p-10 rounded-2xl border border-white/10 max-w-md text-center flex flex-col items-center gap-6 shadow-2xl">
@@ -800,6 +801,7 @@ async function renderWatchView() {
                         </label>
                     </div>
                 </div>
+                ${typeof window.getAdBannerHTML === 'function' ? window.getAdBannerHTML() : ''}
             </div>
 
             <!-- 3. Episode Selector & Grid Container (Sits directly under controls on mobile, right column on desktop) -->
@@ -2037,11 +2039,7 @@ async function renderAnimeDetailsView() {
                     <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
                     <div id="details-episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
-
-                <!-- Sidebar Banner Ad Container -->
-                <div id="ad-slot-details-sidebar" class="w-full min-h-[250px] bg-slate-950/40 rounded-2xl border border-white/5 overflow-hidden flex justify-center items-center">
-                    ${typeof window.getBannerAdHTML === 'function' ? window.getBannerAdHTML() : '<div data-banner-id="1498736"></div>'}
-                </div>
+                ${typeof window.getInPageAdHTML === 'function' ? window.getInPageAdHTML() : ''}
             </div>
 
             <!-- Main Column: Title & Metadata -->
@@ -2113,10 +2111,7 @@ async function renderAnimeDetailsView() {
                 ${charactersHtml}
                 ${categorizedHtml}
 
-                <!-- In-Page Details Ad Container -->
-                <div id="ad-slot-details-inpage" class="w-full my-6 flex justify-center items-center min-h-[90px] bg-slate-950/40 rounded-xl border border-white/5 overflow-hidden">
-                    <div data-inpage-id="YOUR_INPAGE_ID"></div>
-                </div>
+                <!-- Reviews Section -->
 
                 ${reviewsHtml}
             </div>
