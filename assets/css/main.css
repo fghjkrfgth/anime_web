@@ -365,19 +365,19 @@ html, body {
     }
 }
 
-/* Ad Slot Containers Responsive Collapse */
-[id^="ad-slot-"]:empty {
+/* Centralized Ad Wrapper Styles */
+.ad-banner-wrapper,
+.ad-inpage-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 1rem auto;
+    overflow: hidden;
+}
+
+.ad-banner-wrapper:empty,
+.ad-inpage-wrapper:empty {
     display: none !important;
 }
-
-[data-banner-id] {
-    width: 300px !important;
-    height: 100px !important;
-    margin: 0 auto !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    overflow: hidden !important;
-}
-
 
