@@ -529,19 +529,6 @@ async function initApp() {
         handleSpaRouting();
     });
 
-    // Intercept clicks on links to keep SPA routing pure
-    document.addEventListener('click', (e) => {
-        const anchor = e.target.closest('a');
-        if (anchor) {
-            const href = anchor.getAttribute('href');
-            if (href && (href === '/' || href.startsWith('/home') || href.startsWith('/watch/') || href.startsWith('/anime/') || href.startsWith('/explore') || href.startsWith('/schedule') || href.includes('#trending-section') || href.includes('#airing-broadcast-section'))) {
-                e.preventDefault();
-                window.history.pushState(null, '', href);
-                handleSpaRouting();
-            }
-        }
-    });
-
     // Run the routing handler
     try {
         await handleSpaRouting();
@@ -1216,11 +1203,7 @@ function setupWatchGlobalFunctions() {
         window.currentEp = epNum;
 
         const slug = slugify(window.showData.title.english || window.showData.title.romaji || window.showData.title.userPreferred);
-        window.history.pushState(null, '', `/watch/anime/${slug}-${window.showData.id}?ep=${epNum}`);
-
-        window.renderStreamPreRollOverlay(epNum);
-        window.renderEpisodePicker();
-        window.loadEpisodeStream(epNum);
+        window.location.href = `/watch/anime/${slug}-${window.showData.id}?ep=${epNum}`;
     };
 
     window.renderEpisodePicker = function() {
@@ -2229,8 +2212,7 @@ window.navigateWatchEpisode = function(epNum, forcedLang) {
         toggleUserPreference('preferredLang', selectedLang);
     }
     const slug = window.slugify(show.title.english || show.title.romaji || show.title.userPreferred);
-    window.history.pushState({}, '', `/watch/anime/${slug}-${show.id}?ep=${epNum}`);
-    handleSpaRouting();
+    window.location.href = `/watch/anime/${slug}-${show.id}?ep=${epNum}`;
 };
 
 if (document.readyState === 'loading') {
