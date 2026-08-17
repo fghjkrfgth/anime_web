@@ -261,10 +261,6 @@ function initPlayerControls() {
     `;
     container.appendChild(overlay);
 
-    if (typeof window.initInStreamAdScript === 'function') {
-        window.initInStreamAdScript();
-    }
-
     const btnRewind = document.getElementById('btn-rewind-10');
     const btnForward = document.getElementById('btn-forward-10');
     const btnCenterPlay = document.getElementById('btn-center-play');
