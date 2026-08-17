@@ -469,21 +469,13 @@ window.slugify = slugify;
 function watchShowProgress(show, epNum) {
     const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     localStorage.setItem('activeShowData', JSON.stringify(show));
-    window.history.pushState({}, '', `/watch/anime/${slug}-${show.id}?ep=${epNum}`);
-    if (typeof window.handleSpaRouting === 'function') {
-        window.handleSpaRouting();
-    } else if (typeof window.renderWatchView === 'function') {
-        window.renderWatchView();
-    }
+    window.location.href = `/watch/anime/${slug}-${show.id}?ep=${epNum}`;
 }
 
 function watchShow(show) {
     const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     localStorage.setItem('activeShowData', JSON.stringify(show));
-    window.history.pushState({}, '', `/anime/${slug}-${show.id}`);
-    if (typeof window.handleSpaRouting === 'function') {
-        window.handleSpaRouting();
-    }
+    window.location.href = `/anime/${slug}-${show.id}`;
 }
 
 // Dynamic AniList Accent Color Theming Helper
