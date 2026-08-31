@@ -623,10 +623,6 @@ async function handleSpaRouting() {
         }
     }
 
-    if (typeof window.mountPageAds === 'function') {
-        const pageType = isWatch ? 'watch' : (isDetails ? 'details' : (isLanding ? 'landing' : 'home'));
-        window.mountPageAds(pageType);
-    }
 }
 
 
@@ -788,7 +784,6 @@ async function renderWatchView() {
                         </label>
                     </div>
                 </div>
-                ${typeof window.getAdBannerHTML === 'function' ? window.getAdBannerHTML() : ''}
             </div>
 
             <!-- 3. Episode Selector & Grid Container (Sits directly under controls on mobile, right column on desktop) -->
@@ -1090,7 +1085,13 @@ function setupWatchGlobalFunctions() {
         posterOverlay.style.backgroundImage = `url('${posterUrl}')`;
         posterOverlay.onclick = function() {
             posterOverlay.classList.add('hidden');
-            if (video) video.play().catch(() => {});
+            if (typeof window.playVastPreRoll === 'function' && window.VAST_TAG_URL) {
+                window.playVastPreRoll(video, window.VAST_TAG_URL, () => {
+                    if (video) video.play().catch(() => {});
+                });
+            } else if (video) {
+                video.play().catch(() => {});
+            }
         };
 
         posterOverlay.innerHTML = `
@@ -2022,7 +2023,6 @@ async function renderAnimeDetailsView() {
                     <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
                     <div id="details-episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
-                ${typeof window.getInPageAdHTML === 'function' ? window.getInPageAdHTML() : ''}
             </div>
 
             <!-- Main Column: Title & Metadata -->
