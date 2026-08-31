@@ -47,4 +47,6 @@ function decodeRegistryUrl(encodedStr) {
     return atob(encodedStr);
 }
 
+window.VAST_TAG_URL = "https://enchantingboss.com/dfm/F/z.d/GDNJvoZ/G/Ux/AeYmX9HuqZIU/l/k/PUT/cXzcNgjYk/1-N/TcM/tJNqzDMw2cOYTuUY1INPws";
+
 
