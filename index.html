@@ -1,485 +1,1044 @@
-<!DOCTYPE html>
-<html lang="en" class="h-full">
+// -------------------------------------------------------------------------
+// CLOUDFLARE WORKER ROUTER & PROXY ENGINE
+// -------------------------------------------------------------------------
 
-<head>
-    <meta charset="UTF-8">
-    <base href="/">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="6d4dc456896158cdd608353127b6a0ffca4d7a95" content="6d4dc456896158cdd608353127b6a0ffca4d7a95" />
-    <title>BlackLeg - Premium Anime Streaming</title>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Outfit', 'sans-serif'],
-                    },
-                    colors: {
-                        themeBlack: '#08080c',
-                        themeGlass: 'rgba(18, 18, 24, 0.45)',
-                        themeCyan: '#00ffcc',
-                        themeCrimson: '#ff0055',
-                        steelGray: '#a0a5b5'
-                    }
-                }
-            }
+addEventListener("fetch", (event) => {
+  event.respondWith(handleRequest(event));
+});
+
+async function handleRequest(event) {
+  const request = event.request;
+  const url = new URL(request.url);
+  
+  // 1. UNIVERSAL OPTIONS PREFLIGHT HANDLER
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges, Content-Type",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }
+
+  // Define client User-Agent
+  let userAgent = request.headers.get("User-Agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+
+  // 2. ROUTING PIPELINE: Weekly Broadcast Schedule (/schedule)
+  const action = url.searchParams.get("action");
+  if (action === "schedule" || url.pathname === "/schedule") {
+    return await handleScheduleRequest(url);
+  }
+
+  // 3. OBFUSCATED ROUTE: Franchise Tree (/comment?s={slug}&id={anilistId})
+  if (url.pathname === "/comment" || action === "comment" || url.pathname === "/api/franchise" || action === "franchise") {
+    const slug = url.searchParams.get("s") || url.searchParams.get("slug");
+    const id = url.searchParams.get("id") || url.searchParams.get("anilistId") || url.searchParams.get("anilist_id");
+    return await handleFranchiseRequest(slug, id, userAgent);
+  }
+
+  // 4. OBFUSCATED ROUTE: Media & Stream Resolution (/rating?e={episodeId}&id={anilistId}&lang={lang})
+  const hasStreamParams = url.searchParams.has("e") || url.searchParams.has("ep_num") || url.searchParams.has("ep") || url.searchParams.has("episodeId");
+  if (url.pathname === "/rating" || action === "rating" || url.pathname === "/api/stream" || url.pathname === "/api/media" || (hasStreamParams && action !== "proxy_caption" && action !== "schedule")) {
+    return await handleStreamRequest(url, request);
+  }
+
+  // 4. ROUTING PIPELINE: Subtitle VTT Caption Proxy
+  if (action === "proxy_caption") {
+    const vttUrl = url.searchParams.get("vtt_url") || url.searchParams.get("src");
+    if (!vttUrl) {
+      return new Response(JSON.stringify({ error: "Missing vtt_url parameter" }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
         }
-    </script>
-    <!-- Custom Modular CSS Stylesheet -->
-    <link rel="stylesheet" href="/assets/css/main.css">
-    <!-- Hls.js Engine Script -->
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+      });
+    }
 
-</head>
+    try {
+      const vttRes = await fetch(vttUrl, {
+        headers: {
+          'Referer': 'https://megaplay.buzz/',
+          'User-Agent': userAgent
+        }
+      });
 
-<body class="h-full flex flex-col scrollbar-thin">
+      if (!vttRes.ok) {
+        return new Response("Failed to fetch caption tracks from upstream source.", {
+          status: 502,
+          headers: { "Access-Control-Allow-Origin": "*" }
+        });
+      }
 
-    <!-- Header Bar -->
-    <header
-        class="sticky top-0 z-50 w-full bg-[#08080c]/85 backdrop-blur-xl border-b border-white/5 px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
-        <!-- Left: Hamburger Menu (Mobile Drawer Toggle) -->
-        <button id="mobile-drawer-toggle"
-            class="p-2 text-white hover:text-[#00f5ff] transition-colors focus:outline-none md:hidden">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-        </button>
+      const vttText = await vttRes.text();
+      return new Response(vttText, {
+        headers: {
+          "Content-Type": "text/vtt; charset=utf-8",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 502,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+  }
 
-        <!-- Center: ANIMEFLOW Logo -->
-        <a href="/"
-            class="flex items-center gap-1 text-white font-extralight text-lg md:text-2xl tracking-[0.2em] select-none absolute left-1/2 transform -translate-x-1/2 md:static md:transform-none uppercase">
-            ANIME<span class="font-normal text-slate-300">FLOW</span>
-        </a>
+  // 5. TRANSPARENT PROXY ENGINE (For general assets, TS segments, sub-playlists, keys)
+  const srcUrl = url.searchParams.get("src");
+  if (!srcUrl) {
+    return new Response(JSON.stringify({ error: "Missing 'src' target URL or unsupported route." }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
 
-        <!-- Right: Search, Language & Filter Icons -->
-        <div class="flex items-center gap-2 ml-auto md:ml-0 relative">
-            <!-- Language Preference Selector Popover -->
-            <div class="relative inline-block text-left">
-                <button id="lang-pref-btn"
-                    class="px-2.5 py-1.5 text-white hover:text-[#00f5ff] transition-colors focus:outline-none rounded-full bg-white/5 border border-white/10 flex items-center justify-center min-w-[36px]"
-                    title="Language Preference">
-                    <span id="current-lang-code" class="font-mono text-xs font-extrabold tracking-wider text-themeCyan">EN</span>
-                </button>
-                <div id="lang-pref-dropdown"
-                    class="absolute right-0 mt-2 w-60 max-h-72 overflow-y-auto scrollbar-thin rounded-2xl bg-slate-950/90 border border-white/10 backdrop-blur-xl shadow-2xl hidden z-50 transition-all duration-300">
-                    <div class="py-1">
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="en"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">EN</span> - English</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="x-jat"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">JP</span> - Romaji</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="ja"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">日</span> - Native Japanese</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="zh-Hans"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">简</span> - Simplified Chinese</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="zh-Hant"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">繁</span> - Traditional Chinese</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="ar"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">AR</span> - Arabic</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="cs"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">CS</span> - Czech</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="de"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">DE</span> - German</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="es"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">ES</span> - Spanish</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="es-CA"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">ES-CA</span> - Spanish (LatAm)</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="fr"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">FR</span> - French</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="he"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">HE</span> - Hebrew</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="hu"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">HU</span> - Hungarian</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="it"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">IT</span> - Italian</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="ko"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">KO</span> - Korean</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="pl"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">PL</span> - Polish</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="pt"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">PT</span> - Portuguese</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="pt-BR"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">PT-BR</span> - Portuguese (Brazil)</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="ro"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">RO</span> - Romanian</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="ru"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">RU</span> - Russian</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="th"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">TH</span> - Thai</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="tr"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">TR</span> - Turkish</button>
-                        <button class="lang-option w-full text-left px-4 py-2 text-xs font-semibold text-white hover:bg-[#00f5ff]/10 hover:text-[#00f5ff] transition-all flex items-center gap-2" data-value="vi"><span class="font-mono text-[10px] text-themeCyan font-bold min-w-[32px]">VI</span> - Vietnamese</button>
-                    </div>
-                </div>
-            </div>
+  // Cache read initialization
+  const cache = typeof caches !== 'undefined' ? caches.default : null;
+  const cacheKey = request.clone();
+  let cachedResponse = null;
+  
+  if (cache) {
+    try {
+      cachedResponse = await cache.match(cacheKey);
+    } catch (e) {
+      console.warn("[Worker Cache] Match error:", e);
+    }
+  }
 
-            <!--
-            <button id="filter-toggle-btn" class="p-2 text-white hover:text-[#00f5ff] transition-colors focus:outline-none rounded-full bg-white/5 border border-white/10" title="Filter Catalog">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-                </svg>
-            </button>
-            -->
-            <button id="search-toggle-btn"
-                class="p-2 text-white hover:text-[#00f5ff] transition-colors focus:outline-none rounded-full bg-white/5 border border-white/10"
-                title="Search Catalog">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-            </button>
-        </div>
-    </header>
+  if (cachedResponse) {
+    const headers = new Headers(cachedResponse.headers);
+    headers.set("Access-Control-Allow-Origin", "*");
+    return new Response(cachedResponse.body, {
+      status: cachedResponse.status,
+      statusText: cachedResponse.statusText,
+      headers,
+    });
+  }
 
+  // Construct request headers for upstream target forwarding
+  const headers = new Headers();
 
+  const lowerSrcUrl = srcUrl.toLowerCase();
+  const isCdnTarget = 
+    srcUrl.includes("cloudbuzz.lol") ||
+    srcUrl.includes("sugevideo.xyz") ||
+    srcUrl.includes("mewstream.buzz") ||
+    srcUrl.includes("megaplay.buzz") ||
+    lowerSrcUrl.includes(".html") || 
+    lowerSrcUrl.includes(".m3u8") || 
+    lowerSrcUrl.includes(".ts") || 
+    lowerSrcUrl.includes(".jpg") || 
+    lowerSrcUrl.includes(".jpeg") ||
+    lowerSrcUrl.includes(".png") ||
+    lowerSrcUrl.includes(".m4s") ||
+    lowerSrcUrl.includes(".mp4") ||
+    lowerSrcUrl.includes(".ts") ||
+    lowerSrcUrl.includes(".mp3") ||
+    lowerSrcUrl.includes(".js") ||
+    lowerSrcUrl.includes(".json") ||
+    lowerSrcUrl.includes(".xml") ||
+    lowerSrcUrl.includes(".key");
 
-    <!-- Mobile Side Drawer -->
-    <div id="mobile-drawer"
-        class="fixed inset-y-0 left-0 w-64 bg-[#0c0c12]/95 backdrop-blur-2xl z-[100] border-r border-white/5 transform -translate-x-full transition-transform duration-300 ease-in-out md:hidden">
-        <div class="p-6 flex flex-col gap-6">
-            <div class="flex items-center justify-between">
-                <span class="text-white font-extrabold text-xl tracking-wider">FLOW MENU</span>
-                <button id="mobile-drawer-close" class="p-1 text-white hover:text-[#00f5ff]">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <nav class="flex flex-col gap-4 text-sm font-semibold text-steelGray">
-                <a href="/home" class="hover:text-white transition-colors py-2 border-b border-white/5">Home</a>
-                <a href="#trending-section"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5">Explore</a>
-                <a href="#airing-broadcast-section"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5">Schedule</a>
-                <a href="#" id="drawer-filter-trigger"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5 flex items-center justify-between">
-                    <span>Genres</span>
-                    <svg class="w-4 h-4 text-[#00f5ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                    </svg>
-                </a>
-                <a href="#" onclick="toggleClusterModeDebug()"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5 flex items-center justify-between">
-                    <span>Cluster</span>
-                    <span class="w-2.5 h-2.5 rounded-full bg-themeCyan animate-pulse"></span>
-                </a>
-            </nav>
-        </div>
-    </div>
-    <!-- Drawer Overlay -->
-    <div id="mobile-drawer-overlay" class="fixed inset-0 bg-black/60 z-[90] hidden md:hidden"></div>
+  if (isCdnTarget) {
+    headers.set("Referer", "https://megaplay.buzz/");
+    headers.set("Origin", "https://megaplay.buzz");
+    headers.set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
+    headers.set("Accept", "*/*");
+    headers.set("Accept-Language", "en-US,en;q=0.9");
+    headers.set("Sec-Fetch-Dest", "empty");
+    headers.set("Sec-Fetch-Mode", "cors");
+    headers.set("Sec-Fetch-Site", "cross-site");
+  } else if (srcUrl.includes("anikototv.to")) {
+    headers.set("Referer", "https://anikototv.to/home");
+    headers.set("Origin", "https://anikototv.to");
+    headers.set("User-Agent", userAgent);
+  } else {
+    headers.set("User-Agent", userAgent);
+    const origReferer = request.headers.get("Referer");
+    if (origReferer) headers.set("Referer", origReferer);
+    const origOrigin = request.headers.get("Origin");
+    if (origOrigin) headers.set("Origin", origOrigin);
+  }
 
-    <!-- Pinned Mobile Bottom Application Dock -->
-    <nav id="mobile-bottom-nav" class="block md:hidden fixed bottom-0 left-0 right-0 z-50 glass-crystal border-t border-white/10 px-4 py-2 flex justify-around items-center shadow-2xl pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        <a href="/home" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-white hover:text-white transition-colors">
-            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-            <span class="text-[9px] font-mono tracking-widest uppercase">Home</span>
-        </a>
-        <a href="#trending-section" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
-            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            <span class="text-[9px] font-mono tracking-widest uppercase">Explore</span>
-        </a>
-        <a href="#airing-broadcast-section" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
-            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-            <span class="text-[9px] font-mono tracking-widest uppercase">Schedule</span>
-        </a>
-        <a href="#" onclick="return false;" class="mobile-nav-item flex flex-col items-center gap-1 py-1 text-center text-slate-400 hover:text-white transition-colors">
-            <svg class="w-5 h-5 fill-none stroke-current" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            <span class="text-[9px] font-mono tracking-widest uppercase">Settings</span>
-        </a>
-    </nav>
+  // Forward Range header if present for byte-range segment requests
+  const rangeHeader = request.headers.get("Range");
+  if (rangeHeader) {
+    headers.set("Range", rangeHeader);
+  }
 
-    <!-- Main Feed Content Container -->
-    <main id="main-content" class="px-4 md:px-8 pb-24 md:pb-16 max-w-7xl mx-auto w-full">
-        <!-- Dedicated Trending Explore Layout Container -->
-        <div id="trending-explore-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6"></div>
+  const accept = request.headers.get("Accept");
+  if (accept) headers.set("Accept", accept);
+  
+  const acceptLanguage = request.headers.get("Accept-Language");
+  if (acceptLanguage) headers.set("Accept-Language", acceptLanguage);
 
-        <!-- Dedicated Airing Broadcast Schedule Layout Container -->
-        <div id="dedicated-schedule-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6"></div>
+  if (request.method === "POST" || request.method === "PUT") {
+    const contentType = request.headers.get("Content-Type") || "application/json";
+    headers.set("Content-Type", contentType);
+  }
 
-        <!-- Search Results Page Layout Container -->
-        <div id="search-results-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6">
-            <!-- Search Input and Filters Section -->
-            <div class="w-full mb-8 flex flex-col gap-4">
-                <h2 class="text-white text-xl md:text-2xl font-extrabold uppercase tracking-wider">Search Anime Catalog
-                </h2>
-                <div class="relative w-full">
-                    <svg class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-steelGray pointer-events-none"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <input id="search-input" type="text" placeholder="Type name, genre, or keywords..."
-                        class="w-full pl-12 pr-6 py-3.5 md:py-4 text-base md:text-lg text-white bg-slate-950/60 rounded-2xl border border-[#00f5ff]/20 outline-none transition-all duration-300 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 shadow-[0_0_15px_rgba(0,245,255,0.1)]">
-                </div>
+  const fetchOptions = {
+    method: request.method,
+    headers: headers,
+  };
 
-                <!-- Compact Dropdown Packed Filters inline -->
-                <div id="filter-dropdowns-container" class="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-2">
-                    <select id="filter-genre"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Any Genre</option>
-                        <option value="Action">Action</option>
-                        <option value="Adventure">Adventure</option>
-                        <option value="Comedy">Comedy</option>
-                        <option value="Drama">Drama</option>
-                        <option value="Fantasy">Fantasy</option>
-                        <option value="Horror">Horror</option>
-                        <option value="Mecha">Mecha</option>
-                        <option value="Music">Music</option>
-                        <option value="Mystery">Mystery</option>
-                        <option value="Romance">Romance</option>
-                        <option value="Sci-Fi">Sci-Fi</option>
-                        <option value="Slice of Life">Slice of Life</option>
-                        <option value="Sports">Sports</option>
-                        <option value="Supernatural">Supernatural</option>
-                        <option value="Thriller">Thriller</option>
-                    </select>
+  if (request.method === "POST" || request.method === "PUT") {
+    fetchOptions.body = await request.text();
+  }
 
-                    <select id="filter-status"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Any Status</option>
-                        <option value="FINISHED">Finished</option>
-                        <option value="RELEASING">Releasing</option>
-                        <option value="NOT_YET_RELEASED">Not Yet Released</option>
-                        <option value="CANCELLED">Cancelled</option>
-                        <option value="HIATUS">Hiatus</option>
-                    </select>
+  try {
+    const upstreamResponse = await fetch(srcUrl, fetchOptions);
+    
+    // Check if target is a sub-playlist that requires on-the-fly absolute URI rewriting
+    if (srcUrl.toLowerCase().includes(".m3u8") && upstreamResponse.status === 200 && request.method === "GET") {
+      const playlistText = await upstreamResponse.text();
+      const rewritten = rewriteM3u8Manifest(playlistText, srcUrl, url.origin);
+      
+      const responseHeaders = new Headers();
+      responseHeaders.set("Content-Type", "application/x-mpegURL");
+      responseHeaders.set("Access-Control-Allow-Origin", "*");
+      responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+      responseHeaders.set("Access-Control-Allow-Headers", "*");
+      responseHeaders.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+      
+      const modifiedResponse = new Response(rewritten, {
+        status: 200,
+        headers: responseHeaders,
+      });
 
-                    <select id="filter-format"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Any Format</option>
-                        <option value="TV">TV</option>
-                        <option value="TV_SHORT">TV Short</option>
-                        <option value="MOVIE">Movie</option>
-                        <option value="SPECIAL">Special</option>
-                        <option value="OVA">OVA</option>
-                        <option value="ONA">ONA</option>
-                    </select>
+      if (cache) {
+        try {
+          event.waitUntil(cache.put(cacheKey, modifiedResponse.clone()));
+        } catch (e) {
+          console.warn("[Worker Cache] Put error:", e);
+        }
+      }
 
-                    <select id="filter-year"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Any Year</option>
-                    </select>
+      return modifiedResponse;
+    }
 
-                    <select id="filter-sort"
-                        class="bg-slate-900 border-2 border-white/20 text-white font-semibold text-xs md:text-sm hover:border-[#00f5ff]/60 focus:border-[#00f5ff] focus:ring-2 focus:ring-[#00f5ff]/20 rounded-xl px-4 py-3 outline-none transition-all cursor-pointer shadow-lg">
-                        <option value="">Sort Order</option>
-                        <option value="POPULARITY_DESC">Most Popular</option>
-                        <option value="SCORE_DESC">Highest Score</option>
-                        <option value="TRENDING_DESC">Trending</option>
-                        <option value="SEARCH_MATCH">Relevance</option>
-                    </select>
-                </div>
-            </div>
+    // Direct proxy response (TS/HTML segments, keys, etc.)
+    const responseHeaders = new Headers(upstreamResponse.headers);
+    responseHeaders.set("Access-Control-Allow-Origin", "*");
+    responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    responseHeaders.set("Access-Control-Allow-Headers", "*");
+    responseHeaders.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
+    
+    const modifiedResponse = new Response(upstreamResponse.body, {
+      status: upstreamResponse.status,
+      statusText: upstreamResponse.statusText,
+      headers: responseHeaders,
+    });
 
-            <!-- Search Results Grid Area -->
-            <div class="w-full">
-                <div id="search-overlay-results-header" class="mb-6 flex justify-between items-center hidden">
-                    <h3 id="search-overlay-title"
-                        class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-[#00f5ff] pl-3">
-                        Search Results
-                    </h3>
-                    <button id="search-overlay-clear"
-                        class="text-xs font-semibold px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-md text-white transition-all">
-                        Back to Home
-                    </button>
-                </div>
+    if (cache && upstreamResponse.status === 200 && request.method === "GET") {
+      try {
+        event.waitUntil(cache.put(cacheKey, modifiedResponse.clone()));
+      } catch (e) {
+        console.warn("[Worker Cache] Put error:", e);
+      }
+    }
 
-                <div id="search-results-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-6">
-                    <!-- Dynamic Results -->
-                </div>
-            </div>
-        </div>
+    return modifiedResponse;
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+}
 
-        <div id="homepage-sections-wrapper">
-            <!-- SECTION 1: THE SPLIT COMMAND LAYER (TOP HALF) -->
-            <div class="flex flex-col lg:grid lg:grid-cols-12 lg:gap-8 my-8 items-start">
+// Helper: Rewrite M3U8 manifest segments and URI attributes to proxy URLs
+function rewriteM3u8Manifest(playlistText, targetUrl, workerOrigin) {
+  if (!playlistText) return '';
+  let baseUrl;
+  try {
+    baseUrl = new URL(targetUrl);
+  } catch (e) {
+    return playlistText;
+  }
 
-                <!-- LEFT SIDEBAR SPOTLIGHT (40% Width: 5 columns on lg, 12 columns on mobile) -->
-                <section class="col-span-12 lg:col-span-5 flex flex-col gap-4">
-                    <h2
-                        class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3 flex items-center gap-2">
-                        Spotlight <span class="w-1.5 h-1.5 rounded-full bg-themeCyan animate-ping"></span>
-                    </h2>
+  const lines = playlistText.split(/\r?\n/);
+  const rewrittenLines = lines.map(line => {
+    let trimmed = line.trim();
+    if (!trimmed) return line;
 
-                    <!-- Floating Spotlight Container with neon lightning border -->
-                    <div id="spotlight-outer-container"
-                        class="relative w-full aspect-[3/4] md:aspect-[4/5] rounded-3xl p-1 overflow-hidden transition-all duration-500 bg-gradient-to-br from-[#00f5ff] via-transparent to-[#bd00ff] shadow-[0_0_20px_rgba(0,245,255,0.15)] group/spotlight">
-                        <!-- Internal Card container with backdrop blur -->
-                        <div id="spotlight-card-content"
-                            class="relative w-full h-full rounded-[22px] overflow-hidden bg-slate-950/95 flex flex-col justify-end p-6 md:p-8 z-10 transition-opacity duration-300">
-                            <!-- Background Image Zoom -->
-                            <div id="spotlight-bg-img"
-                                class="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover/spotlight:scale-105"
-                                style="background-image: url('');"></div>
-                            <div
-                                class="absolute inset-0 bg-gradient-to-t from-[#08080c] via-[#08080c]/60 to-transparent">
-                            </div>
+    if (trimmed.startsWith('#')) {
+      return line.replace(/URI=["']([^"']+)["']/gi, (match, uri) => {
+        let absUrl;
+        try {
+          absUrl = new URL(uri, baseUrl.href).href;
+        } catch (e) {
+          absUrl = uri;
+        }
+        const proxiedUrl = `${workerOrigin}/?src=${encodeURIComponent(absUrl)}`;
+        return `URI="${proxiedUrl}"`;
+      });
+    }
 
-                            <!-- Overlay Details -->
-                            <div class="relative z-10 flex flex-col gap-4">
-                                <h1 id="spotlight-title"
-                                    class="text-2xl md:text-4xl font-extrabold text-white leading-tight tracking-tight drop-shadow-md transition-all duration-300">
-                                    Loading...
-                                </h1>
-                                <p id="spotlight-desc"
-                                    class="text-steelGray text-xs md:text-sm line-clamp-3 font-light transition-all duration-300">
-                                    Loading...
-                                </p>
-                                <div class="flex items-center gap-3 flex-wrap mt-2">
-                                    <button id="spotlight-watch-btn"
-                                        class="px-6 py-2.5 bg-gradient-to-r from-[#bd00ff] to-[#7a00cc] hover:from-[#d500ff] hover:to-[#9a00ff] text-white font-extrabold text-xs md:text-sm rounded-full shadow-lg shadow-purple-950/50 hover:shadow-[#bd00ff]/30 transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase tracking-widest">
-                                        Details
-                                    </button>
-                                    <button id="spotlight-watchlist-btn"
-                                        class="px-5 py-2.5 glass-panel hover:bg-white/10 text-white font-bold text-xs md:text-sm rounded-full transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase border border-white/10">
-                                        Watchlist
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+    let absSegmentUrl;
+    try {
+      absSegmentUrl = new URL(trimmed, baseUrl.href).href;
+    } catch (e) {
+      absSegmentUrl = trimmed;
+    }
+    return `${workerOrigin}/?src=${encodeURIComponent(absSegmentUrl)}`;
+  });
 
-                <!-- RIGHT CONTENT HUB (60% Width: 7 columns on lg, 12 columns on mobile) -->
-                <div class="col-span-12 lg:col-span-7 flex flex-col gap-10 min-w-0 w-full overflow-hidden">
+  return rewrittenLines.join('\n');
+}
 
-                    <!-- Continue Watching (If present) -->
-                    <section id="continue-watching-section" class="hidden flex flex-col gap-4 w-full min-w-0 overflow-hidden">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Continue Watching
-                        </h2>
-                        <div id="continue-watching-container" class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
-                            <!-- Dynamic Content -->
-                        </div>
-                    </section>
+// Helper: HTML entity decoder
+function htmlEntityDecode(str) {
+  if (!str) return '';
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&#039;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&nbsp;/g, ' ');
+}
 
-                    <!-- TOP PICKS THIS WEEK -->
-                    <section id="trending-section" class="flex flex-col gap-4 w-full min-w-0 overflow-hidden">
-                        <div class="flex items-center justify-between">
-                            <h2
-                                class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                                TOP PICKS THIS WEEK
-                            </h2>
-                            <!-- Track Navigators -->
-                            <div class="hidden md:flex items-center gap-2">
-                                <button onclick="scrollTrack('trending-container', 'left')"
-                                    class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                                <button onclick="scrollTrack('trending-container', 'right')"
-                                    class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                            </div>
-                        </div>
-                        <div id="trending-container"
-                            class="flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-3 pb-4 touch-pan-x">
-                            <div class="w-full flex justify-center py-12">
-                                <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                            </div>
-                        </div>
-                    </section>
+// Helper: Discover master manifest path (.m3u8)
+function findM3u8Url(arr) {
+  if (!arr || typeof arr !== 'object') return null;
+  if (typeof arr.video === 'string') return arr.video;
+  if (typeof arr.file === 'string') return arr.file;
+  if (Array.isArray(arr.sources)) {
+    for (let src of arr.sources) {
+      if (typeof src.file === 'string') return src.file;
+    }
+  }
+  for (let k in arr) {
+    let v = arr[k];
+    if (typeof v === 'string' && /\.m3u8(\?|$)/i.test(v)) {
+      return v;
+    } else if (typeof v === 'object' && v !== null) {
+      let res = findM3u8Url(v);
+      if (res) return res;
+    }
+  }
+  return null;
+}
 
-                </div>
+// Helper: Locate subtitle tracks
+function findSubtitlesRecursive(arr) {
+  if (!arr || typeof arr !== 'object') return [];
+  if (Array.isArray(arr)) {
+    let subs = [];
+    for (let item of arr) {
+      if (item && typeof item === 'object' && typeof item.file === 'string' && (item.label || item.kind)) {
+        subs.push({
+          file: item.file,
+          label: item.label || item.kind || 'Unknown Language',
+          kind: item.kind || 'captions'
+        });
+      }
+    }
+    if (subs.length > 0) return subs;
+  }
+  for (let k in arr) {
+    let v = arr[k];
+    if (typeof v === 'object' && v !== null) {
+      let res = findSubtitlesRecursive(v);
+      if (res && res.length > 0) return res;
+    }
+  }
+  return [];
+}
 
-            </div> <!-- End of Split Grid Container -->
+// Helper: Locate skip point timestamp configs
+function findSkipTimesRecursive(arr, key) {
+  if (!arr || typeof arr !== 'object') return null;
+  for (let k in arr) {
+    let v = arr[k];
+    if (k.toLowerCase() === key.toLowerCase()) {
+      if (v && typeof v === 'object') {
+        return {
+          start: parseFloat(v.start || 0),
+          end: parseFloat(v.end || 0)
+        };
+      } else if (typeof v === 'number' || !isNaN(v)) {
+        return {
+          start: parseFloat(v),
+          end: 0.0
+        };
+      }
+    }
+    if (typeof v === 'object' && v !== null) {
+      let res = findSkipTimesRecursive(v, key);
+      if (res) return res;
+    }
+  }
+  return null;
+}
 
+// Helper: Manifest URL rewriter (Absolute CDN & Tag attribute rewriting)
+function rewriteM3u8Manifest(manifestText, manifestUrl, workerOrigin) {
+  const parsedUrl = new URL(manifestUrl);
+  const scheme = parsedUrl.protocol;
+  const host = parsedUrl.host;
+  
+  let path = parsedUrl.pathname;
+  let baseDir = path.substring(0, path.lastIndexOf('/'));
+  if (baseDir === '' || baseDir === '/') {
+    baseDir = '';
+  }
+  
+  const baseUrl = `${scheme}//${host}${baseDir}/`;
+  const originUrl = `${scheme}//${host}`;
+  
+  const lines = manifestText.split("\n");
+  const rewrittenLines = lines.map(line => {
+    let trimmed = line.trim();
+    if (trimmed.length === 0) return line;
+    
+    const getProxyUrl = (targetUrl) => {
+      return `${workerOrigin}/?src=${encodeURIComponent(targetUrl)}`;
+    };
 
-            <!-- SECTION 2: THE FULL-LENGTH UNDER-ROWS (BOTTOM HALF) -->
-            <div class="flex flex-col gap-10 my-8">
+    const toAbsoluteUrl = (relOrAbsUrl) => {
+      if (relOrAbsUrl.startsWith('http://') || relOrAbsUrl.startsWith('https://')) {
+        return relOrAbsUrl;
+      }
+      if (relOrAbsUrl.startsWith('/')) {
+        return originUrl + relOrAbsUrl;
+      }
+      return baseUrl + relOrAbsUrl;
+    };
+    
+    if (!trimmed.startsWith('#')) {
+      const absoluteUrl = toAbsoluteUrl(trimmed);
+      return getProxyUrl(absoluteUrl);
+    } else {
+      // Handles #EXT-X-KEY, #EXT-X-MAP, #EXT-X-MEDIA, etc.
+      let updatedLine = trimmed;
+      const uriMatches = trimmed.matchAll(/URI=["']([^"']+)["']/g);
+      for (const match of uriMatches) {
+        const rawUri = match[1];
+        const absoluteUri = toAbsoluteUrl(rawUri);
+        const newProxyUri = getProxyUrl(absoluteUri);
+        updatedLine = updatedLine.replace(`URI="${rawUri}"`, `URI="${newProxyUri}"`).replace(`URI='${rawUri}'`, `URI='${newProxyUri}'`);
+      }
+      return updatedLine;
+    }
+  });
+  
+  return rewrittenLines.join("\n");
+}
 
-                <!-- Popular All-Time -->
-                <section id="popular-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            POPULAR ALL-TIME
-                        </h2>
-                        <!-- Track Navigators -->
-                        <div class="hidden md:flex items-center gap-2">
-                            <button onclick="scrollTrack('popular-container', 'left')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                            <button onclick="scrollTrack('popular-container', 'right')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                        </div>
-                    </div>
-                    <div id="popular-container"
-                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
+// -------------------------------------------------------------------------
+// RESOLVER 1: WEEKLY BROADCAST SCHEDULE ROUTER
+// -------------------------------------------------------------------------
+async function handleScheduleRequest(url) {
+  const inputTime = parseInt(url.searchParams.get("time") || Math.floor(Date.now() / 1000).toString(), 10);
+  const inputTz = parseInt(url.searchParams.get("tz") || "0", 10);
+  
+  const localizedTime = inputTime + (inputTz * 3600);
+  const localizedDate = new Date(localizedTime * 1000);
+  const year = localizedDate.getUTCFullYear();
+  const month = localizedDate.getUTCMonth();
+  const date = localizedDate.getUTCDate();
+  const todayMidnightUtc = Math.floor(Date.UTC(year, month, date) / 1000);
+  
+  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const payload = [];
+  
+  for (let i = 0; i < 7; i++) {
+    const timestamp = todayMidnightUtc + (i * 86400);
+    const dayIndex = new Date(timestamp * 1000).getUTCDay();
+    const dayName = daysOfWeek[dayIndex];
+    
+    const ajaxUrl = `https://anikototv.to/ajax/schedule/date?tz=0&time=${timestamp}`;
+    const headers = new Headers({
+      'X-Requested-With': 'XMLHttpRequest',
+      'Referer': 'https://anikototv.to/home',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+    });
+    
+    const shows = [];
+    
+    try {
+      const res = await fetch(ajaxUrl, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const html = data.result || '';
+        
+        const itemRegex = /<a\s+([^>]*class=["'][^"']*item[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi;
+        let match;
+        while ((match = itemRegex.exec(html)) !== null) {
+          const attrs = match[1];
+          const inner = match[2];
+          
+          const hrefMatch = attrs.match(/href=["']([^"']*)["']/i);
+          const href = hrefMatch ? hrefMatch[1] : '';
+          
+          let slug = '';
+          const slugMatch = href.match(/\/watch\/([^\/]+)/i);
+          if (slugMatch) {
+            slug = slugMatch[1];
+          } else {
+            slug = href.substring(href.lastIndexOf('/') + 1);
+          }
+          
+          const timeMatch = inner.match(/<div[^>]+class=["']time["'][^>]*>([\s\S]*?)<\/div>/i);
+          const timeStr = timeMatch ? timeMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+          
+          let showTimeUnix = timestamp;
+          if (timeStr) {
+            const ampmMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            const militaryMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+            if (ampmMatch) {
+              let hours = parseInt(ampmMatch[1], 10);
+              const mins = parseInt(ampmMatch[2], 10);
+              const ampm = ampmMatch[3].toUpperCase();
+              if (ampm === 'PM' && hours < 12) {
+                hours += 12;
+              } else if (ampm === 'AM' && hours === 12) {
+                hours = 0;
+              }
+              showTimeUnix = timestamp + (hours * 3600) + (mins * 60);
+            } else if (militaryMatch) {
+              const hours = parseInt(militaryMatch[1], 10);
+              const mins = parseInt(militaryMatch[2], 10);
+              showTimeUnix = timestamp + (hours * 3600) + (mins * 60);
+            }
+          }
+          
+          const epMatch = inner.match(/<div[^>]+class=["']ep["'][^>]*>[\s\S]*?<span>([\s\S]*?)<\/span>/i);
+          const epStr = epMatch ? epMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+          const epNumClean = epStr.replace(/^Episode\s+/i, '');
+          
+          let titleEn = '';
+          let titleJp = '';
+          const titleMatch = inner.match(/<div[^>]+class=["'][^"']*(title\s+d-title|d-title\s+title)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+          if (titleMatch) {
+            const titleDivTag = titleMatch[0];
+            titleEn = htmlEntityDecode(titleMatch[2].replace(/<[^>]*>/g, '').trim());
+            
+            const jpMatch = titleDivTag.match(/data-jp=["']([^"']*)["']/i);
+            if (jpMatch) {
+              titleJp = htmlEntityDecode(jpMatch[1].trim());
+            }
+          }
+          
+          let image = '';
+          const imgMatch = inner.match(/<img[^>]+(?:src|data-src|data-original)=["']([^"']*)["']/i);
+          if (imgMatch) {
+            image = imgMatch[1].trim();
+          }
+          
+          const formatTime = (unixSecs) => {
+            const date = new Date(unixSecs * 1000);
+            let hours = date.getUTCHours();
+            const minutes = date.getUTCMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+            const hoursStr = hours < 10 ? '0' + hours : hours;
+            return `${hoursStr}:${minutesStr} ${ampm}`;
+          };
+          
+          shows.push({
+            time: formatTime(showTimeUnix),
+            timestamp: showTimeUnix,
+            episode: epNumClean,
+            title: titleEn,
+            title_jp: titleJp,
+            slug: slug,
+            href: href,
+            image: image
+          });
+        }
+      }
+    } catch (e) {
+      console.error(`[Worker Schedule] Failed parsing date ${dayName}:`, e);
+    }
+    
+    payload.push({
+      day: dayName,
+      timestamp: timestamp,
+      shows: shows
+    });
+  }
+  
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const currentDayName = days[new Date(localizedTime * 1000).getUTCDay()];
+  let foundIdx = -1;
+  for (let k = 0; k < payload.length; k++) {
+    if (payload[k].day.toLowerCase() === currentDayName.toLowerCase()) {
+      foundIdx = k;
+      break;
+    }
+  }
+  
+  let reorderedPayload = payload;
+  if (foundIdx !== -1) {
+    reorderedPayload = [
+      ...payload.slice(foundIdx),
+      ...payload.slice(0, foundIdx)
+    ];
+  }
+  
+  return new Response(JSON.stringify(reorderedPayload), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    }
+  });
+}
 
-                <!-- Recently Updated -->
-                <section id="recent-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Recently Updated
-                        </h2>
-                        <!-- Track Navigators -->
-                        <div class="hidden md:flex items-center gap-2">
-                            <button onclick="scrollTrack('recent-container', 'left')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                            <button onclick="scrollTrack('recent-container', 'right')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                        </div>
-                    </div>
-                    <div id="recent-container"
-                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
+// -------------------------------------------------------------------------
+// RESOLVER 2: VIDEO STREAM & MANIFEST ROUTER
+// -------------------------------------------------------------------------
+// Helper: Parse master manifest to find the highest quality stream
+function parseMasterM3u8(masterText, masterUrl) {
+  const lines = masterText.split('\n');
+  let bestBandwidth = -1;
+  let bestUrl = null;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('#EXT-X-STREAM-INF:')) {
+      const bwMatch = line.match(/BANDWIDTH=(\d+)/i);
+      const bandwidth = bwMatch ? parseInt(bwMatch[1], 10) : 0;
+      
+      let nextUrl = null;
+      for (let j = i + 1; j < lines.length; j++) {
+        const subLine = lines[j].trim();
+        if (subLine && !subLine.startsWith('#')) {
+          nextUrl = subLine;
+          break;
+        }
+      }
+      if (nextUrl) {
+        if (bandwidth > bestBandwidth || bestUrl === null) {
+          bestBandwidth = bandwidth;
+          bestUrl = nextUrl;
+        }
+      }
+    }
+  }
+  
+  if (!bestUrl) {
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        bestUrl = trimmed;
+        break;
+      }
+    }
+  }
+  
+  if (!bestUrl) return null;
+  
+  const parsedUrl = new URL(masterUrl);
+  const scheme = parsedUrl.protocol;
+  const host = parsedUrl.host;
+  let path = parsedUrl.pathname;
+  let baseDir = path.substring(0, path.lastIndexOf('/'));
+  if (baseDir === '' || baseDir === '/') {
+    baseDir = '';
+  }
+  const baseUrl = `${scheme}//${host}${baseDir}/`;
+  const originUrl = `${scheme}//${host}`;
+  
+  if (!bestUrl.startsWith('http://') && !bestUrl.startsWith('https://')) {
+    if (bestUrl.startsWith('/')) {
+      return originUrl + bestUrl;
+    } else {
+      return baseUrl + bestUrl;
+    }
+  }
+  return bestUrl;
+}
 
-                <!-- Hidden Gems -->
-                <section id="hidden-gems-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Hidden Gems
-                        </h2>
-                        <!-- Track Navigators -->
-                        <div class="hidden md:flex items-center gap-2">
-                            <button onclick="scrollTrack('hidden-gems-container', 'left')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&larr;</button>
-                            <button onclick="scrollTrack('hidden-gems-container', 'right')"
-                                class="w-8 h-8 rounded-full border border-white/10 hover:border-themeCyan/50 flex items-center justify-center text-steelGray hover:text-themeCyan bg-white/[0.02] hover:bg-themeCyan/10 transition-all duration-300 font-bold">&rarr;</button>
-                        </div>
-                    </div>
-                    <div id="hidden-gems-container"
-                        class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scroll-smooth snap-x snap-mandatory snap-track">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
+// -------------------------------------------------------------------------
+// RESOLVER 2: VIDEO STREAM & MANIFEST ROUTER (/rating)
+// -------------------------------------------------------------------------
+async function handleStreamRequest(url, request) {
+  const anilistId = url.searchParams.get("id") || url.searchParams.get("anilist_id") || url.searchParams.get("anilistId");
+  const epNum = url.searchParams.get("e") || url.searchParams.get("ep_num") || url.searchParams.get("ep") || url.searchParams.get("episodeId") || "1";
+  const language = url.searchParams.get("lang") || url.searchParams.get("language") || url.searchParams.get("provider") || "sub";
+  
+  const megaplayUrl = `https://megaplay.buzz/stream/ani/${anilistId}/${epNum}/${language}`;
+  const userAgent = request.headers.get("User-Agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+  
+  // Step 1: Fetch target HTML page
+  const step1Res = await fetch(megaplayUrl, {
+    headers: {
+      'Referer': 'https://megaplay.buzz/',
+      'User-Agent': userAgent,
+      'Origin': 'https://megaplay.buzz'
+    }
+  });
+  
+  if (!step1Res.ok) {
+    return new Response(JSON.stringify({
+      error: 'Failed to connect to streaming gateway page',
+      debug: { target_url: megaplayUrl, http_code: step1Res.status }
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+  
+  const html = await step1Res.text();
+  let fileId = null;
+  
+  const titleMatch = html.match(/<title>[^<]*?File\s+(\d+)\s*-[^<]*?<\/title>/i);
+  const megaMatch = html.match(/File\s+(\d+)\s*-\s*MegaPlay/i);
+  const fileMatch = html.match(/File\s+(\d+)/i);
+  
+  if (titleMatch) {
+    fileId = titleMatch[1];
+  } else if (megaMatch) {
+    fileId = megaMatch[1];
+  } else if (fileMatch) {
+    fileId = fileMatch[1];
+  }
+  
+  if (!fileId) {
+    return new Response(JSON.stringify({
+      error: 'Streaming source token could not be resolved from gateway HTML',
+      debug: { url: megaplayUrl }
+    }), {
+      status: 404,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+  
+  // Step 2: Fetch sources from internal API
+  const apiUrl = `https://megaplay.buzz/stream/getSources?id=${fileId}`;
+  const step2Res = await fetch(apiUrl, {
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json, text/javascript, */*; q=0.01',
+      'Referer': 'https://megaplay.buzz/',
+      'User-Agent': userAgent,
+      'Origin': 'https://megaplay.buzz'
+    }
+  });
+  
+  if (!step2Res.ok) {
+    return new Response(JSON.stringify({
+      error: 'Failed to resolve streaming paths from internal API gateway',
+      debug: { target_url: apiUrl, http_code: step2Res.status }
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+  
+  let sources;
+  try {
+    sources = await step2Res.json();
+  } catch (e) {
+    return new Response(JSON.stringify({
+      error: 'Aggregator received corrupted JSON from streaming router API'
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+  
+  const m3u8Url = findM3u8Url(sources);
+  if (!m3u8Url) {
+    return new Response(JSON.stringify({
+      error: 'Master stream coordinate playlist (.m3u8) path not found in sources mapping',
+      debug: sources
+    }), {
+      status: 404,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+  
+  const subtitles = findSubtitlesRecursive(sources);
+  const intro = findSkipTimesRecursive(sources, 'intro') || { start: 0.0, end: 0.0 };
+  const outro = findSkipTimesRecursive(sources, 'outro') || { start: 0.0, end: 0.0 };
+  
+  // Step 3: Fetch master playlist text from CDN
+  const masterRes = await fetch(m3u8Url, {
+    headers: {
+      'Referer': 'https://megaplay.buzz/',
+      'Origin': 'https://megaplay.buzz',
+      'User-Agent': userAgent
+    }
+  });
+  
+  if (!masterRes.ok) {
+    return new Response(JSON.stringify({
+      error: 'Failed to download master stream configuration playlist from CDN',
+      debug: { m3u8_url: m3u8Url, http_code: masterRes.status }
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+  
+  const masterText = await masterRes.text();
+  
+  // Step 4: Parse master playlist and find highest quality variant URL
+  const variantUrl = parseMasterM3u8(masterText, m3u8Url);
+  if (!variantUrl) {
+    return new Response(JSON.stringify({
+      error: 'Failed to extract quality variant from master playlist',
+      debug: { masterText }
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+  
+  // Step 5: Fetch highest quality variant playlist text directly
+  const variantRes = await fetch(variantUrl, {
+    headers: {
+      'Referer': 'https://megaplay.buzz/',
+      'Origin': 'https://megaplay.buzz',
+      'User-Agent': userAgent
+    }
+  });
+  
+  if (!variantRes.ok) {
+    return new Response(JSON.stringify({
+      error: 'Failed to download variant playlist from CDN',
+      debug: { variantUrl, http_code: variantRes.status }
+    }), {
+      status: 502,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
+  }
+  
+  const variantText = await variantRes.text();
+  
+  // Step 6: Rewrite the variant playlist relative/absolute URLs to use our proxy
+  const rewrittenManifest = rewriteM3u8Manifest(variantText, variantUrl, url.origin);
+  
+  // Step 7: Server-side fetch and resolve all subtitle caption file contents
+  const subtitleTracks = [];
+  for (const track of subtitles) {
+    if (track.file) {
+      try {
+        const vttRes = await fetch(track.file, {
+          headers: {
+            'Referer': 'https://megaplay.buzz/',
+            'Origin': 'https://megaplay.buzz',
+            'User-Agent': userAgent
+          }
+        });
+        if (vttRes.ok) {
+          const vttText = await vttRes.text();
+          subtitleTracks.push({
+            file: track.file,
+            label: track.label,
+            kind: track.kind,
+            content: vttText
+          });
+        } else {
+          subtitleTracks.push(track);
+        }
+      } catch (err) {
+        console.error(`Failed to download subtitle content for ${track.label}:`, err);
+        subtitleTracks.push(track);
+      }
+    } else {
+      subtitleTracks.push(track);
+    }
+  }
+  
+  // Step 8: Return a single fully self-contained response
+  return new Response(JSON.stringify({
+    success: true,
+    manifest: rewrittenManifest,
+    subtitles: subtitleTracks,
+    intro: intro,
+    outro: outro
+  }), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    }
+  });
+}
 
-                <!-- Weekly Airing Broadcast Schedule (Moved to Bottom) -->
-                <section id="airing-broadcast-section" class="flex flex-col gap-4">
-                    <div class="flex items-center justify-between">
-                        <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3 flex items-center gap-2">
-                            Weekly Airing Broadcast
-                        </h2>
-                    </div>
-                    <div id="airing-broadcast-columns"
-                        class="flex gap-6 overflow-x-auto pb-4 scrollbar-thin snap-x snap-mandatory scroll-smooth">
-                        <div class="w-full flex justify-center py-12">
-                            <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-themeCyan"></div>
-                        </div>
-                    </div>
-                </section>
-            </div>
-            </div>
-    </main>
+// -------------------------------------------------------------------------
+// FRANCHISE TREE FETCH & SVELTEKIT JSON DE-SERIALIZATION ENGINE (/comment)
+// -------------------------------------------------------------------------
+async function handleFranchiseRequest(slug, id, userAgent) {
+  if (!slug || !id) {
+    return new Response(JSON.stringify({ error: "Missing parameter", seasons: [] }), {
+      status: 400,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
 
+  const targetUrl = `https://animex.one/anime/${encodeURIComponent(slug)}-${id}/__data.json?x-sveltekit-invalidated=01`;
+  try {
+    const upstreamRes = await fetch(targetUrl, {
+      headers: {
+        'Referer': 'https://animex.one/',
+        'User-Agent': userAgent,
+        'Accept': 'application/json'
+      }
+    });
 
+    if (!upstreamRes.ok) {
+      return new Response(JSON.stringify({ seasons: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
 
-    <!-- Page Footer -->
-    <footer
-        class="mt-auto w-full bg-[#08080c] border-t border-white/5 py-8 text-center text-steelGray text-xs md:text-sm">
-        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p>&copy; 2026 BlackLeg Platform. Built for absolute zero-traffic efficiency.</p>
-            <div class="flex gap-4 text-themeCyan">
-                <span class="cursor-pointer hover:underline" onclick="toggleClusterModeDebug()">Cluster Mode Sync</span>
-                <span>&bull;</span>
-                <span class="text-white">Active Node: <span id="active-node-display"
-                        class="font-mono text-themeCyan bg-slate-900/60 px-2 py-0.5 rounded border border-white/5">Primary Node</span></span>
-            </div>
-        </div>
-    </footer>
+    const json = await upstreamRes.json();
+    const seasons = parseAnimexDataPayload(json);
 
-    <!-- Modular Application JS Imports -->
-    <script src="/assets/js/config.js"></script>
-    <script src="/assets/js/gateway.js"></script>
-    <script src="/assets/js/renderers.js"></script>
-    <script src="/assets/js/player.js"></script>
-    <script src="/assets/js/app.js"></script>
-</body>
+    return new Response(JSON.stringify({ seasons }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=3600"
+      }
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ seasons: [], error: err.message }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
+}
 
-</html>
+function parseAnimexDataPayload(json) {
+  if (!json) return [];
+  if (Array.isArray(json.seasons)) return formatSeasonsArray(json.seasons);
+
+  let rawSeasons = null;
+
+  if (json.nodes && Array.isArray(json.nodes)) {
+    for (const node of json.nodes) {
+      if (!node) continue;
+      if (Array.isArray(node.data)) {
+        const flatData = node.data;
+        for (let i = 0; i < flatData.length; i++) {
+          const item = flatData[i];
+          if (item && typeof item === 'object' && !Array.isArray(item)) {
+            if (item.seasons !== undefined) {
+              const deserialized = deserializeSvelteKit(flatData, i);
+              if (deserialized && Array.isArray(deserialized.seasons)) {
+                rawSeasons = deserialized.seasons;
+                break;
+              }
+            }
+          }
+        }
+      } else if (node.data && Array.isArray(node.data.seasons)) {
+        rawSeasons = node.data.seasons;
+      }
+      if (rawSeasons) break;
+    }
+  }
+
+  if (!rawSeasons && json.data && Array.isArray(json.data.seasons)) {
+    rawSeasons = json.data.seasons;
+  }
+
+  if (Array.isArray(rawSeasons)) {
+    return formatSeasonsArray(rawSeasons);
+  }
+
+  return [];
+}
+
+function deserializeSvelteKit(flatData, idx) {
+  if (idx === null || idx === undefined) return null;
+  if (typeof idx !== 'number') return idx;
+  if (idx < 0 || idx >= flatData.length) return idx;
+
+  const val = flatData[idx];
+  if (val === null || val === undefined) return null;
+  if (typeof val !== 'object') return val;
+
+  if (Array.isArray(val)) {
+    return val.map(item => deserializeSvelteKit(flatData, item));
+  }
+
+  const res = {};
+  for (const [k, v] of Object.entries(val)) {
+    res[k] = deserializeSvelteKit(flatData, v);
+  }
+  return res;
+}
+
+function formatSeasonsArray(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.map(item => {
+    if (!item) return null;
+    let anilistId = item.anilistId || item.id || item.anilist_id || item.mediaId || '';
+    if (typeof anilistId !== 'string') anilistId = String(anilistId);
+
+    let title = '';
+    if (typeof item.title === 'string') {
+      title = item.title;
+    } else if (item.title && typeof item.title === 'object') {
+      title = item.title.english || item.title.romaji || item.title.userPreferred || '';
+    } else if (item.name) {
+      title = String(item.name);
+    }
+
+    let image = item.image || item.poster || item.coverImage || item.banner || item.cover || '';
+    if (typeof image === 'object' && image !== null) {
+      image = image.large || image.extraLarge || image.medium || '';
+    }
+
+    let type = item.type || item.format || item.mediaType || 'TV';
+    if (typeof type !== 'string') type = 'TV';
+
+    return {
+      anilistId: anilistId,
+      title: title || 'Anime',
+      image: image || '',
+      type: type || 'TV'
+    };
+  }).filter(Boolean);
+}
