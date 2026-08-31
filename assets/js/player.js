@@ -860,6 +860,217 @@ function setupPlayerKeyboardShortcuts() {
 window.initPlayerControls = initPlayerControls;
 window.setupPlayerKeyboardShortcuts = setupPlayerKeyboardShortcuts;
 
+// -------------------------------------------------------------------------
+// VAST 2.0 / 3.0 IN-STREAM PRE-ROLL VIDEO AD ENGINE
+// -------------------------------------------------------------------------
+
+async function fetchVastXml(url) {
+    try {
+        const res = await fetch(url, { mode: 'cors' });
+        if (!res.ok) return null;
+        const text = await res.text();
+        const parser = new DOMParser();
+        return parser.parseFromString(text, "application/xml");
+    } catch (e) {
+        console.warn("[VAST Engine] Failed to fetch or parse VAST XML:", e);
+        return null;
+    }
+}
+
+function parseVastData(xmlDoc) {
+    if (!xmlDoc) return null;
+    
+    const mediaFiles = Array.from(xmlDoc.querySelectorAll("MediaFile"));
+    let mediaUrl = null;
+    
+    const mp4File = mediaFiles.find(mf => {
+        const type = mf.getAttribute("type") || "";
+        return type.includes("mp4") || type.includes("video");
+    }) || mediaFiles[0];
+    
+    if (mp4File) {
+        mediaUrl = mp4File.textContent.trim();
+    }
+    
+    if (!mediaUrl) return null;
+    
+    const clickThroughEl = xmlDoc.querySelector("ClickThrough");
+    const clickThroughUrl = clickThroughEl ? clickThroughEl.textContent.trim() : null;
+    
+    const impressionEls = xmlDoc.querySelectorAll("Impression");
+    const impressions = Array.from(impressionEls).map(el => el.textContent.trim()).filter(Boolean);
+    
+    const trackingEls = xmlDoc.querySelectorAll("Tracking");
+    const trackingEvents = {};
+    trackingEls.forEach(el => {
+        const event = el.getAttribute("event");
+        if (event) {
+            if (!trackingEvents[event]) trackingEvents[event] = [];
+            trackingEvents[event].push(el.textContent.trim());
+        }
+    });
+    
+    return {
+        mediaUrl,
+        clickThroughUrl,
+        impressions,
+        trackingEvents
+    };
+}
+
+function fireVastUrls(urls) {
+    if (!urls || !urls.length) return;
+    urls.forEach(url => {
+        if (url) {
+            const img = new Image();
+            img.src = url;
+        }
+    });
+}
+
+function playVastPreRoll(mainVideo, vastUrl, onAdComplete) {
+    const urlToUse = vastUrl || window.VAST_TAG_URL;
+    if (!urlToUse) {
+        if (onAdComplete) onAdComplete();
+        return;
+    }
+    
+    const container = mainVideo?.parentElement || document.getElementById('player-container');
+    if (!container) {
+        if (onAdComplete) onAdComplete();
+        return;
+    }
+
+    let adContainer = document.getElementById('vast-ad-container');
+    if (adContainer) adContainer.remove();
+
+    adContainer = document.createElement('div');
+    adContainer.id = 'vast-ad-container';
+    adContainer.className = 'absolute inset-0 z-40 bg-black flex items-center justify-center overflow-hidden';
+    adContainer.innerHTML = `
+        <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-themeCyan"></div>
+    `;
+    container.appendChild(adContainer);
+
+    fetchVastXml(urlToUse).then(xmlDoc => {
+        const adData = parseVastData(xmlDoc);
+        if (!adData || !adData.mediaUrl) {
+            console.log('[VAST Engine] No valid ad media found. Proceeding to main stream.');
+            adContainer.remove();
+            if (onAdComplete) onAdComplete();
+            return;
+        }
+
+        fireVastUrls(adData.impressions);
+
+        adContainer.innerHTML = `
+            <video id="vast-ad-video" class="w-full h-full object-contain" playsinline autoplay></video>
+            
+            <div class="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-white text-xs font-bold">
+                <span class="px-1.5 py-0.5 rounded bg-amber-500 text-black text-[10px] uppercase font-extrabold">Ad</span>
+                <span id="vast-ad-timer">0:00</span>
+            </div>
+
+            ${adData.clickThroughUrl ? `
+                <a href="${adData.clickThroughUrl}" target="_blank" rel="noopener noreferrer" class="absolute bottom-4 left-4 z-10 bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs font-semibold flex items-center gap-2 transition-all">
+                    <span>Visit Advertiser</span>
+                    <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3zM5 5h6v2H5v12h12v-6h2v8H3V5h2z"/></svg>
+                </a>
+            ` : ''}
+
+            <button id="vast-skip-btn" class="absolute bottom-4 right-4 z-10 bg-black/80 hover:bg-black border border-white/20 px-5 py-2.5 rounded-xl text-white text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                Skip Ad in 5
+            </button>
+        `;
+
+        const adVideo = adContainer.querySelector('#vast-ad-video');
+        const timerEl = adContainer.querySelector('#vast-ad-timer');
+        const skipBtn = adContainer.querySelector('#vast-skip-btn');
+
+        adVideo.src = adData.mediaUrl;
+        
+        let skipCountdown = 5;
+        let firedEvents = new Set();
+
+        const updateTimer = () => {
+            if (!adVideo.duration) return;
+            const remaining = Math.max(0, Math.ceil(adVideo.duration - adVideo.currentTime));
+            if (timerEl) timerEl.innerText = `0:${remaining < 10 ? '0' : ''}${remaining}`;
+            
+            const pct = adVideo.currentTime / adVideo.duration;
+            if (pct >= 0 && !firedEvents.has('start')) {
+                firedEvents.add('start');
+                fireVastUrls(adData.trackingEvents['start']);
+            }
+            if (pct >= 0.25 && !firedEvents.has('firstQuartile')) {
+                firedEvents.add('firstQuartile');
+                fireVastUrls(adData.trackingEvents['firstQuartile']);
+            }
+            if (pct >= 0.5 && !firedEvents.has('midpoint')) {
+                firedEvents.add('midpoint');
+                fireVastUrls(adData.trackingEvents['midpoint']);
+            }
+            if (pct >= 0.75 && !firedEvents.has('thirdQuartile')) {
+                firedEvents.add('thirdQuartile');
+                fireVastUrls(adData.trackingEvents['thirdQuartile']);
+            }
+
+            if (skipCountdown > 0) {
+                const passed = Math.floor(adVideo.currentTime);
+                const currentRemainingSkip = Math.max(0, 5 - passed);
+                if (currentRemainingSkip > 0) {
+                    if (skipBtn) skipBtn.innerText = `Skip Ad in ${currentRemainingSkip}`;
+                } else {
+                    skipCountdown = 0;
+                    if (skipBtn) {
+                        skipBtn.disabled = false;
+                        skipBtn.innerText = `Skip Ad \u2192`;
+                        skipBtn.classList.add('bg-themeCyan', 'text-black', 'hover:scale-105');
+                    }
+                }
+            }
+        };
+
+        adVideo.ontimeupdate = updateTimer;
+
+        const finishAd = () => {
+            if (!firedEvents.has('complete')) {
+                firedEvents.add('complete');
+                fireVastUrls(adData.trackingEvents['complete']);
+            }
+            adContainer.remove();
+            if (onAdComplete) onAdComplete();
+        };
+
+        if (skipBtn) {
+            skipBtn.disabled = true;
+            skipBtn.onclick = () => {
+                fireVastUrls(adData.trackingEvents['skip']);
+                finishAd();
+            };
+        }
+
+        adVideo.onended = finishAd;
+        adVideo.onerror = () => {
+            console.warn('[VAST Engine] Ad video error. Skipping to main content.');
+            finishAd();
+        };
+
+        adVideo.play().catch(err => {
+            console.warn('[VAST Engine] Muting ad video due to browser policy:', err);
+            adVideo.muted = true;
+            adVideo.play().catch(() => finishAd());
+        });
+
+    }).catch(err => {
+        console.error('[VAST Engine] Error processing VAST XML:', err);
+        adContainer.remove();
+        if (onAdComplete) onAdComplete();
+    });
+}
+
+window.playVastPreRoll = playVastPreRoll;
+
 window.addEventListener('DOMContentLoaded', () => {
     setupPlayerKeyboardShortcuts();
 });
