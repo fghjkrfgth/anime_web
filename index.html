@@ -474,16 +474,26 @@
 
 
     <!-- Page Footer -->
-    <footer
-        class="mt-auto w-full bg-[#08080c] border-t border-white/5 py-8 text-center text-steelGray text-xs md:text-sm">
-        <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p>&copy; 2026 BlackLeg Platform. Built for absolute zero-traffic efficiency.</p>
-            <div class="flex gap-4 text-themeCyan">
-                <span class="cursor-pointer hover:underline" onclick="toggleClusterModeDebug()">Cluster Mode Sync</span>
-                <span>&bull;</span>
-                <span class="text-white">Active Node: <span id="active-node-display"
-                        class="font-mono text-themeCyan bg-slate-900/60 px-2 py-0.5 rounded border border-white/5">Primary Node</span></span>
+    <footer class="mt-auto w-full bg-[#08080c] border-t border-white/5 py-10 text-steelGray text-xs md:text-sm">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col items-center gap-6 text-center">
+            <!-- Disclaimer -->
+            <p class="max-w-3xl leading-relaxed text-steelGray/80 text-[11px] md:text-xs">
+                We do not store any files on our server, we only link to media hosted on 3rd party services.
+            </p>
+
+            <!-- Navigation Links -->
+            <div class="flex items-center justify-center gap-6 text-white text-xs font-semibold uppercase tracking-wider">
+                <a href="/contact" onclick="event.preventDefault(); window.history.pushState(null, '', '/contact'); handleSpaRouting();" class="hover:text-[#00f5ff] transition-colors">Contact</a>
+                <span class="text-white/20">&bull;</span>
+                <a href="/dmca" onclick="event.preventDefault(); window.history.pushState(null, '', '/dmca'); handleSpaRouting();" class="hover:text-[#00f5ff] transition-colors">DMCA</a>
+                <span class="text-white/20">&bull;</span>
+                <a href="/terms" onclick="event.preventDefault(); window.history.pushState(null, '', '/terms'); handleSpaRouting();" class="hover:text-[#00f5ff] transition-colors">Terms of Use</a>
             </div>
+
+            <!-- Copyright -->
+            <p class="text-[11px] text-steelGray/60 font-mono">
+                &copy; 2026 BlackLeg. All rights reserved.
+            </p>
         </div>
     </footer>
 
