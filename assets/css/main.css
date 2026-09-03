@@ -401,4 +401,28 @@ html, body {
     max-width: 100%;
 }
 
+/* Mobile Touch & Performance Optimization: Suppress Hover Popups and Scale Animations */
+@media (pointer: coarse), (max-width: 768px) {
+    .anime-card:hover {
+        transform: none !important;
+        box-shadow: none !important;
+        border-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    .anime-card:hover img {
+        transform: none !important;
+    }
+    #trending-container:hover .anime-card:not(:hover),
+    #popular-container:hover .anime-card:not(:hover),
+    #recent-container:hover .anime-card:not(:hover) {
+        transform: none !important;
+        opacity: 1 !important;
+    }
+    .anime-card-hover-preview,
+    #hover-preview-popup,
+    [data-hover-preview="true"] {
+        display: none !important;
+        pointer-events: none !important;
+    }
+}
+
 
