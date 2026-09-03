@@ -375,14 +375,14 @@ function createCardHTML(show) {
     }
 
     const badgeHTML = isNewEpisode
-        ? `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-[#d4af37] text-[#050508] backdrop-blur-md rounded text-[8px] font-extrabold uppercase tracking-wider border border-[#f59e0b]/40 shadow-sm">${displayBadgeText}</div>`
-        : `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-black/70 backdrop-blur-md rounded text-[8px] font-bold text-[#a0a5b5] uppercase tracking-wider border border-white/10">${displayBadgeText}</div>`;
+        ? `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-amber-500 text-black font-black uppercase text-[9px] rounded shadow-md z-10">${displayBadgeText}</div>`
+        : `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-slate-800 text-slate-200 border border-white/10 font-bold uppercase text-[9px] rounded z-10">${displayBadgeText}</div>`;
 
     return `
         <div class="anime-card flex-none w-[140px] md:w-[185px] bg-[#0b0c10]/60 rounded-2xl overflow-hidden border border-white/10 hover:border-[#d4af37] relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_25px_rgba(212,175,55,0.35)] snap-start" onclick="watchShow(${stringifiedShow})" data-anime-data="${stringifiedShow}">
             <div class="relative aspect-[3/4] w-full overflow-hidden bg-[#050508]">
                 <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-black/85 backdrop-blur-md rounded text-[9px] md:text-[11px] font-extrabold text-[#d4af37] border border-[#d4af37]/30 shadow-md">
+                <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-black/85 backdrop-blur-md rounded text-[9px] md:text-[11px] font-extrabold text-[#d4af37] border border-[#d4af37]/30 shadow-md z-10">
                     ★ ${rating}
                 </div>
                 ${badgeHTML}
@@ -665,15 +665,15 @@ window.applyAnimeThemeColor = applyAnimeThemeColor;
 
 // Watch Page 4x25 Grid & Filler Styling Helper
 function getWatchEpisodeBtnClasses(isActive, isFiller, isWatched) {
-    let btnClasses = "episode-btn glass-panel text-xs font-semibold py-2 px-1 rounded-md text-center flex items-center justify-center cursor-pointer transition-all duration-200 ";
+    let btnClasses = "episode-btn text-xs font-semibold py-2 px-1 rounded-md text-center flex items-center justify-center cursor-pointer transition-all duration-200 ";
     if (isActive) {
-        btnClasses += "bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] font-extrabold shadow-[0_0_12px_var(--anime-accent-color,#f59e0b)] border-[var(--anime-accent-color,#f59e0b)] ";
+        btnClasses += "bg-amber-400 text-black font-extrabold ring-2 ring-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.6)] !important ";
     } else if (isFiller) {
         btnClasses += "border border-amber-600/80 bg-amber-950/40 text-amber-300 shadow-[0_0_10px_rgba(180,83,9,0.7)] ";
     } else if (isWatched) {
-        btnClasses += "text-[var(--anime-accent-color,#f59e0b)] hover:text-white border border-[var(--anime-accent-color,#f59e0b)]/30 bg-[#121218]/70 ";
+        btnClasses += "text-amber-400 border border-amber-400/30 bg-white/10 hover:bg-white/20 ";
     } else {
-        btnClasses += "text-steelGray hover:text-white border border-white/5 hover:border-white/20 bg-[#121218]/40 ";
+        btnClasses += "text-slate-200 bg-white/5 border border-white/10 hover:bg-white/15 ";
     }
     return btnClasses;
 }
