@@ -966,19 +966,19 @@ function playVastPreRoll(mainVideo, vastUrl, onAdComplete) {
         adContainer.innerHTML = `
             <video id="vast-ad-video" class="w-full h-full object-contain" playsinline autoplay></video>
             
-            <div class="absolute top-4 left-4 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 text-white text-xs font-bold">
+            <div class="absolute top-4 left-4 z-50 flex items-center gap-2 bg-black/80 text-white border border-white/20 px-2.5 py-1 rounded-md text-xs font-mono font-bold">
                 <span class="px-1.5 py-0.5 rounded bg-amber-500 text-black text-[10px] uppercase font-extrabold">Ad</span>
                 <span id="vast-ad-timer">0:00</span>
             </div>
 
             ${adData.clickThroughUrl ? `
-                <a href="${adData.clickThroughUrl}" target="_blank" rel="noopener noreferrer" class="absolute bottom-4 left-4 z-10 bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs font-semibold flex items-center gap-2 transition-all">
+                <a href="${adData.clickThroughUrl}" target="_blank" rel="noopener noreferrer" class="absolute bottom-4 left-4 z-50 bg-white/10 hover:bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-white text-xs font-semibold flex items-center gap-2 transition-all">
                     <span>Visit Advertiser</span>
                     <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3zM5 5h6v2H5v12h12v-6h2v8H3V5h2z"/></svg>
                 </a>
             ` : ''}
 
-            <button id="vast-skip-btn" class="absolute bottom-4 right-4 z-10 bg-black/80 hover:bg-black border border-white/20 px-5 py-2.5 rounded-xl text-white text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            <button id="vast-skip-btn" class="absolute bottom-4 right-4 z-50 bg-slate-900/90 text-white/90 border border-white/30 backdrop-blur-md px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider select-none disabled:opacity-80 disabled:cursor-not-allowed">
                 Skip Ad in 5
             </button>
         `;
@@ -1019,13 +1019,16 @@ function playVastPreRoll(mainVideo, vastUrl, onAdComplete) {
                 const passed = Math.floor(adVideo.currentTime);
                 const currentRemainingSkip = Math.max(0, 5 - passed);
                 if (currentRemainingSkip > 0) {
-                    if (skipBtn) skipBtn.innerText = `Skip Ad in ${currentRemainingSkip}`;
+                    if (skipBtn) {
+                        skipBtn.innerText = `Skip Ad in ${currentRemainingSkip}`;
+                        skipBtn.className = "absolute bottom-4 right-4 z-50 bg-slate-900/90 text-white/90 border border-white/30 backdrop-blur-md px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider select-none";
+                    }
                 } else {
                     skipCountdown = 0;
                     if (skipBtn) {
                         skipBtn.disabled = false;
                         skipBtn.innerText = `Skip Ad \u2192`;
-                        skipBtn.classList.add('bg-themeCyan', 'text-black', 'hover:scale-105');
+                        skipBtn.className = "absolute bottom-4 right-4 z-50 bg-amber-400 text-black font-black hover:bg-amber-300 px-5 py-2.5 rounded-xl text-xs uppercase tracking-widest shadow-xl cursor-pointer";
                     }
                 }
             }
