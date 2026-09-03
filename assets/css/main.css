@@ -425,4 +425,25 @@ html, body {
     }
 }
 
+/* Active Episode Grid Highlight & Mobile Badge Contrast Protection */
+#episodes-grid button.bg-amber-400,
+#details-episodes-grid button.bg-amber-400,
+button.bg-amber-400 {
+    background-color: #fbbf24 !important;
+    color: #000000 !important;
+    font-weight: 900 !important;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.6) !important;
+}
+
+@media (max-width: 767px) {
+    .bg-amber-500 {
+        background-color: #f59e0b !important;
+        color: #000000 !important;
+    }
+    .bg-slate-800 {
+        background-color: #1e293b !important;
+        color: #e2e8f0 !important;
+    }
+}
+
 
