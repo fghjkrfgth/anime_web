@@ -281,22 +281,22 @@
                 <!-- LEFT SIDEBAR SPOTLIGHT (40% Width: 5 columns on lg, 12 columns on mobile) -->
                 <section class="col-span-12 lg:col-span-5 flex flex-col gap-4">
                     <h2
-                        class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3 flex items-center gap-2">
-                        Spotlight <span class="w-1.5 h-1.5 rounded-full bg-themeCyan animate-ping"></span>
+                        class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-[#d4af37] pl-3 flex items-center gap-2">
+                        Spotlight <span class="w-1.5 h-1.5 rounded-full bg-[#d4af37] animate-ping"></span>
                     </h2>
 
-                    <!-- Floating Spotlight Container with neon lightning border -->
+                    <!-- Floating Spotlight Container with gold accent border -->
                     <div id="spotlight-outer-container"
-                        class="relative w-full aspect-[3/4] md:aspect-[4/5] rounded-3xl p-1 overflow-hidden transition-all duration-500 bg-gradient-to-br from-[#00f5ff] via-transparent to-[#bd00ff] shadow-[0_0_20px_rgba(0,245,255,0.15)] group/spotlight">
+                        class="relative w-full aspect-[3/4] md:aspect-[4/5] rounded-3xl p-1 overflow-hidden transition-all duration-500 bg-gradient-to-br from-[#d4af37]/60 via-transparent to-[#f59e0b]/40 shadow-[0_0_25px_rgba(212,175,55,0.2)] group/spotlight">
                         <!-- Internal Card container with backdrop blur -->
                         <div id="spotlight-card-content"
-                            class="relative w-full h-full rounded-[22px] overflow-hidden bg-slate-950/95 flex flex-col justify-end p-6 md:p-8 z-10 transition-opacity duration-300">
+                            class="relative w-full h-full rounded-[22px] overflow-hidden bg-[#050508]/95 flex flex-col justify-end p-6 md:p-8 z-10 transition-opacity duration-300">
                             <!-- Background Image Zoom -->
                             <div id="spotlight-bg-img"
                                 class="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover/spotlight:scale-105"
                                 style="background-image: url('');"></div>
                             <div
-                                class="absolute inset-0 bg-gradient-to-t from-[#08080c] via-[#08080c]/60 to-transparent">
+                                class="absolute inset-0 bg-gradient-to-t from-[#050508] via-[#050508]/60 to-transparent">
                             </div>
 
                             <!-- Overlay Details -->
@@ -311,12 +311,8 @@
                                 </p>
                                 <div class="flex items-center gap-3 flex-wrap mt-2">
                                     <button id="spotlight-watch-btn"
-                                        class="px-6 py-2.5 bg-gradient-to-r from-[#bd00ff] to-[#7a00cc] hover:from-[#d500ff] hover:to-[#9a00ff] text-white font-extrabold text-xs md:text-sm rounded-full shadow-lg shadow-purple-950/50 hover:shadow-[#bd00ff]/30 transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase tracking-widest">
+                                        class="px-8 py-3 bg-gradient-to-r from-[#d4af37] to-[#f59e0b] hover:from-[#e5bf47] hover:to-[#fbbf24] text-[#050508] font-extrabold text-xs md:text-sm rounded-full shadow-lg shadow-[#d4af37]/20 hover:shadow-[#d4af37]/40 transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase tracking-widest">
                                         Details
-                                    </button>
-                                    <button id="spotlight-watchlist-btn"
-                                        class="px-5 py-2.5 glass-panel hover:bg-white/10 text-white font-bold text-xs md:text-sm rounded-full transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase border border-white/10">
-                                        Watchlist
                                     </button>
                                 </div>
                             </div>
