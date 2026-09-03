@@ -657,6 +657,7 @@ async function loadHomeCatalog() {
         window.trendingCache = trendingList;
 
         renderSpotlight(trendingList);
+        renderContinueWatching();
         renderThumbnailRow('trending-container', trendingList);
         renderThumbnailRow('popular-container', popularList);
         renderThumbnailRow('recent-container', popularList.slice(6) || []);
@@ -740,24 +741,6 @@ async function renderWatchView() {
             <div class="col-span-12 lg:col-span-8 flex flex-col gap-6 lg:col-start-1 lg:row-start-1">
                 <div id="player-container" class="relative w-full aspect-video rounded-2xl overflow-hidden glass-panel border border-white/5 shadow-2xl group">
                     <video id="main-video-player" class="w-full h-full object-contain" playsinline></video>
-                    <div id="autoplay-handshake-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-opacity duration-500">
-                        <div class="glass-panel p-6 md:p-10 rounded-2xl border border-white/10 max-w-md text-center flex flex-col items-center gap-6 shadow-2xl">
-                            <div class="w-16 h-16 rounded-full border-2 border-themeCyan flex items-center justify-center animate-pulse">
-                                <svg class="w-8 h-8 text-themeCyan fill-current translate-x-0.5" viewBox="0 0 24 24">
-                                    <path d="M8 5v14l11-7z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h2 class="text-lg md:text-xl font-extrabold tracking-wider text-white uppercase">BlackLeg Cinema System</h2>
-                                <p class="text-steelGray text-xs md:text-sm font-light mt-2 leading-relaxed">
-                                    Desktop browsers require an interactive trigger to permit unmuted playback.
-                                </p>
-                            </div>
-                            <button onclick="initializeCinemaMatrix()" class="px-6 py-3 bg-themeCyan hover:bg-themeCyan/80 text-themeBlack font-bold text-sm tracking-widest rounded-lg shadow-lg hover:shadow-themeCyan/30 transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase">
-                                Initialize Cinema Matrix
-                            </button>
-                        </div>
-                    </div>
                     <div id="skip-buttons-container" style="display: none !important;" class="absolute bottom-6 right-6 z-20 flex flex-col gap-2">
                         <button id="skip-intro-btn" class="px-4 py-2 bg-[#121218]/80 backdrop-blur-md border border-themeCyan/30 text-themeCyan text-xs md:text-sm font-bold tracking-widest uppercase rounded-lg shadow-lg opacity-0 pointer-events-none transition-all duration-300 transform hover:scale-105 active:scale-95" style="display: none !important;">
                             Skip Intro &rarr;
@@ -1351,6 +1334,7 @@ function setupWatchGlobalFunctions() {
         const spinner = document.getElementById('player-loading-spinner');
         if (spinner) spinner.classList.remove('hidden');
 
+        window.currentEp = Number(epNum) || 1;
         localStorage.setItem(`watched_${window.showData.id}_${epNum}`, 'true');
         if (typeof updateContinueWatchingHistory === 'function') {
             updateContinueWatchingHistory(0);
