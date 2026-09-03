@@ -548,6 +548,9 @@ async function handleSpaRouting() {
     const isDetails = pathname.startsWith('/anime/');
     const isExplore = pathname.startsWith('/explore') || hash === '#trending-section' || hash === '#/trending-section';
     const isSchedule = pathname.startsWith('/schedule') || hash === '#airing-broadcast-section' || hash === '#/airing-broadcast-section';
+    const isContact = pathname.startsWith('/contact');
+    const isDmca = pathname.startsWith('/dmca');
+    const isTerms = pathname.startsWith('/terms');
 
     // Toggle views
     const landing = document.getElementById('landing-page-layout');
@@ -555,6 +558,9 @@ async function handleSpaRouting() {
     const details = document.getElementById('anime-details-layout');
     const trendingExplore = document.getElementById('trending-explore-layout');
     const dedicatedSchedule = document.getElementById('dedicated-schedule-layout');
+    const contact = document.getElementById('contact-page-layout');
+    const dmca = document.getElementById('dmca-page-layout');
+    const terms = document.getElementById('terms-page-layout');
     const homepageWrapper = document.getElementById('homepage-sections-wrapper');
     const searchResultsLayout = document.getElementById('search-results-layout');
 
@@ -563,9 +569,12 @@ async function handleSpaRouting() {
     if (details) details.classList.toggle('hidden', !isDetails);
     if (trendingExplore) trendingExplore.classList.toggle('hidden', !isExplore);
     if (dedicatedSchedule) dedicatedSchedule.classList.toggle('hidden', !isSchedule);
+    if (contact) contact.classList.toggle('hidden', !isContact);
+    if (dmca) dmca.classList.toggle('hidden', !isDmca);
+    if (terms) terms.classList.toggle('hidden', !isTerms);
 
     // Stop background spotlight auto-rotator when leaving home view
-    const isHomeView = (!isLanding && !isWatch && !isDetails && !isExplore && !isSchedule);
+    const isHomeView = (!isLanding && !isWatch && !isDetails && !isExplore && !isSchedule && !isContact && !isDmca && !isTerms);
     if (!isHomeView && window.spotlightInterval) {
         clearInterval(window.spotlightInterval);
         window.spotlightInterval = null;
@@ -605,6 +614,18 @@ async function handleSpaRouting() {
         if (typeof window.renderDedicatedScheduleView === 'function') {
             await window.renderDedicatedScheduleView();
         }
+    } else if (isContact) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        renderContactView();
+    } else if (isDmca) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        renderDmcaView();
+    } else if (isTerms) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        renderTermsView();
     } else {
         if (homepageWrapper) {
             homepageWrapper.classList.remove('hidden');
@@ -2279,6 +2300,157 @@ function injectBannerAdScripts() {
     });
 }
 window.injectBannerAdScripts = injectBannerAdScripts;
+
+// -------------------------------------------------------------------------
+// STATIC PAGES RENDERERS (/contact, /dmca, /terms)
+// -------------------------------------------------------------------------
+function renderContactView() {
+    let layout = document.getElementById('contact-page-layout');
+    if (!layout) {
+        layout = document.createElement('div');
+        layout.id = 'contact-page-layout';
+        layout.className = 'w-full relative min-h-screen py-10 max-w-4xl mx-auto px-4 animate-crystal-in select-none';
+        document.getElementById('main-content').appendChild(layout);
+    }
+    layout.classList.remove('hidden');
+
+    layout.innerHTML = `
+        <div class="glass-panel p-8 md:p-12 rounded-3xl border border-white/10 flex flex-col gap-8 shadow-2xl">
+            <div class="flex flex-col gap-3 border-b border-white/10 pb-6">
+                <span class="text-xs font-mono text-[#00f5ff] tracking-widest uppercase">GET IN TOUCH</span>
+                <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight">Contact Us</h1>
+                <p class="text-steelGray text-sm md:text-base font-light">Have questions, feedback, or technical inquiries? Reach out to the BlackLeg team.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-2">
+                    <h3 class="text-white font-bold text-base flex items-center gap-2">
+                        <span class="text-[#00f5ff]">📧</span> General Inquiries
+                    </h3>
+                    <p class="text-steelGray text-xs font-light">For platform feedback, suggestions, or general support questions.</p>
+                    <a href="mailto:support@blackleg.to" class="text-[#00f5ff] font-mono text-sm mt-2 hover:underline">support@blackleg.to</a>
+                </div>
+
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-2">
+                    <h3 class="text-white font-bold text-base flex items-center gap-2">
+                        <span class="text-[#00f5ff]">⚖️</span> Legal & DMCA
+                    </h3>
+                    <p class="text-steelGray text-xs font-light">For copyright notices, removal requests, and legal correspondence.</p>
+                    <a href="mailto:dmca@blackleg.to" class="text-[#00f5ff] font-mono text-sm mt-2 hover:underline">dmca@blackleg.to</a>
+                </div>
+            </div>
+
+            <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-4">
+                <h3 class="text-white font-bold text-base">Send Us a Message</h3>
+                <form onsubmit="event.preventDefault(); alert('Thank you for contacting BlackLeg. Your message has been sent!');" class="flex flex-col gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" placeholder="Your Name" required class="w-full bg-[#121218] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#00f5ff] transition-colors">
+                        <input type="email" placeholder="Your Email" required class="w-full bg-[#121218] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#00f5ff] transition-colors">
+                    </div>
+                    <textarea rows="4" placeholder="Your Message..." required class="w-full bg-[#121218] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#00f5ff] transition-colors resize-none"></textarea>
+                    <button type="submit" class="px-8 py-3.5 bg-[#00f5ff] hover:bg-[#00d8e6] text-[#08080c] font-bold text-xs md:text-sm uppercase tracking-wider rounded-xl transition-all self-start shadow-[0_0_15px_rgba(0,245,255,0.3)]">
+                        Send Message
+                    </button>
+                </form>
+            </div>
+        </div>
+    `;
+}
+
+function renderDmcaView() {
+    let layout = document.getElementById('dmca-page-layout');
+    if (!layout) {
+        layout = document.createElement('div');
+        layout.id = 'dmca-page-layout';
+        layout.className = 'w-full relative min-h-screen py-10 max-w-4xl mx-auto px-4 animate-crystal-in select-none';
+        document.getElementById('main-content').appendChild(layout);
+    }
+    layout.classList.remove('hidden');
+
+    layout.innerHTML = `
+        <div class="glass-panel p-8 md:p-12 rounded-3xl border border-white/10 flex flex-col gap-8 shadow-2xl">
+            <div class="flex flex-col gap-3 border-b border-white/10 pb-6">
+                <span class="text-xs font-mono text-[#00f5ff] tracking-widest uppercase">LEGAL COMPLIANCE</span>
+                <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight">DMCA Copyright Policy</h1>
+                <p class="text-steelGray text-sm md:text-base font-light">BlackLeg respects the intellectual property rights of others and expects its users to do the same.</p>
+            </div>
+
+            <div class="flex flex-col gap-6 text-steelGray text-xs md:text-sm font-light leading-relaxed">
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-3">
+                    <h3 class="text-white font-bold text-base">Digital Millennium Copyright Act Notice</h3>
+                    <p>BlackLeg is an online service provider under the Digital Millennium Copyright Act (17 U.S.C. § 512). We do not host, store, or upload any media files, videos, or streams on our servers. All media content accessible via our platform is hosted on non-affiliated 3rd party services and servers.</p>
+                </div>
+
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-3">
+                    <h3 class="text-white font-bold text-base">Takedown Request Procedure</h3>
+                    <p>If you believe that your copyrighted work has been linked to or indexed by BlackLeg in a manner that constitutes copyright infringement, please submit a written DMCA takedown notification containing the following details:</p>
+                    <ul class="list-disc list-inside flex flex-col gap-2 mt-2 text-slate-300">
+                        <li>A physical or electronic signature of the copyright owner or authorized representative.</li>
+                        <li>Identification of the copyrighted work claimed to have been infringed.</li>
+                        <li>Identification of the material/link on BlackLeg that is claimed to be infringing.</li>
+                        <li>Your contact information (email address, telephone number, and mailing address).</li>
+                        <li>A statement that you have a good faith belief that the use is not authorized by the copyright owner.</li>
+                        <li>A statement under penalty of perjury that the information in the notification is accurate.</li>
+                    </ul>
+                </div>
+
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-3">
+                    <h3 class="text-white font-bold text-base">Designated Agent Contact</h3>
+                    <p>Please send all official DMCA takedown requests to our designated legal agent at:</p>
+                    <a href="mailto:dmca@blackleg.to" class="text-[#00f5ff] font-mono text-sm hover:underline">dmca@blackleg.to</a>
+                    <p class="text-[11px] text-steelGray/60 mt-1">Properly formatted requests are typically processed within 24 to 48 business hours.</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderTermsView() {
+    let layout = document.getElementById('terms-page-layout');
+    if (!layout) {
+        layout = document.createElement('div');
+        layout.id = 'terms-page-layout';
+        layout.className = 'w-full relative min-h-screen py-10 max-w-4xl mx-auto px-4 animate-crystal-in select-none';
+        document.getElementById('main-content').appendChild(layout);
+    }
+    layout.classList.remove('hidden');
+
+    layout.innerHTML = `
+        <div class="glass-panel p-8 md:p-12 rounded-3xl border border-white/10 flex flex-col gap-8 shadow-2xl">
+            <div class="flex flex-col gap-3 border-b border-white/10 pb-6">
+                <span class="text-xs font-mono text-[#00f5ff] tracking-widest uppercase">USER AGREEMENT</span>
+                <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight">Terms of Use</h1>
+                <p class="text-steelGray text-sm md:text-base font-light">Please read these terms carefully before accessing or using the BlackLeg platform.</p>
+            </div>
+
+            <div class="flex flex-col gap-6 text-steelGray text-xs md:text-sm font-light leading-relaxed">
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-3">
+                    <h3 class="text-white font-bold text-base">1. Acceptance of Terms</h3>
+                    <p>By accessing or using BlackLeg, you agree to be bound by these Terms of Use and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using or accessing this site.</p>
+                </div>
+
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-3">
+                    <h3 class="text-white font-bold text-base">2. Disclaimer of Content & Hosting</h3>
+                    <p>BlackLeg operates solely as an indexing directory and search engine for anime content. BlackLeg does not host, upload, store, or manage video files on any of its servers. All video streams are embedded or linked from third-party hosting services over which BlackLeg exercises no control.</p>
+                </div>
+
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-3">
+                    <h3 class="text-white font-bold text-base">3. Limitation of Liability</h3>
+                    <p>In no event shall BlackLeg or its operators be liable for any damages arising out of the use or inability to use the materials or services on the platform, even if notified orally or in writing of the possibility of such damage.</p>
+                </div>
+
+                <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-3">
+                    <h3 class="text-white font-bold text-base">4. Changes to Terms</h3>
+                    <p>BlackLeg reserves the right to revise or update these Terms of Use at any time without prior notice. By continuing to use the platform after changes are posted, you agree to be bound by the revised terms.</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+window.renderContactView = renderContactView;
+window.renderDmcaView = renderDmcaView;
+window.renderTermsView = renderTermsView;
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
