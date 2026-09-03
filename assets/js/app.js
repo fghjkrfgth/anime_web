@@ -796,6 +796,7 @@ async function renderWatchView() {
                     <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
                     <div id="episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
+                ${renderBannerAdHTML('watch-banner-ad')}
             </div>
 
             <!-- 4. Details & Synopsis Block -->
@@ -2023,6 +2024,7 @@ async function renderAnimeDetailsView() {
                     <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
                     <div id="details-episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
+                ${renderBannerAdHTML('details-banner-ad')}
             </div>
 
             <!-- Main Column: Title & Metadata -->
@@ -2214,6 +2216,23 @@ window.navigateWatchEpisode = function(epNum, forcedLang) {
     const slug = window.slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     window.location.href = `/watch/anime/${slug}-${show.id}?ep=${epNum}`;
 };
+
+function renderBannerAdHTML(adId = 'banner-slot') {
+    return `
+        <div class="banner-ad-container my-6 w-full flex flex-col items-center justify-center">
+            <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1 font-mono select-none">Advertisement</div>
+            <div id="${adId}" class="w-[300px] h-[250px] max-w-full rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative">
+                <iframe 
+                    title="Advertisement"
+                    class="w-[300px] h-[250px] border-0 overflow-hidden" 
+                    scrolling="no" 
+                    srcdoc="<!DOCTYPE html><html><head><style>body{margin:0;padding:0;overflow:hidden;display:flex;justify-content:center;align-items:center;background:transparent;}</style></head><body><script>(function(hhm){var d=document,s=d.createElement('script'),l=d.scripts[d.scripts.length-1];s.settings=hhm||{};s.src='//prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX';s.async=true;s.referrerPolicy='no-referrer-when-downgrade';l.parentNode.insertBefore(s,l);})({})<\/script></body></html>">
+                </iframe>
+            </div>
+        </div>
+    `;
+}
+window.renderBannerAdHTML = renderBannerAdHTML;
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initApp);
