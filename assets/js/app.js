@@ -2247,16 +2247,30 @@ function renderBannerAdHTML(adId = 'banner-slot', isFullWidthRow = false) {
 }
 window.renderBannerAdHTML = renderBannerAdHTML;
 
-// Direct DOM Script Injector for Ad Slots
+// Direct DOM Script Injector with Ad Cluster Pool Rotation
 function injectBannerAdScripts() {
-    const scriptUrl = "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX";
+    const pool = window.BANNER_AD_POOL || [
+        "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX"
+    ];
     
+    const visibleSlots = [];
     document.querySelectorAll('.ad-slot-box:not([data-ad-loaded="true"])').forEach((slot) => {
-        // Skip elements hidden by media queries to save requests
-        if (window.getComputedStyle(slot).display === 'none') return;
+        if (window.getComputedStyle(slot).display !== 'none') {
+            visibleSlots.push(slot);
+        }
+    });
 
+    if (visibleSlots.length === 0) return;
+
+    // Pick a starting index for rotation across dynamic re-renders
+    let poolIndex = Math.floor(Math.random() * pool.length);
+
+    visibleSlots.forEach((slot) => {
         slot.setAttribute('data-ad-loaded', 'true');
         
+        const scriptUrl = pool[poolIndex % pool.length];
+        poolIndex++;
+
         const adScript = document.createElement('script');
         adScript.src = scriptUrl;
         adScript.async = true;
