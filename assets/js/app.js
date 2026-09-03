@@ -623,6 +623,7 @@ async function handleSpaRouting() {
         }
     }
 
+    setTimeout(injectBannerAdScripts, 100);
 }
 
 
@@ -2217,25 +2218,60 @@ window.navigateWatchEpisode = function(epNum, forcedLang) {
     window.location.href = `/watch/anime/${slug}-${show.id}?ep=${epNum}`;
 };
 
-function renderBannerAdHTML(adId = 'banner-slot') {
-    return `
-        <div class="banner-ad-container my-6 w-full flex flex-col items-center justify-center">
-            <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1 font-mono select-none">Advertisement</div>
-            <div id="${adId}" class="w-[300px] h-[250px] max-w-full rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative">
-                <iframe 
-                    title="Advertisement"
-                    class="w-[300px] h-[250px] border-0 overflow-hidden" 
-                    scrolling="no" 
-                    srcdoc="<!DOCTYPE html><html><head><style>body{margin:0;padding:0;overflow:hidden;display:flex;justify-content:center;align-items:center;background:transparent;}</style></head><body><script>(function(hhm){var d=document,s=d.createElement('script'),l=d.scripts[d.scripts.length-1];s.settings=hhm||{};s.src='//prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX';s.async=true;s.referrerPolicy='no-referrer-when-downgrade';l.parentNode.insertBefore(s,l);})({})<\/script></body></html>">
-                </iframe>
+function renderBannerAdHTML(adId = 'banner-slot', isFullWidthRow = false) {
+    if (isFullWidthRow) {
+        return `
+            <div class="banner-ad-wrapper my-8 w-full flex flex-col items-center justify-center">
+                <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1.5 font-mono select-none">Sponsored Content</div>
+                <div class="flex flex-row items-center justify-center gap-4 w-full overflow-hidden">
+                    <!-- Slot 1 (Always visible) -->
+                    <div class="w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="${adId}-1"></div>
+                    
+                    <!-- Slot 2 (Tablets & Desktops >= 768px) -->
+                    <div class="hidden md:flex w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="${adId}-2"></div>
+                    
+                    <!-- Slot 3 (Large Desktops >= 1200px) -->
+                    <div class="hidden xl:flex w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="${adId}-3"></div>
+                </div>
             </div>
+        `;
+    }
+
+    // Single 300x250 slot for sidebars
+    return `
+        <div class="banner-ad-wrapper my-6 w-full flex flex-col items-center justify-center">
+            <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1.5 font-mono select-none">Advertisement</div>
+            <div class="w-[300px] h-[250px] max-w-full rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="${adId}"></div>
         </div>
     `;
 }
 window.renderBannerAdHTML = renderBannerAdHTML;
 
+// Direct DOM Script Injector for Ad Slots
+function injectBannerAdScripts() {
+    const scriptUrl = "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX";
+    
+    document.querySelectorAll('.ad-slot-box:not([data-ad-loaded="true"])').forEach((slot) => {
+        // Skip elements hidden by media queries to save requests
+        if (window.getComputedStyle(slot).display === 'none') return;
+
+        slot.setAttribute('data-ad-loaded', 'true');
+        
+        const adScript = document.createElement('script');
+        adScript.src = scriptUrl;
+        adScript.async = true;
+        adScript.referrerPolicy = 'no-referrer-when-downgrade';
+        slot.appendChild(adScript);
+    });
+}
+window.injectBannerAdScripts = injectBannerAdScripts;
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
+    document.addEventListener('DOMContentLoaded', () => {
+        initApp();
+        setTimeout(injectBannerAdScripts, 100);
+    });
 } else {
     initApp();
+    setTimeout(injectBannerAdScripts, 100);
 }
