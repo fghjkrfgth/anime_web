@@ -2673,15 +2673,39 @@ async function handleAuthSubmit(e) {
     }
 }
 
+function getAuthWorkerApiUrl(endpoint) {
+    let workerBase = '';
+    if (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+        workerBase = decodeRegistryUrl(NODE_REGISTRY[0]);
+    } else if (typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+        workerBase = NODE_REGISTRY[0];
+    } else {
+        workerBase = window.location.origin;
+    }
+    workerBase = workerBase.replace(/\/+$/, '');
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+    return `${workerBase}${cleanEndpoint}`;
+}
+
 async function registerUser(email, password) {
-    const res = await fetch('/api/auth/register', {
+    const url = getAuthWorkerApiUrl('/api/auth/register');
+    const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
     });
-    const json = await res.json();
+    const rawText = await res.text();
+    if (!rawText) {
+        throw new Error(`Empty response from auth server (HTTP ${res.status})`);
+    }
+    let json;
+    try {
+        json = JSON.parse(rawText);
+    } catch (err) {
+        throw new Error(`Invalid server response format (HTTP ${res.status})`);
+    }
     if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Registration failed');
+        throw new Error(json.error || `Registration failed (HTTP ${res.status})`);
     }
     localStorage.setItem('auth_token', json.token);
     localStorage.setItem('auth_user', JSON.stringify(json.user));
@@ -2690,14 +2714,24 @@ async function registerUser(email, password) {
 }
 
 async function loginUser(email, password) {
-    const res = await fetch('/api/auth/login', {
+    const url = getAuthWorkerApiUrl('/api/auth/login');
+    const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
     });
-    const json = await res.json();
+    const rawText = await res.text();
+    if (!rawText) {
+        throw new Error(`Empty response from auth server (HTTP ${res.status})`);
+    }
+    let json;
+    try {
+        json = JSON.parse(rawText);
+    } catch (err) {
+        throw new Error(`Invalid server response format (HTTP ${res.status})`);
+    }
     if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Login failed');
+        throw new Error(json.error || `Login failed (HTTP ${res.status})`);
     }
     localStorage.setItem('auth_token', json.token);
     localStorage.setItem('auth_user', JSON.stringify(json.user));
@@ -2727,8 +2761,9 @@ async function pushVaultToCloud() {
                 try { vaultObj = JSON.parse(vaultData); } catch (e) {}
             }
             const vaultArray = Object.values(vaultObj);
+            const url = getAuthWorkerApiUrl('/api/user/sync');
 
-            await fetch('/api/user/sync', {
+            const res = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2736,6 +2771,22 @@ async function pushVaultToCloud() {
                 },
                 body: JSON.stringify({ vault: vaultArray })
             });
+
+            const rawText = await res.text();
+            if (!rawText) {
+                console.warn(`[Cloud Sync] Empty response from auth server (HTTP ${res.status})`);
+                return;
+            }
+            let json;
+            try {
+                json = JSON.parse(rawText);
+            } catch (err) {
+                console.warn(`[Cloud Sync] Invalid server response format (HTTP ${res.status})`);
+                return;
+            }
+            if (!res.ok || !json.success) {
+                console.warn('[Cloud Sync] Push failed:', json.error || `HTTP ${res.status}`);
+            }
         } catch (e) {
             console.error('[Cloud Sync] Push error:', e);
         }
@@ -2747,12 +2798,23 @@ async function pullVaultFromCloud() {
     if (!token) return;
 
     try {
-        const res = await fetch('/api/user/sync', {
+        const url = getAuthWorkerApiUrl('/api/user/sync');
+        const res = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!json.success || !Array.isArray(json.vault)) return;
+        const rawText = await res.text();
+        if (!rawText) {
+            console.warn(`[Cloud Sync] Empty response from auth server (HTTP ${res.status})`);
+            return;
+        }
+        let json;
+        try {
+            json = JSON.parse(rawText);
+        } catch (err) {
+            console.warn(`[Cloud Sync] Invalid server response format (HTTP ${res.status})`);
+            return;
+        }
+        if (!res.ok || !json.success || !Array.isArray(json.vault)) return;
 
         let localVault = {};
         try {
@@ -2785,6 +2847,7 @@ async function manualSyncVault() {
     await pushVaultToCloud();
 }
 
+window.getAuthWorkerApiUrl = getAuthWorkerApiUrl;
 window.getAuthToken = getAuthToken;
 window.getAuthUser = getAuthUser;
 window.updateAuthUI = updateAuthUI;
