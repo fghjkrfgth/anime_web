@@ -518,6 +518,8 @@ async function initApp() {
 
         if (typeof setupMobileBottomNav === 'function') setupMobileBottomNav();
         if (typeof updateLanguageSelectionUI === 'function') updateLanguageSelectionUI();
+        if (typeof updateAuthUI === 'function') updateAuthUI();
+        if (typeof pullVaultFromCloud === 'function') pullVaultFromCloud();
     } catch (err) {
         console.error('[Init Error] Non-fatal listener init error:', err);
     }
@@ -1700,6 +1702,9 @@ function getWatchVault() {
 function saveWatchVault(vault) {
     try {
         localStorage.setItem('anime_watch_vault', JSON.stringify(vault));
+        if (typeof pushVaultToCloud === 'function') {
+            pushVaultToCloud();
+        }
     } catch (e) {
         console.error('[Watch Vault] Storage write error:', e);
     }
@@ -2542,6 +2547,258 @@ function renderTermsView() {
 window.renderContactView = renderContactView;
 window.renderDmcaView = renderDmcaView;
 window.renderTermsView = renderTermsView;
+
+// -------------------------------------------------------------------------
+// D1 AUTHENTICATION & CLOUD WATCH VAULT SYNC ENGINE
+// -------------------------------------------------------------------------
+let cloudSyncDebounceTimer = null;
+
+function getAuthToken() {
+    return localStorage.getItem('auth_token') || null;
+}
+
+function getAuthUser() {
+    try {
+        const u = localStorage.getItem('auth_user');
+        return u ? JSON.parse(u) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function updateAuthUI() {
+    const user = getAuthUser();
+    const token = getAuthToken();
+    const navLabel = document.getElementById('auth-nav-label');
+    const userInfo = document.getElementById('auth-user-info');
+    const authBtn = document.getElementById('auth-nav-btn');
+
+    if (user && token) {
+        const displayName = user.email ? user.email.split('@')[0] : 'User';
+        if (navLabel) navLabel.innerText = displayName;
+        if (userInfo) userInfo.innerText = user.email;
+        if (authBtn) {
+            authBtn.onclick = toggleAuthNavDropdown;
+        }
+    } else {
+        if (navLabel) navLabel.innerText = 'Sign In';
+        if (userInfo) userInfo.innerText = 'Not Signed In';
+        if (authBtn) {
+            authBtn.onclick = () => openAuthModal('login');
+        }
+    }
+}
+
+function toggleAuthNavDropdown() {
+    const dropdown = document.getElementById('auth-nav-dropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('hidden');
+    }
+}
+
+let currentAuthTab = 'login';
+function openAuthModal(tab = 'login') {
+    const modal = document.getElementById('auth-modal');
+    const dropdown = document.getElementById('auth-nav-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+    if (modal) modal.classList.remove('hidden');
+    switchAuthTab(tab);
+}
+
+function closeAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.classList.add('hidden');
+    const errEl = document.getElementById('auth-error-msg');
+    if (errEl) errEl.classList.add('hidden');
+}
+
+function switchAuthTab(tab) {
+    currentAuthTab = tab;
+    const titleEl = document.getElementById('auth-modal-title');
+    const submitBtn = document.getElementById('auth-submit-btn');
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabReg = document.getElementById('auth-tab-register');
+    const errEl = document.getElementById('auth-error-msg');
+    if (errEl) errEl.classList.add('hidden');
+
+    if (tab === 'register') {
+        if (titleEl) titleEl.innerText = 'Create Account';
+        if (submitBtn) submitBtn.innerText = 'Create Account';
+        if (tabReg) {
+            tabReg.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-[#d4af37] text-black";
+        }
+        if (tabLogin) {
+            tabLogin.className = "flex-1 py-2 text-xs font-bold text-steelGray hover:text-white rounded-lg transition-all";
+        }
+    } else {
+        if (titleEl) titleEl.innerText = 'Sign In';
+        if (submitBtn) submitBtn.innerText = 'Sign In';
+        if (tabLogin) {
+            tabLogin.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all bg-[#d4af37] text-black";
+        }
+        if (tabReg) {
+            tabReg.className = "flex-1 py-2 text-xs font-bold text-steelGray hover:text-white rounded-lg transition-all";
+        }
+    }
+}
+
+async function handleAuthSubmit(e) {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    const emailEl = document.getElementById('auth-input-email');
+    const passEl = document.getElementById('auth-input-password');
+    const errEl = document.getElementById('auth-error-msg');
+    const submitBtn = document.getElementById('auth-submit-btn');
+
+    if (!emailEl || !passEl) return;
+    const email = emailEl.value.trim();
+    const password = passEl.value;
+
+    if (errEl) errEl.classList.add('hidden');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+        if (currentAuthTab === 'register') {
+            await registerUser(email, password);
+        } else {
+            await loginUser(email, password);
+        }
+        closeAuthModal();
+    } catch (err) {
+        if (errEl) {
+            errEl.innerText = err.message || 'Authentication failed.';
+            errEl.classList.remove('hidden');
+        }
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+async function registerUser(email, password) {
+    const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Registration failed');
+    }
+    localStorage.setItem('auth_token', json.token);
+    localStorage.setItem('auth_user', JSON.stringify(json.user));
+    updateAuthUI();
+    await pushVaultToCloud();
+}
+
+async function loginUser(email, password) {
+    const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Login failed');
+    }
+    localStorage.setItem('auth_token', json.token);
+    localStorage.setItem('auth_user', JSON.stringify(json.user));
+    updateAuthUI();
+    await pullVaultFromCloud();
+}
+
+function logoutUser() {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    updateAuthUI();
+    const dropdown = document.getElementById('auth-nav-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+}
+
+async function pushVaultToCloud() {
+    const token = getAuthToken();
+    if (!token) return;
+
+    if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
+
+    cloudSyncDebounceTimer = setTimeout(async () => {
+        try {
+            const vaultData = localStorage.getItem('anime_watch_vault');
+            let vaultObj = {};
+            if (vaultData) {
+                try { vaultObj = JSON.parse(vaultData); } catch (e) {}
+            }
+            const vaultArray = Object.values(vaultObj);
+
+            await fetch('/api/user/sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ vault: vaultArray })
+            });
+        } catch (e) {
+            console.error('[Cloud Sync] Push error:', e);
+        }
+    }, 1000);
+}
+
+async function pullVaultFromCloud() {
+    const token = getAuthToken();
+    if (!token) return;
+
+    try {
+        const res = await fetch('/api/user/sync', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!json.success || !Array.isArray(json.vault)) return;
+
+        let localVault = {};
+        try {
+            const raw = localStorage.getItem('anime_watch_vault');
+            if (raw) localVault = JSON.parse(raw);
+        } catch (e) {}
+
+        json.vault.forEach(item => {
+            if (!item || !item.id) return;
+            const showId = String(item.id);
+            const existing = localVault[showId];
+            if (!existing || (item.updatedAt || 0) > (existing.updatedAt || 0)) {
+                localVault[showId] = item;
+            }
+        });
+
+        localStorage.setItem('anime_watch_vault', JSON.stringify(localVault));
+        if (typeof window.renderContinueWatching === 'function') {
+            window.renderContinueWatching();
+        }
+    } catch (e) {
+        console.error('[Cloud Sync] Pull error:', e);
+    }
+}
+
+async function manualSyncVault() {
+    const dropdown = document.getElementById('auth-nav-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+    await pullVaultFromCloud();
+    await pushVaultToCloud();
+}
+
+window.getAuthToken = getAuthToken;
+window.getAuthUser = getAuthUser;
+window.updateAuthUI = updateAuthUI;
+window.toggleAuthNavDropdown = toggleAuthNavDropdown;
+window.openAuthModal = openAuthModal;
+window.closeAuthModal = closeAuthModal;
+window.switchAuthTab = switchAuthTab;
+window.handleAuthSubmit = handleAuthSubmit;
+window.loginUser = loginUser;
+window.registerUser = registerUser;
+window.logoutUser = logoutUser;
+window.pushVaultToCloud = pushVaultToCloud;
+window.pullVaultFromCloud = pullVaultFromCloud;
+window.manualSyncVault = manualSyncVault;
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
