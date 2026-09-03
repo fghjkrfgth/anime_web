@@ -326,10 +326,10 @@
                     <!-- Continue Watching (If present) -->
                     <section id="continue-watching-section" class="hidden flex flex-col gap-4 w-full min-w-0 overflow-hidden">
                         <h2
-                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-themeCyan pl-3">
-                            Continue Watching
+                            class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-[#d4af37] pl-3 flex items-center gap-2">
+                            Continue Watching <span class="w-1.5 h-1.5 rounded-full bg-[#d4af37]"></span>
                         </h2>
-                        <div id="continue-watching-container" class="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
+                        <div id="continue-watching-container" class="flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-3 pb-4 touch-pan-x">
                             <!-- Dynamic Content -->
                         </div>
                     </section>
@@ -360,21 +360,6 @@
                 </div>
 
             </div> <!-- End of Split Grid Container -->
-
-            <!-- Banner Ad Slot (Home Page Multi-Banner Row) -->
-            <div class="banner-ad-wrapper my-8 w-full flex flex-col items-center justify-center">
-                <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1.5 font-mono select-none">Sponsored Content</div>
-                <div class="flex flex-row items-center justify-center gap-4 w-full overflow-hidden">
-                    <!-- Slot 1 (Always visible) -->
-                    <div class="w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="home-banner-1"></div>
-                    
-                    <!-- Slot 2 (Tablets & Desktops >= 768px) -->
-                    <div class="hidden md:flex w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="home-banner-2"></div>
-                    
-                    <!-- Slot 3 (Large Desktops >= 1200px) -->
-                    <div class="hidden xl:flex w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="home-banner-3"></div>
-                </div>
-            </div>
 
             <!-- SECTION 2: THE FULL-LENGTH UNDER-ROWS (BOTTOM HALF) -->
             <div class="flex flex-col gap-10 my-8">
