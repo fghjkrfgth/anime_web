@@ -537,45 +537,77 @@ function renderContinueWatching() {
     const container = document.getElementById('continue-watching-container');
     if (!dock || !container) return;
 
-    let history = [];
+    let items = [];
+
+    // 1. Read persistent anime_watch_vault
     try {
-        history = JSON.parse(localStorage.getItem('continueWatching')) || [];
+        const vaultData = localStorage.getItem('anime_watch_vault');
+        if (vaultData) {
+            const vault = JSON.parse(vaultData);
+            const vaultList = Object.values(vault).filter(v => v && v.id && v.lastEpNum);
+            vaultList.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+            items = vaultList.map(v => ({
+                show: {
+                    id: v.id,
+                    title: typeof v.title === 'string' ? { romaji: v.title, english: v.title, userPreferred: v.title } : v.title,
+                    coverImage: typeof v.coverImage === 'string' ? { large: v.coverImage, extraLarge: v.coverImage } : (v.coverImage || {}),
+                    bannerImage: v.bannerImage,
+                    format: v.format,
+                    meanScore: v.rating
+                },
+                epNum: v.lastEpNum,
+                percentage: v.percentage || 0
+            }));
+        }
     } catch (e) {
-        history = [];
+        console.error('[Continue Watching] Vault read error:', e);
     }
 
-    history = history.filter(item => item && item.show && item.epNum);
+    // Fallback to legacy continueWatching if vault was empty
+    if (items.length === 0) {
+        try {
+            const legacy = JSON.parse(localStorage.getItem('continueWatching')) || [];
+            items = legacy.filter(item => item && item.show && item.epNum);
+        } catch (e) {}
+    }
 
-    if (history.length === 0) {
+    // Retain up to last 15 shows
+    items = items.slice(0, 15);
+
+    if (items.length === 0) {
         dock.classList.add('hidden');
         return;
     }
 
     dock.classList.remove('hidden');
-    container.innerHTML = history.map(item => {
+    container.innerHTML = items.map(item => {
         const show = item.show;
         const title = getShowTitle(show);
-        const coverUrl = show.coverImage.large || show.coverImage.extraLarge;
+        const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || '';
+        const bannerUrl = show.banner || show.bannerImage || coverUrl;
         const epNum = item.epNum;
         const percent = Math.min(100, Math.max(0, item.percentage || 0));
 
         const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
 
         return `
-            <div class="anime-card flex-none w-[180px] md:w-[220px] bg-[#121218]/45 rounded-xl overflow-hidden border border-white/5 relative cursor-pointer group" onclick="watchShowProgress(${stringifiedShow}, ${epNum})" data-continue-show="${stringifiedShow}">
-                <div class="relative h-[95px] md:h-[120px] overflow-hidden">
-                    <img src="${show.banner || show.bannerImage || coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex flex-col justify-end p-2.5">
-                        <span class="continue-title-text text-white text-xs md:text-sm font-semibold truncate group-hover:text-themeCyan transition-colors duration-300">
+            <div class="anime-card flex-none w-[180px] md:w-[220px] bg-[#0b0c10]/70 rounded-2xl overflow-hidden border border-white/10 hover:border-[#d4af37]/60 relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_20px_rgba(212,175,55,0.25)] snap-start" onclick="watchShowProgress(${stringifiedShow}, ${epNum})" data-continue-show="${stringifiedShow}">
+                <div class="relative h-[100px] md:h-[125px] overflow-hidden bg-[#050508]">
+                    <img src="${bannerUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
+                    <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c10] via-[#0b0c10]/50 to-transparent flex flex-col justify-end p-3">
+                        <span class="continue-title-text text-white text-xs md:text-sm font-bold truncate group-hover:text-[#d4af37] transition-colors duration-300">
                             ${title}
                         </span>
-                        <span class="text-themeCyan text-[9px] md:text-xs font-semibold mt-0.5">
-                            Episode ${epNum}
-                        </span>
+                        <div class="flex items-center justify-between mt-1">
+                            <span class="text-[#d4af37] text-[10px] md:text-xs font-extrabold uppercase tracking-wider">
+                                EP ${epNum}
+                            </span>
+                            <span class="text-steelGray text-[9px] font-mono">${percent}%</span>
+                        </div>
                     </div>
                 </div>
-                <div class="w-full h-1 bg-white/10 relative">
-                    <div class="h-full bg-themeCyan transition-all duration-300" style="width: ${percent}%"></div>
+                <div class="w-full h-1.5 bg-white/10 relative">
+                    <div class="h-full bg-gradient-to-r from-[#d4af37] to-[#f59e0b] transition-all duration-300" style="width: ${percent}%"></div>
                 </div>
             </div>
         `;
@@ -602,7 +634,8 @@ function watchShowProgress(show, epNum) {
 function watchShow(show) {
     const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     localStorage.setItem('activeShowData', JSON.stringify(show));
-    window.location.href = `/anime/${slug}-${show.id}`;
+    const lastEp = (typeof window.getLastWatchedEpisode === 'function') ? window.getLastWatchedEpisode(show.id) : 1;
+    window.location.href = `/watch/anime/${slug}-${show.id}?ep=${lastEp}`;
 }
 
 // Dynamic AniList Accent Color Theming Helper
