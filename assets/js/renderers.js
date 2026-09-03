@@ -405,6 +405,8 @@ let activeBackdrop = null;
 
 function initAnimeCardHoverPreviews() {
     document.addEventListener('mouseover', (e) => {
+        if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768) return;
+
         const card = e.target.closest('[data-anime-data]');
         if (!card) return;
 
@@ -426,6 +428,8 @@ function initAnimeCardHoverPreviews() {
     });
 
     document.addEventListener('mouseout', (e) => {
+        if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768) return;
+
         const card = e.target.closest('[data-anime-data]');
         if (!card) return;
 
@@ -444,6 +448,7 @@ function initAnimeCardHoverPreviews() {
 }
 
 function showHoverPreview(card, show) {
+    if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768) return;
     dismissHoverPreview();
 
     const title = getShowTitle(show);
@@ -494,7 +499,7 @@ function showHoverPreview(card, show) {
             <div class="flex flex-wrap gap-1.5">${genreChips}</div>
             <p class="text-steelGray text-xs line-clamp-3 font-light leading-relaxed">${synopsis}</p>
             <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="mt-2 w-full py-2.5 bg-gradient-to-r from-[#d4af37] to-[#f59e0b] hover:from-[#e5bf47] hover:to-[#fbbf24] text-[#050508] font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)]">
-                Watch Now
+                View Details
             </button>
         </div>
     `;
@@ -634,9 +639,10 @@ function watchShowProgress(show, epNum) {
 function watchShow(show) {
     const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     localStorage.setItem('activeShowData', JSON.stringify(show));
-    const lastEp = (typeof window.getLastWatchedEpisode === 'function') ? window.getLastWatchedEpisode(show.id) : 1;
-    window.location.href = `/watch/anime/${slug}-${show.id}?ep=${lastEp}`;
+    window.location.href = `/anime/${slug}-${show.id}`;
 }
+window.watchShow = watchShow;
+window.openAnimeDetails = watchShow;
 
 // Dynamic AniList Accent Color Theming Helper
 function applyAnimeThemeColor(colorHex) {
@@ -1010,7 +1016,7 @@ window.renderTrendingExploreView = async function() {
                     <div class="flex items-center gap-3 mt-2">
                         <button onclick="watchShow(${top1Stringified})" class="px-6 py-3 min-h-[44px] bg-[#00f5ff] hover:bg-[#00d8e6] text-[#08080c] font-bold text-xs md:text-sm rounded-xl transition-all transform hover:scale-105 active:scale-95 uppercase tracking-wider flex items-center gap-2 shadow-[0_0_20px_rgba(0,245,255,0.4)]">
                             <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                            Watch Now
+                            View Details
                         </button>
                     </div>
                 </div>
