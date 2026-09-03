@@ -365,16 +365,18 @@
 
             </div> <!-- End of Split Grid Container -->
 
-            <!-- Banner Ad Slot (Home Page) -->
-            <div class="banner-ad-container my-6 w-full flex flex-col items-center justify-center">
-                <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1 font-mono select-none">Advertisement</div>
-                <div id="home-banner-ad" class="w-[300px] h-[250px] max-w-full rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative">
-                    <iframe 
-                        title="Advertisement"
-                        class="w-[300px] h-[250px] border-0 overflow-hidden" 
-                        scrolling="no" 
-                        srcdoc="<!DOCTYPE html><html><head><style>body{margin:0;padding:0;overflow:hidden;display:flex;justify-content:center;align-items:center;background:transparent;}</style></head><body><script>(function(hhm){var d=document,s=d.createElement('script'),l=d.scripts[d.scripts.length-1];s.settings=hhm||{};s.src='//prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX';s.async=true;s.referrerPolicy='no-referrer-when-downgrade';l.parentNode.insertBefore(s,l);})({})<\/script></body></html>">
-                    </iframe>
+            <!-- Banner Ad Slot (Home Page Multi-Banner Row) -->
+            <div class="banner-ad-wrapper my-8 w-full flex flex-col items-center justify-center">
+                <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1.5 font-mono select-none">Sponsored Content</div>
+                <div class="flex flex-row items-center justify-center gap-4 w-full overflow-hidden">
+                    <!-- Slot 1 (Always visible) -->
+                    <div class="w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="home-banner-1"></div>
+                    
+                    <!-- Slot 2 (Tablets & Desktops >= 768px) -->
+                    <div class="hidden md:flex w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="home-banner-2"></div>
+                    
+                    <!-- Slot 3 (Large Desktops >= 1200px) -->
+                    <div class="hidden xl:flex w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="home-banner-3"></div>
                 </div>
             </div>
 
