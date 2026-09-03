@@ -49,17 +49,5 @@ function decodeRegistryUrl(encodedStr) {
 
 window.VAST_TAG_URL = "https://enchantingboss.com/dfm/F/z.d/GDNJvoZ/G/Ux/AeYmX9HuqZIU/l/k/PUT/cXzcNgjYk/1-N/TcM/tJNqzDMw2cOYTuUY1INPws";
 
-// Centralized Banner Ad Script Cluster Pool (Place distinct zone script URLs here)
-window.BANNER_AD_POOL = [
-    "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX",
-    "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX",
-    "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX",
-    "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX",
-    "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX",
-    "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX",
-    "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX",
-    "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX"
-];
-
 
 
