@@ -643,8 +643,6 @@ async function handleSpaRouting() {
             renderContinueWatching();
         }
     }
-
-    setTimeout(injectBannerAdScripts, 100);
 }
 
 
@@ -818,7 +816,6 @@ async function renderWatchView() {
                     <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
                     <div id="episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
-                ${renderBannerAdHTML('watch-banner-ad')}
             </div>
 
             <!-- 4. Details & Synopsis Block -->
@@ -867,7 +864,8 @@ async function renderWatchView() {
 
     const pathname = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
-    const epNum = parseInt(urlParams.get('ep') || '1', 10);
+    const hasExplicitEp = urlParams.has('ep');
+    let epNum = parseInt(urlParams.get('ep') || '1', 10);
     const match = pathname.match(/\/watch\/anime\/([a-z0-9\-]+)-(\d+)/i);
     let anilistId = null;
 
@@ -881,6 +879,13 @@ async function renderWatchView() {
         window.history.replaceState(null, '', '/home');
         handleSpaRouting();
         return;
+    }
+
+    if (!hasExplicitEp && typeof getLastWatchedEpisode === 'function') {
+        const lastEp = getLastWatchedEpisode(anilistId);
+        if (lastEp > 1) {
+            epNum = lastEp;
+        }
     }
 
     window.currentEp = epNum;
@@ -1347,6 +1352,9 @@ function setupWatchGlobalFunctions() {
         if (spinner) spinner.classList.remove('hidden');
 
         localStorage.setItem(`watched_${window.showData.id}_${epNum}`, 'true');
+        if (typeof updateContinueWatchingHistory === 'function') {
+            updateContinueWatchingHistory(0);
+        }
         window.renderEpisodePicker();
 
         window.introTimes = null;
@@ -1692,25 +1700,115 @@ function setupWatchGlobalFunctions() {
         });
     }
 
-    function updateContinueWatchingHistory(percentage) {
-        let history = [];
-        try {
-            history = JSON.parse(localStorage.getItem('continueWatching')) || [];
-        } catch (e) {
-            history = [];
-        }
-
-        history = history.filter(item => item && item.show && item.show.id !== window.showData.id);
-
-        history.unshift({
-            show: window.showData,
-            epNum: window.currentEp,
-            percentage: percentage
-        });
-
-        history = history.slice(0, 10);
-        localStorage.setItem('continueWatching', JSON.stringify(history));
+// -------------------------------------------------------------------------
+// PERSISTENT WATCH VAULT & EPISODE TRACKING ENGINE
+// -------------------------------------------------------------------------
+function getWatchVault() {
+    try {
+        const data = localStorage.getItem('anime_watch_vault');
+        if (data) return JSON.parse(data);
+    } catch (e) {
+        console.error('[Watch Vault] Storage read error:', e);
     }
+    return {};
+}
+
+function saveWatchVault(vault) {
+    try {
+        localStorage.setItem('anime_watch_vault', JSON.stringify(vault));
+    } catch (e) {
+        console.error('[Watch Vault] Storage write error:', e);
+    }
+}
+
+function updateContinueWatchingHistory(percentage, currentTime = 0, duration = 0) {
+    if (!window.showData || !window.showData.id) return;
+
+    const show = window.showData;
+    const showId = String(show.id);
+    const epNum = Number(window.currentEp) || 1;
+
+    // 1. Update persistent watch vault
+    const vault = getWatchVault();
+    const existing = vault[showId] || {
+        id: show.id,
+        title: show.title,
+        coverImage: show.coverImage,
+        bannerImage: show.banner || show.bannerImage || (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large)),
+        format: show.format,
+        rating: show.meanScore,
+        watchedEpisodes: [],
+        lastEpNum: epNum,
+        percentage: 0,
+        currentTime: 0,
+        duration: 0,
+        updatedAt: Date.now()
+    };
+
+    existing.title = show.title;
+    existing.coverImage = show.coverImage;
+    existing.bannerImage = show.banner || show.bannerImage || (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large));
+    existing.format = show.format;
+    existing.rating = show.meanScore;
+    existing.lastEpNum = epNum;
+    existing.percentage = Math.round(percentage);
+    existing.currentTime = currentTime;
+    existing.duration = duration;
+    existing.updatedAt = Date.now();
+
+    if (!Array.isArray(existing.watchedEpisodes)) {
+        existing.watchedEpisodes = [];
+    }
+    if (!existing.watchedEpisodes.includes(epNum)) {
+        existing.watchedEpisodes.push(epNum);
+    }
+
+    vault[showId] = existing;
+    saveWatchVault(vault);
+
+    // Synchronize legacy continueWatching key (ceiling of 15 entries)
+    let historyList = [];
+    try {
+        historyList = JSON.parse(localStorage.getItem('continueWatching')) || [];
+    } catch (e) {
+        historyList = [];
+    }
+    historyList = historyList.filter(item => item && item.show && String(item.show.id) !== showId);
+    historyList.unshift({
+        show: window.showData,
+        epNum: epNum,
+        percentage: Math.round(percentage)
+    });
+    historyList = historyList.slice(0, 15);
+    localStorage.setItem('continueWatching', JSON.stringify(historyList));
+
+    if (typeof window.renderContinueWatching === 'function') {
+        window.renderContinueWatching();
+    }
+}
+window.updateContinueWatchingHistory = updateContinueWatchingHistory;
+
+function getLastWatchedEpisode(showId) {
+    if (!showId) return 1;
+    const vault = getWatchVault();
+    const entry = vault[String(showId)];
+    if (entry && entry.lastEpNum) {
+        return Number(entry.lastEpNum);
+    }
+    return 1;
+}
+window.getLastWatchedEpisode = getLastWatchedEpisode;
+
+function isEpisodeWatched(showId, epNum) {
+    if (!showId) return false;
+    const vault = getWatchVault();
+    const entry = vault[String(showId)];
+    if (entry && Array.isArray(entry.watchedEpisodes)) {
+        if (entry.watchedEpisodes.includes(Number(epNum))) return true;
+    }
+    return localStorage.getItem(`watched_${showId}_${epNum}`) === 'true';
+}
+window.isEpisodeWatched = isEpisodeWatched;
 
 // Event Listeners setup
 const searchInputEl = document.getElementById('search-input');
@@ -1998,6 +2096,8 @@ async function renderAnimeDetailsView() {
     const categorizedHtml = renderFranchiseSectionsHTML(franchiseCategories);
 
     const totalEpisodes = getActualEpisodeCount(showData);
+    const lastWatchedEp = (typeof window.getLastWatchedEpisode === 'function') ? window.getLastWatchedEpisode(showData.id) : 1;
+    const ctaLabel = lastWatchedEp > 1 ? `Resume Ep ${lastWatchedEp}` : 'Start Watching';
 
     // Score Distribution Visual Builder
     const scoreDist = showData.stats?.scoreDistribution || [];
@@ -2046,7 +2146,6 @@ async function renderAnimeDetailsView() {
                     <select id="details-batch-selector" class="w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
                     <div id="details-episodes-grid" class="grid grid-cols-4 gap-2 pr-1"></div>
                 </div>
-                ${renderBannerAdHTML('details-banner-ad')}
             </div>
 
             <!-- Main Column: Title & Metadata -->
@@ -2064,9 +2163,9 @@ async function renderAnimeDetailsView() {
                 </div>
 
                 <div class="flex gap-4">
-                    <button onclick="navigateWatchEpisode(1)" class="px-8 py-4 text-[#08080c] font-bold tracking-wider rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase flex items-center gap-2" style="background: var(--anime-accent-color, #f59e0b); box-shadow: 0 0 20px rgba(var(--anime-accent-rgb,245,158,11),0.4);">
+                    <button onclick="navigateWatchEpisode(${lastWatchedEp})" class="px-8 py-4 text-[#08080c] font-bold tracking-wider rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase flex items-center gap-2" style="background: var(--anime-accent-color, #f59e0b); box-shadow: 0 0 20px rgba(var(--anime-accent-rgb,245,158,11),0.4);">
                         <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                        Start Watching
+                        ${ctaLabel}
                     </button>
                 </div>
 
@@ -2239,67 +2338,7 @@ window.navigateWatchEpisode = function(epNum, forcedLang) {
     window.location.href = `/watch/anime/${slug}-${show.id}?ep=${epNum}`;
 };
 
-function renderBannerAdHTML(adId = 'banner-slot', isFullWidthRow = false) {
-    if (isFullWidthRow) {
-        return `
-            <div class="banner-ad-wrapper my-8 w-full flex flex-col items-center justify-center">
-                <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1.5 font-mono select-none">Sponsored Content</div>
-                <div class="flex flex-row items-center justify-center gap-4 w-full overflow-hidden">
-                    <!-- Slot 1 (Always visible) -->
-                    <div class="w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="${adId}-1"></div>
-                    
-                    <!-- Slot 2 (Tablets & Desktops >= 768px) -->
-                    <div class="hidden md:flex w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="${adId}-2"></div>
-                    
-                    <!-- Slot 3 (Large Desktops >= 1200px) -->
-                    <div class="hidden xl:flex w-[300px] h-[250px] flex-shrink-0 rounded-xl bg-white/[0.02] border border-white/5 items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="${adId}-3"></div>
-                </div>
-            </div>
-        `;
-    }
 
-    // Single 300x250 slot for sidebars
-    return `
-        <div class="banner-ad-wrapper my-6 w-full flex flex-col items-center justify-center">
-            <div class="text-[9px] uppercase tracking-widest text-steelGray/40 mb-1.5 font-mono select-none">Advertisement</div>
-            <div class="w-[300px] h-[250px] max-w-full rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-center overflow-hidden shadow-lg relative ad-slot-box" data-ad-slot="${adId}"></div>
-        </div>
-    `;
-}
-window.renderBannerAdHTML = renderBannerAdHTML;
-
-// Direct DOM Script Injector with Ad Cluster Pool Rotation
-function injectBannerAdScripts() {
-    const pool = window.BANNER_AD_POOL || [
-        "https://prizefamily.com/b-X.V/s/dqGxl/0rY/WYcM/TeImc9wu/Z/UJlwkZPXTkcWz/OuDGAb1OMxDSUtt/Nxz_Mn4tM/DKUUwXOSQX"
-    ];
-    
-    const visibleSlots = [];
-    document.querySelectorAll('.ad-slot-box:not([data-ad-loaded="true"])').forEach((slot) => {
-        if (window.getComputedStyle(slot).display !== 'none') {
-            visibleSlots.push(slot);
-        }
-    });
-
-    if (visibleSlots.length === 0) return;
-
-    // Pick a starting index for rotation across dynamic re-renders
-    let poolIndex = Math.floor(Math.random() * pool.length);
-
-    visibleSlots.forEach((slot) => {
-        slot.setAttribute('data-ad-loaded', 'true');
-        
-        const scriptUrl = pool[poolIndex % pool.length];
-        poolIndex++;
-
-        const adScript = document.createElement('script');
-        adScript.src = scriptUrl;
-        adScript.async = true;
-        adScript.referrerPolicy = 'no-referrer-when-downgrade';
-        slot.appendChild(adScript);
-    });
-}
-window.injectBannerAdScripts = injectBannerAdScripts;
 
 // -------------------------------------------------------------------------
 // -------------------------------------------------------------------------
@@ -2523,9 +2562,7 @@ window.renderTermsView = renderTermsView;
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         initApp();
-        setTimeout(injectBannerAdScripts, 100);
     });
 } else {
     initApp();
-    setTimeout(injectBannerAdScripts, 100);
 }
