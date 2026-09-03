@@ -2302,8 +2302,76 @@ function injectBannerAdScripts() {
 window.injectBannerAdScripts = injectBannerAdScripts;
 
 // -------------------------------------------------------------------------
-// STATIC PAGES RENDERERS (/contact, /dmca, /terms)
 // -------------------------------------------------------------------------
+// STATIC PAGES RENDERERS (/contact, /dmca, /terms) & CONTACT MODAL
+// -------------------------------------------------------------------------
+function handleContactSubmit(e) {
+    if (e) e.preventDefault();
+    showContactSuccessModal();
+}
+window.handleContactSubmit = handleContactSubmit;
+
+function showContactSuccessModal() {
+    let modal = document.getElementById('contact-success-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'contact-success-modal';
+        modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md transition-all duration-300 opacity-0 pointer-events-none';
+        modal.innerHTML = `
+            <div class="relative w-full max-w-md bg-[#0b0c10] border border-[#d4af37]/40 rounded-3xl p-8 shadow-[0_0_50px_rgba(212,175,55,0.25)] flex flex-col items-center text-center gap-5 transform scale-95 transition-all duration-300 glass-panel">
+                <button onclick="dismissContactModal()" class="absolute top-4 right-4 text-white/50 hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-base">
+                    ✕
+                </button>
+
+                <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-[#d4af37] to-[#f59e0b] flex items-center justify-center text-3xl text-[#050508] font-bold shadow-[0_0_25px_rgba(212,175,55,0.4)]">
+                    ✓
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <h3 class="text-2xl font-extrabold text-white tracking-tight">Message Dispatched</h3>
+                    <p class="text-steelGray text-xs md:text-sm leading-relaxed font-light">
+                        Thank you for contacting BlackLeg. Your inquiry has been successfully logged and sent directly to our team.
+                    </p>
+                </div>
+
+                <button onclick="dismissContactModal()" class="w-full py-3 bg-[#d4af37] hover:bg-[#e5bf47] text-[#050508] font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)]">
+                    Dismiss
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.addEventListener('click', (ev) => {
+            if (ev.target === modal) {
+                dismissContactModal();
+            }
+        });
+    }
+
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    modal.classList.add('opacity-100');
+    const innerCard = modal.querySelector('.glass-panel');
+    if (innerCard) {
+        innerCard.classList.remove('scale-95');
+        innerCard.classList.add('scale-100');
+    }
+}
+window.showContactSuccessModal = showContactSuccessModal;
+
+function dismissContactModal() {
+    const modal = document.getElementById('contact-success-modal');
+    if (modal) {
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modal.classList.remove('opacity-100');
+        const innerCard = modal.querySelector('.glass-panel');
+        if (innerCard) {
+            innerCard.classList.add('scale-95');
+            innerCard.classList.remove('scale-100');
+        }
+    }
+}
+window.dismissContactModal = dismissContactModal;
+
 function renderContactView() {
     let layout = document.getElementById('contact-page-layout');
     if (!layout) {
@@ -2317,7 +2385,7 @@ function renderContactView() {
     layout.innerHTML = `
         <div class="glass-panel p-8 md:p-12 rounded-3xl border border-white/10 flex flex-col gap-8 shadow-2xl">
             <div class="flex flex-col gap-3 border-b border-white/10 pb-6">
-                <span class="text-xs font-mono text-[#00f5ff] tracking-widest uppercase">GET IN TOUCH</span>
+                <span class="text-xs font-mono text-[#d4af37] tracking-widest uppercase">GET IN TOUCH</span>
                 <h1 class="text-3xl md:text-5xl font-extrabold text-white tracking-tight">Contact Us</h1>
                 <p class="text-steelGray text-sm md:text-base font-light">Have questions, feedback, or technical inquiries? Reach out to the BlackLeg team.</p>
             </div>
@@ -2325,30 +2393,30 @@ function renderContactView() {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-2">
                     <h3 class="text-white font-bold text-base flex items-center gap-2">
-                        <span class="text-[#00f5ff]">📧</span> General Inquiries
+                        <span class="text-[#d4af37]">📧</span> General Inquiries
                     </h3>
                     <p class="text-steelGray text-xs font-light">For platform feedback, suggestions, or general support questions.</p>
-                    <a href="mailto:support@blackleg.to" class="text-[#00f5ff] font-mono text-sm mt-2 hover:underline">support@blackleg.to</a>
+                    <a href="mailto:support@blackleg.to" class="text-[#d4af37] font-mono text-sm mt-2 hover:underline">support@blackleg.to</a>
                 </div>
 
                 <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-2">
                     <h3 class="text-white font-bold text-base flex items-center gap-2">
-                        <span class="text-[#00f5ff]">⚖️</span> Legal & DMCA
+                        <span class="text-[#d4af37]">⚖️</span> Legal & DMCA
                     </h3>
                     <p class="text-steelGray text-xs font-light">For copyright notices, removal requests, and legal correspondence.</p>
-                    <a href="mailto:dmca@blackleg.to" class="text-[#00f5ff] font-mono text-sm mt-2 hover:underline">dmca@blackleg.to</a>
+                    <a href="mailto:dmca@blackleg.to" class="text-[#d4af37] font-mono text-sm mt-2 hover:underline">dmca@blackleg.to</a>
                 </div>
             </div>
 
             <div class="bg-white/[0.02] border border-white/5 p-6 rounded-2xl flex flex-col gap-4">
                 <h3 class="text-white font-bold text-base">Send Us a Message</h3>
-                <form onsubmit="event.preventDefault(); alert('Thank you for contacting BlackLeg. Your message has been sent!');" class="flex flex-col gap-4">
+                <form onsubmit="handleContactSubmit(event)" class="flex flex-col gap-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="text" placeholder="Your Name" required class="w-full bg-[#121218] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#00f5ff] transition-colors">
-                        <input type="email" placeholder="Your Email" required class="w-full bg-[#121218] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#00f5ff] transition-colors">
+                        <input type="text" placeholder="Your Name" required class="w-full bg-[#050508] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#d4af37] transition-colors">
+                        <input type="email" placeholder="Your Email" required class="w-full bg-[#050508] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#d4af37] transition-colors">
                     </div>
-                    <textarea rows="4" placeholder="Your Message..." required class="w-full bg-[#121218] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#00f5ff] transition-colors resize-none"></textarea>
-                    <button type="submit" class="px-8 py-3.5 bg-[#00f5ff] hover:bg-[#00d8e6] text-[#08080c] font-bold text-xs md:text-sm uppercase tracking-wider rounded-xl transition-all self-start shadow-[0_0_15px_rgba(0,245,255,0.3)]">
+                    <textarea rows="4" placeholder="Your Message..." required class="w-full bg-[#050508] border border-white/10 px-4 py-3 rounded-xl text-white text-sm focus:outline-none focus:border-[#d4af37] transition-colors resize-none"></textarea>
+                    <button type="submit" class="px-8 py-3.5 bg-[#d4af37] hover:bg-[#e5bf47] text-[#050508] font-extrabold text-xs md:text-sm uppercase tracking-wider rounded-xl transition-all self-start shadow-[0_0_15px_rgba(212,175,55,0.3)]">
                         Send Message
                     </button>
                 </form>
