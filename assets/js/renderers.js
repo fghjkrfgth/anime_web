@@ -211,14 +211,19 @@ function rotateSpotlight(clickedIdx) {
 
         setTimeout(() => {
             const title = getShowTitle(centerItem);
-            const coverUrl = centerItem.bannerImage || centerItem.coverImage.extraLarge;
+            // Prioritize vertical portrait poster artwork (coverImage.extraLarge or coverImage.large)
+            const coverUrl = (centerItem.coverImage && (centerItem.coverImage.extraLarge || centerItem.coverImage.large)) || centerItem.bannerImage || '';
             const desc = cleanDescription(centerItem.description);
 
-            document.getElementById('spotlight-bg-img').style.backgroundImage = `url('${coverUrl}')`;
-            document.getElementById('spotlight-title').innerText = title;
-            document.getElementById('spotlight-desc').innerText = desc;
+            const bgImg = document.getElementById('spotlight-bg-img');
+            if (bgImg) {
+                bgImg.style.backgroundImage = `url('${coverUrl}')`;
+            }
+            const titleEl = document.getElementById('spotlight-title');
+            if (titleEl) titleEl.innerText = title;
+            const descEl = document.getElementById('spotlight-desc');
+            if (descEl) descEl.innerText = desc;
 
-            const stringifiedShow = JSON.stringify(centerItem).replace(/"/g, '&quot;');
             const spotlightBtn = document.getElementById('spotlight-watch-btn');
             if (spotlightBtn) {
                 spotlightBtn.innerText = 'Details';
@@ -226,9 +231,6 @@ function rotateSpotlight(clickedIdx) {
                     watchShow(centerItem);
                 };
             }
-            document.getElementById('spotlight-watchlist-btn').onclick = () => {
-                alert(`Added "${title}" to watchlist!`);
-            };
 
             cardContent.classList.remove('opacity-0');
         }, 300);
@@ -239,13 +241,13 @@ function renderGenreSpotlight() {
     const container = document.getElementById('genre-spotlight-container');
     if (!container) return;
     container.innerHTML = GENRE_MAPPING.map(g => `
-        <div onclick="searchGenre('${g.genre}')" class="flex flex-col sm:flex-row h-auto sm:h-24 md:h-28 rounded-2xl overflow-hidden border border-white/5 hover:border-[#00f5ff]/40 bg-[#121218]/45 hover:bg-[#121218]/70 transition-all duration-500 cursor-pointer group shadow-lg hover:shadow-[#00f5ff]/5">
+        <div onclick="searchGenre('${g.genre}')" class="flex flex-col sm:flex-row h-auto sm:h-24 md:h-28 rounded-2xl overflow-hidden border border-white/10 hover:border-[#d4af37]/60 bg-[#0b0c10]/60 hover:bg-[#0b0c10]/90 transition-all duration-500 cursor-pointer group shadow-lg hover:shadow-[#d4af37]/10">
             <div class="w-full sm:w-1/3 md:w-1/4 h-32 sm:h-full overflow-hidden relative">
                 <img src="${g.banner}" alt="${g.name}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                <div class="absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-r from-transparent to-[#121218]"></div>
+                <div class="absolute inset-0 bg-gradient-to-b sm:bg-gradient-to-r from-transparent to-[#0b0c10]"></div>
             </div>
             <div class="w-full sm:w-2/3 md:w-3/4 p-4 flex flex-col justify-center">
-                <h3 class="text-white text-sm md:text-base font-extrabold group-hover:text-[#00f5ff] transition-all duration-300 uppercase">${g.name}</h3>
+                <h3 class="text-white text-sm md:text-base font-extrabold group-hover:text-[#d4af37] transition-all duration-300 uppercase">${g.name}</h3>
                 <p class="text-steelGray text-xs sm:text-[10px] md:text-xs line-clamp-none sm:line-clamp-2 mt-1 font-light leading-relaxed">${g.desc}</p>
             </div>
         </div>
@@ -289,7 +291,7 @@ function updateScheduleUI() {
         const displayLabel = isToday ? `Today (${shortDay})` : dayName;
 
         const activeClass = isSelected
-            ? 'bg-purple-600/20 border-purple-500/50 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)] font-bold'
+            ? 'bg-[#d4af37]/20 border-[#d4af37]/60 text-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.3)] font-bold'
             : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white font-medium';
 
         dockHtml += `
@@ -312,16 +314,16 @@ function updateScheduleUI() {
             const searchParam = encodeURIComponent(show.title);
 
             gridHtml += `
-                <div class="flex items-center justify-between p-3.5 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-purple-500/30 transition-all duration-300 cursor-pointer group active:scale-[0.98]" onclick="searchAndPlay('${searchParam}', '${show.slug}')">
+                <div class="flex items-center justify-between p-3.5 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#d4af37]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98]" onclick="searchAndPlay('${searchParam}', '${show.slug}')">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
-                        <span class="text-[11px] font-extrabold text-purple-300 whitespace-nowrap bg-purple-500/15 px-2.5 py-1 rounded-lg border border-purple-500/30 shadow-[0_0_8px_rgba(147,51,234,0.15)]">
+                        <span class="text-[11px] font-extrabold text-[#d4af37] whitespace-nowrap bg-[#d4af37]/15 px-2.5 py-1 rounded-lg border border-[#d4af37]/30 shadow-[0_0_8px_rgba(212,175,55,0.15)]">
                             ${localTime}
                         </span>
-                        <h4 class="text-white text-xs md:text-sm font-bold truncate group-hover:text-purple-300 transition-colors" title="${show.title}">
+                        <h4 class="text-white text-xs md:text-sm font-bold truncate group-hover:text-[#d4af37] transition-colors" title="${show.title}">
                             ${show.title}
                         </h4>
                     </div>
-                    <span class="text-[10px] font-extrabold text-purple-100 bg-purple-600/90 px-2.5 py-1 rounded-full whitespace-nowrap shadow-[0_0_8px_rgba(147,51,234,0.3)] border border-purple-400/30">
+                    <span class="text-[10px] font-extrabold text-[#050508] bg-[#d4af37] px-2.5 py-1 rounded-full whitespace-nowrap shadow-[0_0_8px_rgba(212,175,55,0.3)] border border-[#f59e0b]/40">
                         EP ${show.episode}
                     </span>
                 </div>
@@ -353,8 +355,8 @@ function searchAndPlay(title, slug) {
 
 function createCardHTML(show) {
     const title = getShowTitle(show);
-    const coverUrl = show.coverImage.large || show.coverImage.extraLarge;
-    const rating = show.meanScore ? `${show.meanScore}%` : 'N/A';
+    const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || '';
+    const rating = show.meanScore ? `${(show.meanScore / 10).toFixed(1)}` : 'N/A';
 
     const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
 
@@ -373,25 +375,150 @@ function createCardHTML(show) {
     }
 
     const badgeHTML = isNewEpisode
-        ? `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-[#bd00ff]/80 backdrop-blur-md rounded text-[8px] font-bold text-white uppercase tracking-wider border border-[#00f5ff]/30 animate-pulse">${displayBadgeText}</div>`
-        : `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-md rounded text-[8px] font-bold text-[#a0a5b5] uppercase tracking-wider border border-white/5">${displayBadgeText}</div>`;
+        ? `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-[#d4af37] text-[#050508] backdrop-blur-md rounded text-[8px] font-extrabold uppercase tracking-wider border border-[#f59e0b]/40 shadow-sm">${displayBadgeText}</div>`
+        : `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-black/70 backdrop-blur-md rounded text-[8px] font-bold text-[#a0a5b5] uppercase tracking-wider border border-white/10">${displayBadgeText}</div>`;
 
     return `
-        <div class="anime-card flex-none w-[140px] md:w-[185px] bg-[#121218]/45 rounded-2xl overflow-hidden border border-[#bd00ff]/20 hover:border-[#00f5ff] relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_20px_rgba(0,245,255,0.25)] snap-start" onclick="watchShow(${stringifiedShow})" data-anime-data="${stringifiedShow}">
-            <div class="relative aspect-[3/4] w-full overflow-hidden">
+        <div class="anime-card flex-none w-[140px] md:w-[185px] bg-[#0b0c10]/60 rounded-2xl overflow-hidden border border-white/10 hover:border-[#d4af37] relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_25px_rgba(212,175,55,0.35)] snap-start" onclick="watchShow(${stringifiedShow})" data-anime-data="${stringifiedShow}">
+            <div class="relative aspect-[3/4] w-full overflow-hidden bg-[#050508]">
                 <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-black/80 backdrop-blur-md rounded text-[9px] md:text-[11px] font-bold text-[#00f5ff] border border-[#00f5ff]/20">
+                <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-black/85 backdrop-blur-md rounded text-[9px] md:text-[11px] font-extrabold text-[#d4af37] border border-[#d4af37]/30 shadow-md">
                     ★ ${rating}
                 </div>
                 ${badgeHTML}
             </div>
             <div class="anime-card-title-box">
-                <h3 class="anime-title-text text-white text-xs md:text-sm font-semibold group-hover:text-[#00f5ff] transition-colors duration-300" title="${title}">
+                <h3 class="anime-title-text text-white text-xs md:text-sm font-semibold group-hover:text-[#d4af37] transition-colors duration-300" title="${title}">
                     ${title}
                 </h3>
             </div>
         </div>
     `;
+}
+
+// -------------------------------------------------------------------------
+// INTERACTIVE HOVER PREVIEW POP-UP SYSTEM (1s delay, pop-slide-up)
+// -------------------------------------------------------------------------
+let hoverTimer = null;
+let activePreviewCard = null;
+let activeBackdrop = null;
+
+function initAnimeCardHoverPreviews() {
+    document.addEventListener('mouseover', (e) => {
+        const card = e.target.closest('[data-anime-data]');
+        if (!card) return;
+
+        if (card.dataset.hoverActive === 'true') return;
+
+        if (hoverTimer) clearTimeout(hoverTimer);
+        card.dataset.hoverActive = 'true';
+
+        hoverTimer = setTimeout(() => {
+            try {
+                const showDataRaw = card.getAttribute('data-anime-data');
+                if (!showDataRaw) return;
+                const show = JSON.parse(showDataRaw);
+                showHoverPreview(card, show);
+            } catch (err) {
+                console.error('[Hover Preview Error]', err);
+            }
+        }, 1000);
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        const card = e.target.closest('[data-anime-data]');
+        if (!card) return;
+
+        const related = e.relatedTarget;
+        if (related && (card.contains(related) || (activePreviewCard && activePreviewCard.contains(related)))) {
+            return;
+        }
+
+        card.dataset.hoverActive = 'false';
+        if (hoverTimer) {
+            clearTimeout(hoverTimer);
+            hoverTimer = null;
+        }
+        dismissHoverPreview();
+    });
+}
+
+function showHoverPreview(card, show) {
+    dismissHoverPreview();
+
+    const title = getShowTitle(show);
+    const coverUrl = (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large)) || '';
+    const bannerUrl = show.banner || show.bannerImage || coverUrl;
+    const rating = show.meanScore ? `${(show.meanScore / 10).toFixed(1)}/10 (${show.meanScore}%)` : 'N/A';
+    const epCount = show.episodes ? `${show.episodes} Episodes` : (show.nextAiringEpisode ? `Ep ${show.nextAiringEpisode.episode - 1} Released` : 'Completed');
+    const format = show.format ? show.format.replace('_', ' ') : 'TV';
+    const synopsis = cleanDescription(show.description);
+    const genres = (show.genres || []).slice(0, 3);
+    const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
+
+    // Viewport Backdrop Blur
+    activeBackdrop = document.createElement('div');
+    activeBackdrop.id = 'anime-preview-backdrop';
+    activeBackdrop.className = 'fixed inset-0 z-40 bg-black/60 backdrop-blur-md transition-opacity duration-300 pointer-events-none opacity-0';
+    document.body.appendChild(activeBackdrop);
+    requestAnimationFrame(() => activeBackdrop && activeBackdrop.classList.remove('opacity-0'));
+
+    // Animated Preview Pop-up Card
+    activePreviewCard = document.createElement('div');
+    activePreviewCard.id = 'anime-preview-popup-card';
+    activePreviewCard.className = 'fixed z-50 animate-pop-slide-up w-[90vw] max-w-[380px] bg-[#0b0c10] border border-[#d4af37]/40 shadow-[0_15px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(212,175,55,0.2)] rounded-3xl overflow-hidden pointer-events-auto';
+
+    const rect = card.getBoundingClientRect();
+    const topPos = Math.max(20, Math.min(window.innerHeight - 420, rect.top - 20));
+    const leftPos = Math.max(20, Math.min(window.innerWidth - 400, rect.left + rect.width / 2 - 190));
+
+    activePreviewCard.style.top = `${topPos}px`;
+    activePreviewCard.style.left = `${leftPos}px`;
+
+    const genreChips = genres.map(g => `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30">${g}</span>`).join('');
+
+    activePreviewCard.innerHTML = `
+        <div class="relative h-[150px] w-full overflow-hidden bg-[#050508]">
+            <img src="${bannerUrl}" alt="${title}" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c10] via-[#0b0c10]/40 to-transparent"></div>
+            <div class="absolute top-3 right-3 px-2.5 py-1 bg-black/80 backdrop-blur-md rounded-full text-xs font-extrabold text-[#d4af37] border border-[#d4af37]/30 flex items-center gap-1 shadow-lg">
+                ★ ${rating}
+            </div>
+            <div class="absolute bottom-3 left-4 right-4 flex items-center justify-between">
+                <span class="px-2.5 py-0.5 bg-[#d4af37] text-[#050508] rounded-md text-[10px] font-extrabold uppercase tracking-wider">${format}</span>
+                <span class="text-white/80 text-xs font-mono">${epCount}</span>
+            </div>
+        </div>
+        <div class="p-5 flex flex-col gap-3">
+            <h3 class="text-white text-base font-bold leading-snug line-clamp-1">${title}</h3>
+            <div class="flex flex-wrap gap-1.5">${genreChips}</div>
+            <p class="text-steelGray text-xs line-clamp-3 font-light leading-relaxed">${synopsis}</p>
+            <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="mt-2 w-full py-2.5 bg-gradient-to-r from-[#d4af37] to-[#f59e0b] hover:from-[#e5bf47] hover:to-[#fbbf24] text-[#050508] font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)]">
+                Watch Now
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(activePreviewCard);
+}
+
+function dismissHoverPreview() {
+    if (activeBackdrop) {
+        activeBackdrop.remove();
+        activeBackdrop = null;
+    }
+    if (activePreviewCard) {
+        activePreviewCard.remove();
+        activePreviewCard = null;
+    }
+}
+window.dismissHoverPreview = dismissHoverPreview;
+window.initAnimeCardHoverPreviews = initAnimeCardHoverPreviews;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAnimeCardHoverPreviews);
+} else {
+    initAnimeCardHoverPreviews();
 }
 
 function renderThumbnailRow(containerId, shows) {
