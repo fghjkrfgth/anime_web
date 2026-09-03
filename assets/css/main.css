@@ -365,19 +365,23 @@ html, body {
     }
 }
 
-/* Centralized Ad Wrapper Styles */
-.ad-banner-wrapper,
-.ad-inpage-wrapper {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin: 1rem auto;
-    overflow: hidden;
+/* Ad Slot Box Layout Stability & Styling */
+.banner-ad-wrapper {
+    contain: layout style;
 }
 
-.ad-banner-wrapper:empty,
-.ad-inpage-wrapper:empty {
-    display: none !important;
+.ad-slot-box {
+    width: 300px;
+    height: 250px;
+    min-width: 300px;
+    min-height: 250px;
+    max-width: 100%;
+    contain: strict;
 }
+
+.ad-slot-box iframe,
+.ad-slot-box script {
+    max-width: 100%;
+}
+
 
