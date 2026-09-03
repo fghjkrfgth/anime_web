@@ -1,5 +1,5 @@
 html, body {
-    background-color: #08080c !important;
+    background-color: #050508 !important;
     color: #ffffff !important;
     font-family: 'Outfit', sans-serif;
     width: 100% !important;
@@ -11,10 +11,10 @@ html, body {
 
 /* Zenith Glass Panels */
 .glass-panel {
-    background: rgba(18, 18, 24, 0.45);
+    background: rgba(11, 12, 16, 0.7);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Custom Scrollbars */
@@ -29,13 +29,13 @@ html, body {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(0, 255, 204, 0.25);
+    background: rgba(212, 175, 55, 0.35);
     border-radius: 10px;
     transition: background 0.3s;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 255, 204, 0.6);
+    background: rgba(212, 175, 55, 0.75);
 }
 
 /* Kinetic Fluidity & Component Animations */
@@ -46,6 +46,7 @@ html, body {
     contain: content;
     content-visibility: auto;
     contain-intrinsic-size: 140px 210px;
+    border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .anime-card img {
@@ -54,14 +55,30 @@ html, body {
 }
 
 .anime-card:hover {
-    transform: scale(1.05) translateY(-4px) translateZ(0);
-    box-shadow: 0 0 25px rgba(0, 245, 255, 0.35);
-    border-color: #00f5ff !important;
+    transform: scale(1.04) translateY(-4px) translateZ(0);
+    box-shadow: 0 0 25px rgba(212, 175, 55, 0.35);
+    border-color: #d4af37 !important;
     z-index: 10;
 }
 
 .anime-card:hover img {
     transform: scale(1.08);
+}
+
+/* Slide-Up & Scale Pop-up Animation */
+@keyframes popSlideUp {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.animate-pop-slide-up {
+    animation: popSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Surrounding nodes slide back slightly */
@@ -92,7 +109,7 @@ html, body {
     .backdrop-blur-lg,
     .backdrop-blur-xl,
     .backdrop-blur-2xl {
-        background: rgba(12, 12, 18, 0.95) !important;
+        background: rgba(11, 12, 16, 0.95) !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
     }
@@ -122,7 +139,7 @@ html, body {
 
     #spotlight-outer-container {
         box-shadow: none !important;
-        background: linear-gradient(135deg, rgba(0, 245, 255, 0.25), rgba(189, 0, 255, 0.25)) !important;
+        background: linear-gradient(135deg, rgba(212, 175, 55, 0.3), rgba(245, 158, 11, 0.3)) !important;
     }
 
     /* Hide non-interactive background decorations/glows/spark overlays to reclaim draw call threads */
