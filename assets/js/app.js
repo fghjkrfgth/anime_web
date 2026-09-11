@@ -1399,6 +1399,10 @@ function setupWatchGlobalFunctions() {
             }
 
             if (!activeData) {
+                console.error("[Stream Probe Diagnostics]", {
+                    sub: subResult.status === 'fulfilled' ? subResult.value : subResult.reason?.message,
+                    dub: dubResult.status === 'fulfilled' ? dubResult.value : dubResult.reason?.message
+                });
                 throw new Error("Neither Sub nor Dub stream source could be resolved for this episode.");
             }
 
