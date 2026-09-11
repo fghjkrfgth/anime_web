@@ -1413,7 +1413,16 @@ function setupWatchGlobalFunctions() {
             // Synchronized Subtitle track injection BEFORE HLS segment attachment
             await loadSubtitles(data.subtitles || [], video);
 
-            const manifestText = data.manifest;
+            let manifestText = data.manifest;
+            if (!manifestText || typeof manifestText !== 'string' || !manifestText.includes('#EXTM3U')) {
+                if (typeof window.renderEmptyStreamFallback === 'function') {
+                    window.renderEmptyStreamFallback(epNum);
+                }
+                throw new Error("Received malformed playlist from stream gateway");
+            }
+            // Ensure clean EXTM3U start
+            manifestText = manifestText.replace(/^\uFEFF/, '').trimStart();
+
             const blob = new Blob([manifestText], { type: 'application/x-mpegURL' });
             const manifestBlobUrl = URL.createObjectURL(blob);
             console.log('[HLS Engine] Manifest Blob URL:', manifestBlobUrl);
