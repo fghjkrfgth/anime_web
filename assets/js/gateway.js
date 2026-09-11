@@ -119,7 +119,16 @@ async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
 
         const targetUrl = `${activeWorkerUrl}${routePath}${queryConnector}`;
         const response = await fetch(targetUrl, fetchOptions);
-        if (!response.ok) throw new Error(`Gateway HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+            let errorJson = null;
+            try {
+                errorJson = await response.json();
+            } catch (e) {}
+            if (errorJson && typeof errorJson === 'object') {
+                return errorJson;
+            }
+            throw new Error(`Gateway HTTP error! status: ${response.status}`);
+        }
         return await response.json();
     }
 
@@ -153,6 +162,13 @@ async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
             clearTimeout(timeoutId);
 
             if (!response.ok || response.status >= 400) {
+                let errorJson = null;
+                try {
+                    errorJson = await response.json();
+                } catch (e) {}
+                if (errorJson && typeof errorJson === 'object') {
+                    return errorJson;
+                }
                 throw new Error(`Status Code ${response.status}`);
             }
 
@@ -168,7 +184,16 @@ async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
     updateActiveNodeDisplay();
     const fallbackUrl = `${primaryWorkerUrl}${routePath}${queryConnector}`;
     const fallbackResponse = await fetch(fallbackUrl, fetchOptions);
-    if (!fallbackResponse.ok) throw new Error(`Gateway failed: ${fallbackResponse.status}`);
+    if (!fallbackResponse.ok) {
+        let errorJson = null;
+        try {
+            errorJson = await fallbackResponse.json();
+        } catch (e) {}
+        if (errorJson && typeof errorJson === 'object') {
+            return errorJson;
+        }
+        throw new Error(`Gateway failed: ${fallbackResponse.status}`);
+    }
     return await fallbackResponse.json();
 }
 
