@@ -28,7 +28,121 @@ function applySubtitleStyles(fontSize, styleType) {
     `;
 }
 
+window.streamRetryCount = window.streamRetryCount || 0;
+
+window.autoSendBackToDetailsPage = function () {
+    window.streamRetryCount = 0;
+
+    const fallback = document.getElementById('empty-stream-fallback-overlay');
+    if (fallback) fallback.remove();
+
+    const spinner = document.getElementById('player-loading-spinner');
+    if (spinner) spinner.classList.add('hidden');
+
+    if (window.hlsInstance) {
+        window.hlsInstance.destroy();
+        window.hlsInstance = null;
+    }
+
+    const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
+    if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+    }
+
+    if (window.showData && window.showData.id) {
+        const title = window.showData.title?.english || window.showData.title?.romaji || window.showData.title?.userPreferred || 'anime';
+        const slug = (typeof window.slugify === 'function') ? window.slugify(title) : 'anime';
+        const targetUrl = `/anime/${slug}-${window.showData.id}`;
+        console.log(`[Stream Retry] Max tries reached. Auto-redirecting to details page: ${targetUrl}`);
+        window.history.pushState(null, '', targetUrl);
+        if (typeof handleSpaRouting === 'function') {
+            handleSpaRouting();
+        }
+    } else {
+        console.log('[Stream Retry] Max tries reached. Auto-redirecting to home.');
+        window.history.pushState(null, '', '/home');
+        if (typeof handleSpaRouting === 'function') {
+            handleSpaRouting();
+        }
+    }
+};
+
+window.handleStreamRetry = async function (epNum) {
+    const currentEp = Number(epNum) || window.currentEp || 1;
+    window.streamRetryCount = (window.streamRetryCount || 0) + 1;
+
+    console.log(`[Stream Retry] Try attempt ${window.streamRetryCount} of 3 for Episode ${currentEp}`);
+
+    // Immediately close the "no sub/deb found" popup
+    const fallback = document.getElementById('empty-stream-fallback-overlay');
+    if (fallback) fallback.remove();
+
+    // Check if max tries (3) already exceeded
+    if (window.streamRetryCount > 3) {
+        console.warn('[Stream Retry] Exceeded max tries (3). Returning to details page.');
+        window.autoSendBackToDetailsPage();
+        return;
+    }
+
+    // Show loading spinner
+    const spinner = document.getElementById('player-loading-spinner');
+    if (spinner) spinner.classList.remove('hidden');
+
+    // Clean active player instance
+    if (window.hlsInstance) {
+        window.hlsInstance.destroy();
+        window.hlsInstance = null;
+    }
+    const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
+    if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+        const oldTracks = video.querySelectorAll('track');
+        oldTracks.forEach(t => t.remove());
+    }
+
+    // Re-fetch episode servers if missing
+    const anilistId = window.showData?.id;
+    if ((!window.episodeServers || window.episodeServers.length === 0) && anilistId && typeof fetchEpisodeServers === 'function') {
+        try {
+            const servers = await fetchEpisodeServers(anilistId, currentEp);
+            if (servers && servers.length > 0) {
+                const active = window.setupServerControls(servers, currentEp);
+                if (active && typeof window.loadEpisodeStream === 'function') {
+                    await window.loadEpisodeStream(currentEp, active.dataLink, active.dataType);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error('[Stream Retry] Error re-fetching servers:', e);
+        }
+
+        // Still not found
+        if (typeof window.renderEmptyStreamFallback === 'function') {
+            window.renderEmptyStreamFallback(currentEp, "No sub or dub streams found for this episode.");
+        }
+        return;
+    }
+
+    // Servers are available, load episode stream with active server or fallback
+    if (typeof window.loadEpisodeStream === 'function') {
+        const active = window.activeServer || (window.episodeServers && window.episodeServers[0]);
+        const dataLink = active ? active.dataLink : null;
+        const dataType = active ? active.dataType : (window.currentLang || 'sub');
+        await window.loadEpisodeStream(currentEp, dataLink, dataType);
+    }
+};
+
 function renderEmptyStreamFallback(epNum, customMessage = null) {
+    if ((window.streamRetryCount || 0) >= 3) {
+        console.warn(`[Stream Fallback] Max tries (3) reached for Episode ${epNum}. Auto redirecting to details page...`);
+        window.autoSendBackToDetailsPage();
+        return;
+    }
+
     const playerContainer = document.getElementById('player-container') || document.querySelector('#watch-page-layout .aspect-video') || document.querySelector('.aspect-video');
     if (!playerContainer) return;
 
@@ -48,6 +162,10 @@ function renderEmptyStreamFallback(epNum, customMessage = null) {
     const epText = epNum ? `Episode ${epNum}` : 'this episode';
     const messageContent = customMessage || `Neither Sub nor Dub segments could be resolved for <strong class="text-white font-medium">${epText}</strong>.`;
 
+    const triesBadge = (window.streamRetryCount && window.streamRetryCount > 0)
+        ? `<span class="text-[10px] font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 self-center">ATTEMPT ${window.streamRetryCount} / 3 FAILED</span>`
+        : `<span class="text-[10px] font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-slate-300 self-center">STREAM UNAVAILABLE</span>`;
+
     fallback.innerHTML = `
         <div class="glass-crystal p-8 md:p-10 rounded-3xl max-w-md w-full flex flex-col items-center gap-6 shadow-2xl relative overflow-hidden">
             <!-- Minimalist Line-Art Anime Reaction Sticker in Soft White -->
@@ -57,9 +175,7 @@ function renderEmptyStreamFallback(epNum, customMessage = null) {
 
             <!-- Header & Messages -->
             <div class="flex flex-col gap-2">
-                <span class="text-[10px] font-mono uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-white/[0.04] border border-white/10 text-slate-300 self-center">
-                    STREAM UNAVAILABLE
-                </span>
+                ${triesBadge}
                 <h3 class="text-lg md:text-xl font-light text-white tracking-wide mt-1">
                     Stream Segment Unresolved
                 </h3>
@@ -70,11 +186,11 @@ function renderEmptyStreamFallback(epNum, customMessage = null) {
 
             <!-- Action Buttons in Crystal Glass -->
             <div class="flex items-center gap-3 w-full mt-1">
-                <button onclick="if(typeof window.loadEpisodeStream === 'function'){ window.loadEpisodeStream(${epNum || 1}); }" class="btn-crystal flex-1 py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2">
+                <button onclick="if(typeof window.handleStreamRetry === 'function'){ window.handleStreamRetry(${epNum || 1}); }" class="btn-crystal flex-1 py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2">
                     <svg class="w-3.5 h-3.5 fill-current opacity-80" viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                    Retry Cluster
+                    Try Again
                 </button>
-                <button onclick="if(window.showData){ const slug = (typeof window.slugify === 'function' ? window.slugify(window.showData.title.english || window.showData.title.romaji) : 'anime'); window.history.pushState({}, '', '/anime/' + slug + '-' + window.showData.id); handleSpaRouting(); } else { window.history.pushState({}, '', '/home'); handleSpaRouting(); }" class="btn-crystal py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider">
+                <button onclick="if(typeof window.autoSendBackToDetailsPage === 'function'){ window.autoSendBackToDetailsPage(); } else if(window.showData){ const slug = (typeof window.slugify === 'function' ? window.slugify(window.showData.title.english || window.showData.title.romaji) : 'anime'); window.history.pushState({}, '', '/anime/' + slug + '-' + window.showData.id); handleSpaRouting(); } else { window.history.pushState({}, '', '/home'); handleSpaRouting(); }" class="btn-crystal py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider">
                     Go Back
                 </button>
             </div>
