@@ -874,7 +874,7 @@ async function renderWatchView() {
     }
 
     window.currentEp = epNum;
-    window.currentLang = localStorage.getItem(`lang_${anilistId}`) || 'sub';
+    window.currentLang = localStorage.getItem(`lang_${anilistId}`) || getUserPreferences().preferredLang || 'sub';
 
     let showData = null;
     try {
@@ -972,13 +972,25 @@ async function hydrateWatchUI() {
 function getUserPreferences() {
     try {
         const stored = localStorage.getItem('anime_user_preferences');
-        if (stored) return JSON.parse(stored);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            return {
+                autoSkipIntro: parsed.autoSkipIntro !== undefined ? !!parsed.autoSkipIntro : false,
+                autoSkipOutro: parsed.autoSkipOutro !== undefined ? !!parsed.autoSkipOutro : false,
+                autoNext: parsed.autoNext !== undefined ? !!parsed.autoNext : true,
+                preferredLang: parsed.preferredLang || 'sub',
+                volume: typeof parsed.volume === 'number' ? parsed.volume : 1.0,
+                playbackSpeed: typeof parsed.playbackSpeed === 'number' ? parsed.playbackSpeed : 1.0
+            };
+        }
     } catch (e) {}
     return {
         autoSkipIntro: false,
         autoSkipOutro: false,
         autoNext: true,
-        preferredLang: 'sub'
+        preferredLang: 'sub',
+        volume: 1.0,
+        playbackSpeed: 1.0
     };
 }
 
@@ -1009,6 +1021,13 @@ function setupWatchGlobalFunctions() {
     if (autoNextEl) autoNextEl.checked = !!prefs.autoNext;
 
     if (video) {
+        if (typeof prefs.volume === 'number') {
+            video.volume = Math.max(0, Math.min(1, prefs.volume));
+        }
+        if (typeof prefs.playbackSpeed === 'number' && prefs.playbackSpeed > 0) {
+            video.playbackRate = prefs.playbackSpeed;
+        }
+
         video.ontimeupdate = () => {
             const currentPrefs = getUserPreferences();
             const currTime = video.currentTime;
@@ -1349,17 +1368,53 @@ function setupWatchGlobalFunctions() {
         if (skipOutroBtn) skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
 
         try {
+            // Determine primary worker node for rating stream resolution
+            let primaryWorkerUrl = window.location.origin;
+            if (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+                primaryWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
+            } else if (typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+                primaryWorkerUrl = NODE_REGISTRY[0];
+            }
+
+            async function fetchRatingStream(anilistId, ep, lang) {
+                const url = `${primaryWorkerUrl}/rating?id=${encodeURIComponent(anilistId)}&e=${encodeURIComponent(ep)}&lang=${encodeURIComponent(lang)}`;
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const data = await res.json().catch(() => null);
+                    if (!res.ok) {
+                        return data && typeof data === 'object' ? data : { success: false, error: `HTTP ${res.status}` };
+                    }
+                    return data;
+                } catch (err) {
+                    if (typeof fetchClusterNode === 'function') {
+                        try {
+                            return await fetchClusterNode({ route: 'rating', id: anilistId, e: ep, lang });
+                        } catch (clusterErr) {
+                            return { success: false, error: clusterErr.message };
+                        }
+                    }
+                    return { success: false, error: err.message };
+                }
+            }
+
             // Dual parallel probe for Sub and Dub stream availability
             const [subResult, dubResult] = await Promise.allSettled([
-                fetchClusterNode({ route: 'rating', id: window.showData.id, e: epNum, lang: 'sub' }),
-                fetchClusterNode({ route: 'rating', id: window.showData.id, e: epNum, lang: 'dub' })
+                fetchRatingStream(window.showData.id, epNum, 'sub'),
+                fetchRatingStream(window.showData.id, epNum, 'dub')
             ]);
 
-            const subData = (subResult.status === 'fulfilled' && subResult.value && subResult.value.success && subResult.value.manifest) ? subResult.value : null;
-            const dubData = (dubResult.status === 'fulfilled' && dubResult.value && dubResult.value.success && dubResult.value.manifest) ? dubResult.value : null;
+            const isManifestValid = (item) => Boolean(
+                item &&
+                item.success &&
+                typeof item.manifest === 'string' &&
+                item.manifest.trim().length > 0 &&
+                item.manifest.includes('#EXTM3U')
+            );
 
-            const playerSubdubToggle = document.getElementById('player-subdub-toggle');
-            const langToggleBtn = document.getElementById('lang-toggle-btn');
+            const subData = (subResult.status === 'fulfilled' && isManifestValid(subResult.value)) ? subResult.value : null;
+            const dubData = (dubResult.status === 'fulfilled' && isManifestValid(dubResult.value)) ? dubResult.value : null;
 
             let activeData = null;
 
@@ -1398,12 +1453,27 @@ function setupWatchGlobalFunctions() {
                 window.updateSubDubButtonsUI();
             }
 
-            if (!activeData) {
-                console.error("[Stream Probe Diagnostics]", {
+            // If stream is unavailable, trigger renderEmptyStreamFallback cleanly without mounting invalid URLs
+            if (!activeData || !activeData.manifest || typeof activeData.manifest !== 'string' || !activeData.manifest.trim()) {
+                console.warn("[Stream Probe Diagnostics] Stream unavailable for episode", epNum, {
                     sub: subResult.status === 'fulfilled' ? subResult.value : subResult.reason?.message,
                     dub: dubResult.status === 'fulfilled' ? dubResult.value : dubResult.reason?.message
                 });
-                throw new Error("Neither Sub nor Dub stream source could be resolved for this episode.");
+                if (spinner) spinner.classList.add('hidden');
+                if (typeof window.renderEmptyStreamFallback === 'function') {
+                    window.renderEmptyStreamFallback(epNum);
+                }
+                return;
+            }
+
+            let manifestText = activeData.manifest.replace(/^\uFEFF/, '').trimStart();
+            if (!manifestText.startsWith('#EXTM3U')) {
+                console.warn("[Stream Resolver] Manifest does not contain EXTM3U header");
+                if (spinner) spinner.classList.add('hidden');
+                if (typeof window.renderEmptyStreamFallback === 'function') {
+                    window.renderEmptyStreamFallback(epNum);
+                }
+                return;
             }
 
             const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
@@ -1412,20 +1482,10 @@ function setupWatchGlobalFunctions() {
             window.introTimes = data.intro;
             window.outroTimes = data.outro;
 
-            console.log('[HLS Engine] Active Worker Proxy URL:', data.proxy || (typeof NODE_REGISTRY !== 'undefined' ? NODE_REGISTRY[0] : window.location.origin));
+            console.log('[HLS Engine] Active Worker Proxy URL:', primaryWorkerUrl);
 
             // Synchronized Subtitle track injection BEFORE HLS segment attachment
             await loadSubtitles(data.subtitles || [], video);
-
-            let manifestText = data.manifest;
-            if (!manifestText || typeof manifestText !== 'string' || !manifestText.includes('#EXTM3U')) {
-                if (typeof window.renderEmptyStreamFallback === 'function') {
-                    window.renderEmptyStreamFallback(epNum);
-                }
-                throw new Error("Received malformed playlist from stream gateway");
-            }
-            // Ensure clean EXTM3U start
-            manifestText = manifestText.replace(/^\uFEFF/, '').trimStart();
 
             const blob = new Blob([manifestText], { type: 'application/x-mpegURL' });
             const manifestBlobUrl = URL.createObjectURL(blob);
@@ -1506,19 +1566,29 @@ function setupWatchGlobalFunctions() {
         const existingTracks = videoEl.querySelectorAll('track');
         existingTracks.forEach(t => t.remove());
 
-        if (!trackList || trackList.length === 0) return;
+        if (!trackList || !Array.isArray(trackList) || trackList.length === 0) return;
 
-        const activeUrl = typeof decodeRegistryUrl === 'function' ? decodeRegistryUrl(NODE_REGISTRY[0]) : (typeof NODE_REGISTRY !== 'undefined' ? NODE_REGISTRY[0] : window.location.origin);
+        let activeUrl = window.location.origin;
+        if (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+            activeUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
+        } else if (typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+            activeUrl = NODE_REGISTRY[0];
+        }
 
         for (let track of trackList) {
-            if (!track.file && !track.content) continue;
+            const subUrl = track.file || track.url || track.rawFile || track.src;
+            if (!subUrl && !track.content) continue;
+
+            const subLabel = track.label || track.language || track.lang || 'English';
+            const subKind = track.kind || 'captions';
+            const isDefault = Boolean(track.default || subLabel.toLowerCase().includes('eng') || subLabel.toLowerCase().includes('en'));
 
             try {
                 let vttText;
                 if (track.content) {
                     vttText = track.content;
                 } else {
-                    const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}`;
+                    const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
                     const response = await fetch(proxyUrl);
                     if (!response.ok) throw new Error("Sandbox load error");
                     vttText = await response.text();
@@ -1528,25 +1598,28 @@ function setupWatchGlobalFunctions() {
                 const dataUrl = 'data:text/vtt;base64,' + base64Vtt;
 
                 const trackEl = document.createElement('track');
-                trackEl.kind = track.kind || 'captions';
-                trackEl.label = track.label || 'Subtitles';
-                trackEl.srclang = track.label ? track.label.toLowerCase().slice(0, 2) : 'en';
+                trackEl.kind = subKind;
+                trackEl.label = subLabel;
+                trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
                 trackEl.src = dataUrl;
 
-                if (track.default || trackEl.label.toLowerCase().includes('eng') || trackEl.label.toLowerCase().includes('en')) {
+                if (isDefault) {
                     trackEl.default = true;
                 }
 
                 videoEl.appendChild(trackEl);
             } catch (err) {
-                console.warn(`[Subtitles Fallback] CORS track fetch failure: ${track.label}. Loading via proxy directly.`);
-                const proxyUrl = track.file ? `${activeUrl}/?src=${encodeURIComponent(track.file)}&action=proxy_caption&vtt_url=${encodeURIComponent(track.file)}` : '';
-                const trackEl = document.createElement('track');
-                trackEl.kind = track.kind || 'captions';
-                trackEl.label = track.label || 'Subtitles';
-                trackEl.srclang = 'en';
-                trackEl.src = proxyUrl;
-                videoEl.appendChild(trackEl);
+                console.warn(`[Subtitles Fallback] CORS track fetch failure for "${subLabel}". Loading via proxy directly.`);
+                if (subUrl) {
+                    const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
+                    const trackEl = document.createElement('track');
+                    trackEl.kind = subKind;
+                    trackEl.label = subLabel;
+                    trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
+                    trackEl.src = proxyUrl;
+                    if (isDefault) trackEl.default = true;
+                    videoEl.appendChild(trackEl);
+                }
             }
         }
 
