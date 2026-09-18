@@ -634,9 +634,9 @@ async function handleSpaRouting() {
             homepageWrapper.classList.add('animate-crystal-in');
         }
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
-        
+
         checkUrlParamsAndSearch();
-        
+
         // Fetch home catalog if not already loaded
         if (!window.homeCatalogFetched) {
             window.homeCatalogFetched = true;
@@ -720,7 +720,7 @@ async function renderWatchView() {
     // Hide other views
     const homepageWrapper = document.getElementById('homepage-sections-wrapper');
     if (homepageWrapper) homepageWrapper.classList.add('hidden');
-    
+
     const searchResultsLayout = document.getElementById('search-results-layout');
     if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
 
@@ -773,6 +773,7 @@ async function renderWatchView() {
                                 🎙️ DUB
                             </button>
                         </div>
+                        <div id="player-server-buttons" class="flex items-center gap-1.5 flex-wrap"></div>
                     </div>
                     <div class="flex items-center gap-4 flex-wrap">
                         <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
@@ -874,12 +875,12 @@ async function renderWatchView() {
     }
 
     window.currentEp = epNum;
-    window.currentLang = localStorage.getItem(`lang_${anilistId}`) || getUserPreferences().preferredLang || 'sub';
+    window.currentLang = localStorage.getItem(`lang_${anilistId}`) || 'sub';
 
     let showData = null;
     try {
         showData = JSON.parse(localStorage.getItem('activeShowData'));
-    } catch (e) {}
+    } catch (e) { }
 
     setupWatchGlobalFunctions();
 
@@ -906,7 +907,28 @@ async function renderWatchView() {
         }
     }
 
-    window.loadEpisodeStream(window.currentEp);
+    // Fetch episode servers on watch page load before stream loading
+    let servers = [];
+    if (typeof fetchEpisodeServers === 'function') {
+        servers = await fetchEpisodeServers(anilistId, window.currentEp);
+    }
+
+    if (!servers || servers.length === 0) {
+        console.warn("[Servers Ingestion] No servers returned for episode", window.currentEp);
+        if (typeof window.renderEmptyStreamFallback === 'function') {
+            window.renderEmptyStreamFallback(window.currentEp, "No sub or dub streams found for this episode.");
+        }
+        return;
+    }
+
+    const activeServer = window.setupServerControls(servers, window.currentEp);
+    if (activeServer) {
+        window.loadEpisodeStream(window.currentEp, activeServer.dataLink, activeServer.dataType);
+    } else {
+        if (typeof window.renderEmptyStreamFallback === 'function') {
+            window.renderEmptyStreamFallback(window.currentEp, "No sub or dub streams found for this episode.");
+        }
+    }
 }
 
 window.renderWatchView = renderWatchView;
@@ -972,25 +994,13 @@ async function hydrateWatchUI() {
 function getUserPreferences() {
     try {
         const stored = localStorage.getItem('anime_user_preferences');
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            return {
-                autoSkipIntro: parsed.autoSkipIntro !== undefined ? !!parsed.autoSkipIntro : false,
-                autoSkipOutro: parsed.autoSkipOutro !== undefined ? !!parsed.autoSkipOutro : false,
-                autoNext: parsed.autoNext !== undefined ? !!parsed.autoNext : true,
-                preferredLang: parsed.preferredLang || 'sub',
-                volume: typeof parsed.volume === 'number' ? parsed.volume : 1.0,
-                playbackSpeed: typeof parsed.playbackSpeed === 'number' ? parsed.playbackSpeed : 1.0
-            };
-        }
-    } catch (e) {}
+        if (stored) return JSON.parse(stored);
+    } catch (e) { }
     return {
         autoSkipIntro: false,
         autoSkipOutro: false,
         autoNext: true,
-        preferredLang: 'sub',
-        volume: 1.0,
-        playbackSpeed: 1.0
+        preferredLang: 'sub'
     };
 }
 
@@ -1021,13 +1031,6 @@ function setupWatchGlobalFunctions() {
     if (autoNextEl) autoNextEl.checked = !!prefs.autoNext;
 
     if (video) {
-        if (typeof prefs.volume === 'number') {
-            video.volume = Math.max(0, Math.min(1, prefs.volume));
-        }
-        if (typeof prefs.playbackSpeed === 'number' && prefs.playbackSpeed > 0) {
-            video.playbackRate = prefs.playbackSpeed;
-        }
-
         video.ontimeupdate = () => {
             const currentPrefs = getUserPreferences();
             const currTime = video.currentTime;
@@ -1056,10 +1059,120 @@ function setupWatchGlobalFunctions() {
         };
     }
 
-    window.updateSubDubButtonsUI = function() {
+    window.setupServerControls = function (servers, epNum) {
+        window.episodeServers = Array.isArray(servers) ? servers : [];
+
+        const subServers = window.episodeServers.filter(s => (s.dataType || s.type || 'sub').toLowerCase() === 'sub');
+        const dubServers = window.episodeServers.filter(s => (s.dataType || s.type || '').toLowerCase() === 'dub');
+
+        window.dubUnavailable = (dubServers.length === 0);
+
+        const preferredServer = localStorage.getItem('preferredServer') || 'HD-1';
+        const preferredLang = (localStorage.getItem('preferredLang') || (typeof getUserPreferences === 'function' ? getUserPreferences().preferredLang : 'sub') || 'sub').toLowerCase();
+
+        // Selection Logic:
+        // 1. If preferred server exists for preferred language, select it.
+        let primaryList = (preferredLang === 'dub') ? dubServers : subServers;
+        let fallbackList = (preferredLang === 'dub') ? subServers : dubServers;
+
+        let activeServer = primaryList.find(s => (s.serverName || s.name || '').toLowerCase() === preferredServer.toLowerCase());
+
+        // 2. If not available, fall back to the same server in the other language.
+        if (!activeServer) {
+            activeServer = fallbackList.find(s => (s.serverName || s.name || '').toLowerCase() === preferredServer.toLowerCase());
+        }
+
+        // 3. If still unavailable, select the first available server.
+        if (!activeServer) {
+            activeServer = primaryList[0] || fallbackList[0] || window.episodeServers[0];
+        }
+
+        if (!activeServer) {
+            return null;
+        }
+
+        window.activeServer = activeServer;
+        window.currentLang = (activeServer.dataType || activeServer.type || 'sub').toLowerCase();
+
+        localStorage.setItem('preferredServer', activeServer.serverName || activeServer.name || 'HD-1');
+        localStorage.setItem('preferredLang', window.currentLang);
+        if (window.showData?.id) {
+            localStorage.setItem(`lang_${window.showData.id}`, window.currentLang);
+        }
+        if (typeof window.toggleUserPreference === 'function') {
+            window.toggleUserPreference('preferredLang', window.currentLang);
+        }
+
+        window.renderServerButtonsUI();
+        if (typeof window.updateSubDubButtonsUI === 'function') {
+            window.updateSubDubButtonsUI();
+        }
+
+        return activeServer;
+    };
+
+    window.renderServerButtonsUI = function () {
+        const container = document.getElementById('player-server-buttons');
+        if (!container) return;
+
+        const currentLang = (window.currentLang || 'sub').toLowerCase();
+        const serversForLang = (window.episodeServers || []).filter(s => (s.dataType || s.type || 'sub').toLowerCase() === currentLang);
+
+        if (serversForLang.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        serversForLang.forEach(server => {
+            const sName = server.serverName || server.name || 'HD-1';
+            const sLink = server.dataLink || server.link || '';
+            const isActive = window.activeServer && (
+                (window.activeServer.dataLink && window.activeServer.dataLink === sLink) ||
+                ((window.activeServer.serverName || window.activeServer.name) === sName)
+            );
+
+            const activeClass = "px-3 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)]";
+            const inactiveClass = "px-3 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 text-steelGray hover:text-white bg-white/5 hover:bg-white/10 border border-white/10";
+
+            html += `<button class="server-btn ${isActive ? activeClass : inactiveClass}" data-link="${encodeURIComponent(sLink)}" data-name="${sName}" data-type="${server.dataType || currentLang}">
+                ${sName}
+            </button>`;
+        });
+
+        container.innerHTML = html;
+
+        container.querySelectorAll('.server-btn').forEach(btn => {
+            btn.onclick = () => {
+                const dataLink = decodeURIComponent(btn.getAttribute('data-link'));
+                const sName = btn.getAttribute('data-name');
+                const sType = btn.getAttribute('data-type');
+
+                const selectedServer = (window.episodeServers || []).find(s => (s.dataLink || s.link) === dataLink && (s.dataType || '').toLowerCase() === sType.toLowerCase()) || {
+                    serverName: sName,
+                    dataLink: dataLink,
+                    dataType: sType
+                };
+
+                window.activeServer = selectedServer;
+                localStorage.setItem('preferredServer', sName);
+                localStorage.setItem('preferredLang', sType);
+
+                window.renderServerButtonsUI();
+                window.loadEpisodeStream(window.currentEp, selectedServer.dataLink, selectedServer.dataType);
+            };
+        });
+    };
+
+    window.updateSubDubButtonsUI = function () {
         const subBtn = document.getElementById('btn-sub-toggle');
         const dubBtn = document.getElementById('btn-dub-toggle');
         if (!subBtn || !dubBtn) return;
+
+        const subServers = (window.episodeServers || []).filter(s => (s.dataType || s.type || 'sub').toLowerCase() === 'sub');
+        const dubServers = (window.episodeServers || []).filter(s => (s.dataType || s.type || '').toLowerCase() === 'dub');
+
+        window.dubUnavailable = dubServers.length === 0;
 
         if (window.currentLang === 'dub') {
             dubBtn.className = "px-3.5 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)]";
@@ -1082,21 +1195,51 @@ function setupWatchGlobalFunctions() {
             dubBtn.disabled = false;
             dubBtn.removeAttribute('title');
         }
+
+        if (subServers.length === 0) {
+            subBtn.disabled = true;
+            subBtn.title = `Sub unavailable for Episode ${window.currentEp || 1}`;
+            subBtn.className = "px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 opacity-50 cursor-not-allowed text-steelGray/50 bg-transparent";
+            subBtn.innerHTML = "💬 SUB (Unavailable)";
+        } else {
+            subBtn.disabled = false;
+            subBtn.removeAttribute('title');
+        }
     };
 
-    window.setAudioLanguage = function(lang) {
+    window.setAudioLanguage = function (lang) {
         if (lang === 'dub' && window.dubUnavailable) return;
         window.currentLang = lang;
+        localStorage.setItem('preferredLang', lang);
         if (window.showData?.id) {
             localStorage.setItem(`lang_${window.showData.id}`, lang);
         }
         toggleUserPreference('preferredLang', lang);
+
+        const preferredServer = localStorage.getItem('preferredServer') || 'HD-1';
+        const serversForLang = (window.episodeServers || []).filter(s => (s.dataType || s.type || 'sub').toLowerCase() === lang);
+
+        if (serversForLang.length > 0) {
+            let matching = serversForLang.find(s => (s.serverName || s.name || '').toLowerCase() === preferredServer.toLowerCase());
+            if (!matching) matching = serversForLang[0];
+            window.activeServer = matching;
+            localStorage.setItem('preferredServer', matching.serverName || matching.name || 'HD-1');
+        }
+
         window.updateSubDubButtonsUI();
+        if (typeof window.renderServerButtonsUI === 'function') {
+            window.renderServerButtonsUI();
+        }
         window.renderEpisodePicker();
-        window.loadEpisodeStream(window.currentEp);
+
+        if (window.activeServer) {
+            window.loadEpisodeStream(window.currentEp, window.activeServer.dataLink, window.activeServer.dataType);
+        } else {
+            window.loadEpisodeStream(window.currentEp, null, lang);
+        }
     };
 
-    window.renderStreamPreRollOverlay = function(epNum) {
+    window.renderStreamPreRollOverlay = function (epNum) {
         const video = document.getElementById('main-video-player');
         const container = video?.parentElement;
         if (!container) return;
@@ -1115,14 +1258,14 @@ function setupWatchGlobalFunctions() {
 
         posterOverlay.className = "absolute inset-0 z-30 flex items-center justify-center bg-cover bg-center cursor-pointer group transition-all duration-500";
         posterOverlay.style.backgroundImage = `url('${posterUrl}')`;
-        posterOverlay.onclick = function() {
+        posterOverlay.onclick = function () {
             posterOverlay.classList.add('hidden');
             if (typeof window.playVastPreRoll === 'function' && window.VAST_TAG_URL) {
                 window.playVastPreRoll(video, window.VAST_TAG_URL, () => {
-                    if (video) video.play().catch(() => {});
+                    if (video) video.play().catch(() => { });
                 });
             } else if (video) {
-                video.play().catch(() => {});
+                video.play().catch(() => { });
             }
         };
 
@@ -1139,7 +1282,7 @@ function setupWatchGlobalFunctions() {
         posterOverlay.classList.remove('hidden');
     };
 
-    window.showFillerWarningModal = function(epNum) {
+    window.showFillerWarningModal = function (epNum) {
         const video = document.getElementById('main-video-player');
         const container = video?.parentElement || document.getElementById('player-container') || document.body;
 
@@ -1179,13 +1322,13 @@ function setupWatchGlobalFunctions() {
         modal.classList.remove('hidden');
     };
 
-    window.continueFillerEpisode = function(epNum) {
+    window.continueFillerEpisode = function (epNum) {
         const modal = document.getElementById('filler-warning-modal');
         if (modal) modal.classList.add('hidden');
         window.changeEpisode(epNum, true);
     };
 
-    window.skipFillerEpisode = async function(currentEp) {
+    window.skipFillerEpisode = async function (currentEp) {
         const modal = document.getElementById('filler-warning-modal');
         if (modal) modal.classList.add('hidden');
 
@@ -1205,572 +1348,578 @@ function setupWatchGlobalFunctions() {
     };
 }
 
-    window.toggleSynopsis = function() {
-        const wrapper = document.getElementById('synopsis-wrapper');
-        const btn = document.getElementById('read-more-btn');
-        if (!wrapper || !btn) return;
+window.toggleSynopsis = function () {
+    const wrapper = document.getElementById('synopsis-wrapper');
+    const btn = document.getElementById('read-more-btn');
+    if (!wrapper || !btn) return;
 
-        if (wrapper.classList.contains('max-h-12')) {
-            wrapper.classList.remove('max-h-12');
-            wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
-            btn.innerText = "- Show Less";
-        } else {
-            wrapper.style.maxHeight = '3rem';
-            wrapper.classList.add('max-h-12');
-            btn.innerText = "+ Read More";
-        }
-    };
+    if (wrapper.classList.contains('max-h-12')) {
+        wrapper.classList.remove('max-h-12');
+        wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
+        btn.innerText = "- Show Less";
+    } else {
+        wrapper.style.maxHeight = '3rem';
+        wrapper.classList.add('max-h-12');
+        btn.innerText = "+ Read More";
+    }
+};
 
-    window.changeEpisode = async function(epNum, bypassFillerCheck = false) {
-        const totalEps = getActualEpisodeCount(window.showData);
-        if (epNum < 1 || epNum > totalEps) return;
+window.changeEpisode = async function (epNum, bypassFillerCheck = false) {
+    const totalEps = getActualEpisodeCount(window.showData);
+    if (epNum < 1 || epNum > totalEps) return;
 
-        if (!bypassFillerCheck) {
-            const fillerSet = await fetchFillerEpisodes(window.showData.id);
-            if (fillerSet.has(epNum)) {
-                window.showFillerWarningModal(epNum);
-                return;
-            }
-        }
-
-        window.currentEp = epNum;
-
-        const slug = slugify(window.showData.title.english || window.showData.title.romaji || window.showData.title.userPreferred);
-        window.location.href = `/watch/anime/${slug}-${window.showData.id}?ep=${epNum}`;
-    };
-
-    window.renderEpisodePicker = function() {
-        const selector = document.getElementById('batch-selector');
-        const totalEps = getActualEpisodeCount(window.showData);
-
-        const batchSize = 100;
-        const numBatches = Math.ceil(totalEps / batchSize);
-
-        if (!selector) return;
-
-        if (numBatches > 1) {
-            selector.classList.remove('hidden');
-            let selectorHtml = '';
-            for (let b = 0; b < numBatches; b++) {
-                const start = b * batchSize + 1;
-                const end = Math.min((b + 1) * batchSize, totalEps);
-                selectorHtml += `<option value="${b}">Episodes ${start} - ${end}</option>`;
-            }
-            selector.innerHTML = selectorHtml;
-
-            const currentBatch = Math.floor((window.currentEp - 1) / batchSize);
-            selector.value = currentBatch;
-
-            selector.onchange = (e) => {
-                const selectedBatch = parseInt(e.target.value, 10);
-                window.renderEpisodesGridForBatch(selectedBatch, totalEps);
-            };
-
-            window.renderEpisodesGridForBatch(currentBatch, totalEps);
-        } else {
-            selector.classList.add('hidden');
-            window.renderEpisodesGridForBatch(0, totalEps);
-        }
-    };
-
-    window.renderEpisodesGridForBatch = async function(batchIdx, totalEps) {
-        const container = document.getElementById('episodes-grid');
-        if (!container) return;
-
+    if (!bypassFillerCheck) {
         const fillerSet = await fetchFillerEpisodes(window.showData.id);
-        const subDubData = await fetchSubDubCounts(window.showData.id);
+        if (fillerSet.has(epNum)) {
+            window.showFillerWarningModal(epNum);
+            return;
+        }
+    }
 
-        const isDub = (window.currentLang === 'dub');
-        const validEps = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
-                              : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+    window.currentEp = epNum;
 
-        const totalValidEps = validEps.length;
-        const batchSize = 100;
-        const startIdx = batchIdx * batchSize;
-        const endIdx = Math.min((batchIdx + 1) * batchSize, totalValidEps);
+    const slug = slugify(window.showData.title.english || window.showData.title.romaji || window.showData.title.userPreferred);
+    const newPath = `/watch/anime/${slug}-${window.showData.id}?ep=${epNum}`;
+    window.history.pushState(null, '', newPath);
 
-        let html = '';
-        for (let idx = startIdx; idx < endIdx; idx++) {
-            const i = validEps[idx];
-            const isWatched = localStorage.getItem(`watched_${window.showData.id}_${i}`) === 'true';
-            const isActive = (i === window.currentEp);
-            const isFiller = fillerSet.has(i);
+    // Fetch servers for the new episode before loading streams
+    let servers = [];
+    if (typeof fetchEpisodeServers === 'function') {
+        servers = await fetchEpisodeServers(window.showData.id, epNum);
+    }
 
-            const btnClasses = getWatchEpisodeBtnClasses(isActive, isFiller, isWatched);
-            const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
+    if (!servers || servers.length === 0) {
+        console.warn("[Servers Ingestion] No servers returned for episode", epNum);
+        if (typeof window.renderEmptyStreamFallback === 'function') {
+            window.renderEmptyStreamFallback(epNum, "No sub or dub streams found for this episode.");
+        }
+        return;
+    }
 
-            html += `
+    const activeServer = window.setupServerControls(servers, epNum);
+    if (activeServer) {
+        window.loadEpisodeStream(epNum, activeServer.dataLink, activeServer.dataType);
+    } else {
+        if (typeof window.renderEmptyStreamFallback === 'function') {
+            window.renderEmptyStreamFallback(epNum, "No sub or dub streams found for this episode.");
+        }
+    }
+};
+
+window.renderEpisodePicker = function () {
+    const selector = document.getElementById('batch-selector');
+    const totalEps = getActualEpisodeCount(window.showData);
+
+    const batchSize = 100;
+    const numBatches = Math.ceil(totalEps / batchSize);
+
+    if (!selector) return;
+
+    if (numBatches > 1) {
+        selector.classList.remove('hidden');
+        let selectorHtml = '';
+        for (let b = 0; b < numBatches; b++) {
+            const start = b * batchSize + 1;
+            const end = Math.min((b + 1) * batchSize, totalEps);
+            selectorHtml += `<option value="${b}">Episodes ${start} - ${end}</option>`;
+        }
+        selector.innerHTML = selectorHtml;
+
+        const currentBatch = Math.floor((window.currentEp - 1) / batchSize);
+        selector.value = currentBatch;
+
+        selector.onchange = (e) => {
+            const selectedBatch = parseInt(e.target.value, 10);
+            window.renderEpisodesGridForBatch(selectedBatch, totalEps);
+        };
+
+        window.renderEpisodesGridForBatch(currentBatch, totalEps);
+    } else {
+        selector.classList.add('hidden');
+        window.renderEpisodesGridForBatch(0, totalEps);
+    }
+};
+
+window.renderEpisodesGridForBatch = async function (batchIdx, totalEps) {
+    const container = document.getElementById('episodes-grid');
+    if (!container) return;
+
+    const fillerSet = await fetchFillerEpisodes(window.showData.id);
+    const subDubData = await fetchSubDubCounts(window.showData.id);
+
+    const isDub = (window.currentLang === 'dub');
+    const validEps = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
+        : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+
+    const totalValidEps = validEps.length;
+    const batchSize = 100;
+    const startIdx = batchIdx * batchSize;
+    const endIdx = Math.min((batchIdx + 1) * batchSize, totalValidEps);
+
+    let html = '';
+    for (let idx = startIdx; idx < endIdx; idx++) {
+        const i = validEps[idx];
+        const isWatched = localStorage.getItem(`watched_${window.showData.id}_${i}`) === 'true';
+        const isActive = (i === window.currentEp);
+        const isFiller = fillerSet.has(i);
+
+        const btnClasses = getWatchEpisodeBtnClasses(isActive, isFiller, isWatched);
+        const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
+
+        html += `
                 <button class="${btnClasses}" title="${titleAttr}" onclick="changeEpisode(${i})">
                     ${i}
                 </button>
             `;
+    }
+    container.innerHTML = html;
+};
+
+window.renderRelatedAdaptations = async function () {
+    const showData = window.showData;
+    const relatedContainer = document.getElementById('watch-related-container');
+    if (!relatedContainer) return;
+
+    const slug = slugify(showData.title.english || showData.title.romaji || showData.title.userPreferred);
+    const franchiseSeasons = await fetchFranchiseTree(slug, showData.id);
+    const fallbackRelations = showData.relations?.edges || [];
+
+    const categories = categorizeFranchiseItems(franchiseSeasons, fallbackRelations);
+    const html = renderFranchiseSectionsHTML(categories);
+
+    if (!html) {
+        relatedContainer.classList.add('hidden');
+        return;
+    }
+
+    relatedContainer.classList.remove('hidden');
+    relatedContainer.innerHTML = html;
+};
+
+window.viewRelatedShow = async function (relatedId) {
+    const spinner = document.getElementById('player-loading-spinner');
+    if (spinner) spinner.classList.remove('hidden');
+    try {
+        const json = await fetchAniListGraphQL({ query: FULL_SHOW_QUERY, variables: { id: relatedId } });
+        if (json && json.data && json.data.Media) {
+            const data = json.data.Media;
+            localStorage.setItem('activeShowData', JSON.stringify(data));
+
+            const slug = slugify(data.title.english || data.title.romaji || data.title.userPreferred);
+            window.history.pushState(null, '', `/anime/${slug}-${data.id}`);
+            handleSpaRouting();
+        } else {
+            throw new Error("Media not found");
         }
-        container.innerHTML = html;
-    };
+    } catch (err) {
+        console.error("Failed to load related show:", err);
+        alert("Could not load details for this related show.");
+        if (spinner) spinner.classList.add('hidden');
+    }
+};
 
-    window.renderRelatedAdaptations = async function() {
-        const showData = window.showData;
-        const relatedContainer = document.getElementById('watch-related-container');
-        if (!relatedContainer) return;
+window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) {
+    const spinner = document.getElementById('player-loading-spinner');
+    if (spinner) spinner.classList.remove('hidden');
 
-        const slug = slugify(showData.title.english || showData.title.romaji || showData.title.userPreferred);
-        const franchiseSeasons = await fetchFranchiseTree(slug, showData.id);
-        const fallbackRelations = showData.relations?.edges || [];
+    window.currentEp = Number(epNum) || 1;
+    localStorage.setItem(`watched_${window.showData.id}_${epNum}`, 'true');
+    if (typeof updateContinueWatchingHistory === 'function') {
+        updateContinueWatchingHistory(0);
+    }
+    if (typeof window.renderEpisodePicker === 'function') {
+        window.renderEpisodePicker();
+    }
 
-        const categories = categorizeFranchiseItems(franchiseSeasons, fallbackRelations);
-        const html = renderFranchiseSectionsHTML(categories);
+    window.introTimes = null;
+    window.outroTimes = null;
+    if (skipIntroBtn) skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+    if (skipOutroBtn) skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
 
-        if (!html) {
-            relatedContainer.classList.add('hidden');
+    try {
+        let primaryWorkerUrl = window.location.origin;
+        if (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+            primaryWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
+        } else if (typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+            primaryWorkerUrl = NODE_REGISTRY[0];
+        }
+
+        const anilistId = window.showData.id;
+        const selectedLang = lang || (window.activeServer ? window.activeServer.dataType : null) || window.currentLang || localStorage.getItem('preferredLang') || 'sub';
+        const selectedDataLink = (dataLink !== null && dataLink !== undefined) ? dataLink : (window.activeServer ? window.activeServer.dataLink : '');
+
+        const url = `${primaryWorkerUrl}/rating?id=${encodeURIComponent(anilistId)}&e=${encodeURIComponent(epNum)}&server=${encodeURIComponent(selectedDataLink || '')}&lang=${encodeURIComponent(selectedLang)}`;
+
+        console.log(`[Stream Resolver] Querying rating endpoint:`, url);
+
+        let data = null;
+        try {
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            data = await res.json().catch(() => null);
+        } catch (fetchErr) {
+            console.warn("[Stream Resolver] Fetch error, trying cluster:", fetchErr.message);
+            if (typeof fetchClusterNode === 'function') {
+                try {
+                    data = await fetchClusterNode({
+                        route: 'rating',
+                        id: anilistId,
+                        e: epNum,
+                        lang: selectedLang,
+                        server: selectedDataLink
+                    });
+                } catch (cErr) {
+                    console.error("[Stream Resolver] Cluster fallback failed:", cErr);
+                }
+            }
+        }
+
+        if (!data || !data.success || !data.manifest || typeof data.manifest !== 'string' || !data.manifest.trim()) {
+            console.warn("[Stream Ingestion] Stream unavailable for episode", epNum, data);
+            if (spinner) spinner.classList.add('hidden');
+            if (typeof window.renderEmptyStreamFallback === 'function') {
+                window.renderEmptyStreamFallback(epNum, "No sub or dub streams found for this episode.");
+            }
             return;
         }
 
-        relatedContainer.classList.remove('hidden');
-        relatedContainer.innerHTML = html;
-    };
-
-    window.viewRelatedShow = async function(relatedId) {
-        const spinner = document.getElementById('player-loading-spinner');
-        if (spinner) spinner.classList.remove('hidden');
-        try {
-            const json = await fetchAniListGraphQL({ query: FULL_SHOW_QUERY, variables: { id: relatedId } });
-            if (json && json.data && json.data.Media) {
-                const data = json.data.Media;
-                localStorage.setItem('activeShowData', JSON.stringify(data));
-                
-                const slug = slugify(data.title.english || data.title.romaji || data.title.userPreferred);
-                window.history.pushState(null, '', `/anime/${slug}-${data.id}`);
-                handleSpaRouting();
-            } else {
-                throw new Error("Media not found");
-            }
-        } catch (err) {
-            console.error("Failed to load related show:", err);
-            alert("Could not load details for this related show.");
-            if (spinner) spinner.classList.add('hidden');
-        }
-    };
-
-    window.loadEpisodeStream = async function(epNum) {
-        const spinner = document.getElementById('player-loading-spinner');
-        if (spinner) spinner.classList.remove('hidden');
-
-        window.currentEp = Number(epNum) || 1;
-        localStorage.setItem(`watched_${window.showData.id}_${epNum}`, 'true');
-        if (typeof updateContinueWatchingHistory === 'function') {
-            updateContinueWatchingHistory(0);
-        }
-        window.renderEpisodePicker();
-
-        window.introTimes = null;
-        window.outroTimes = null;
-        if (skipIntroBtn) skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
-        if (skipOutroBtn) skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
-
-        try {
-            // Determine primary worker node for rating stream resolution
-            let primaryWorkerUrl = window.location.origin;
-            if (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
-                primaryWorkerUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
-            } else if (typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
-                primaryWorkerUrl = NODE_REGISTRY[0];
-            }
-
-            async function fetchRatingStream(anilistId, ep, lang) {
-                const url = `${primaryWorkerUrl}/rating?id=${encodeURIComponent(anilistId)}&e=${encodeURIComponent(ep)}&lang=${encodeURIComponent(lang)}`;
-                try {
-                    const res = await fetch(url, {
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    const data = await res.json().catch(() => null);
-                    if (!res.ok) {
-                        return data && typeof data === 'object' ? data : { success: false, error: `HTTP ${res.status}` };
-                    }
-                    return data;
-                } catch (err) {
-                    if (typeof fetchClusterNode === 'function') {
-                        try {
-                            return await fetchClusterNode({ route: 'rating', id: anilistId, e: ep, lang });
-                        } catch (clusterErr) {
-                            return { success: false, error: clusterErr.message };
-                        }
-                    }
-                    return { success: false, error: err.message };
-                }
-            }
-
-            // Dual parallel probe for Sub and Dub stream availability
-            const [subResult, dubResult] = await Promise.allSettled([
-                fetchRatingStream(window.showData.id, epNum, 'sub'),
-                fetchRatingStream(window.showData.id, epNum, 'dub')
-            ]);
-
-            const isManifestValid = (item) => Boolean(
-                item &&
-                item.success &&
-                typeof item.manifest === 'string' &&
-                item.manifest.trim().length > 0 &&
-                item.manifest.includes('#EXTM3U')
-            );
-
-            const subData = (subResult.status === 'fulfilled' && isManifestValid(subResult.value)) ? subResult.value : null;
-            const dubData = (dubResult.status === 'fulfilled' && isManifestValid(dubResult.value)) ? dubResult.value : null;
-
-            let activeData = null;
-
-            if (window.currentLang === 'dub') {
-                if (dubData) {
-                    activeData = dubData;
-                    window.dubUnavailable = false;
-                } else if (subData) {
-                    // Fallback to Sub if Dub is unavailable for this episode
-                    activeData = subData;
-                    window.currentLang = 'sub';
-                    window.dubUnavailable = true;
-                    if (window.showData?.id) {
-                        localStorage.setItem(`lang_${window.showData.id}`, 'sub');
-                    }
-                    toggleUserPreference('preferredLang', 'sub');
-                }
-            } else {
-                // User requested Sub
-                if (subData) {
-                    activeData = subData;
-                    window.dubUnavailable = !dubData;
-                } else if (dubData) {
-                    // Fallback to Dub if Sub is unavailable
-                    activeData = dubData;
-                    window.currentLang = 'dub';
-                    window.dubUnavailable = false;
-                    if (window.showData?.id) {
-                        localStorage.setItem(`lang_${window.showData.id}`, 'dub');
-                    }
-                    toggleUserPreference('preferredLang', 'dub');
-                }
-            }
-
-            if (window.updateSubDubButtonsUI) {
-                window.updateSubDubButtonsUI();
-            }
-
-            // If stream is unavailable, trigger renderEmptyStreamFallback cleanly without mounting invalid URLs
-            if (!activeData || !activeData.manifest || typeof activeData.manifest !== 'string' || !activeData.manifest.trim()) {
-                console.warn("[Stream Probe Diagnostics] Stream unavailable for episode", epNum, {
-                    sub: subResult.status === 'fulfilled' ? subResult.value : subResult.reason?.message,
-                    dub: dubResult.status === 'fulfilled' ? dubResult.value : dubResult.reason?.message
-                });
-                if (spinner) spinner.classList.add('hidden');
-                if (typeof window.renderEmptyStreamFallback === 'function') {
-                    window.renderEmptyStreamFallback(epNum);
-                }
-                return;
-            }
-
-            let manifestText = activeData.manifest.replace(/^\uFEFF/, '').trimStart();
-            if (!manifestText.startsWith('#EXTM3U')) {
-                console.warn("[Stream Resolver] Manifest does not contain EXTM3U header");
-                if (spinner) spinner.classList.add('hidden');
-                if (typeof window.renderEmptyStreamFallback === 'function') {
-                    window.renderEmptyStreamFallback(epNum);
-                }
-                return;
-            }
-
-            const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
-
-            const data = activeData;
-            window.introTimes = data.intro;
-            window.outroTimes = data.outro;
-
-            console.log('[HLS Engine] Active Worker Proxy URL:', primaryWorkerUrl);
-
-            // Synchronized Subtitle track injection BEFORE HLS segment attachment
-            await loadSubtitles(data.subtitles || [], video);
-
-            const blob = new Blob([manifestText], { type: 'application/x-mpegURL' });
-            const manifestBlobUrl = URL.createObjectURL(blob);
-            console.log('[HLS Engine] Manifest Blob URL:', manifestBlobUrl);
-
-            if (window.hlsInstance) {
-                window.hlsInstance.destroy();
-            }
-
-            if (Hls.isSupported()) {
-                window.hlsInstance = new Hls({
-                    enableWorker: true,
-                    lowLatencyMode: true,
-                    maxBufferLength: 30,
-                    maxMaxBufferLength: 60,
-                    maxBufferSize: 30 * 1024 * 1024,
-                    backBufferLength: 10,
-                    xhrSetup: function(xhr, url) {
-                        xhr.withCredentials = false;
-                    }
-                });
-                window.hlsInstance.loadSource(manifestBlobUrl);
-                if (video) window.hlsInstance.attachMedia(video);
-
-                window.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-                    console.log('[HLS Engine] Manifest parsed successfully. Segment streaming ready.');
-                    if (spinner) spinner.classList.add('hidden');
-                    if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
-                    if (typeof window.initPlayerControls === 'function') {
-                        window.initPlayerControls();
-                    }
-                });
-
-                window.hlsInstance.on(Hls.Events.ERROR, (event, errorData) => {
-                    console.error('[HLS Error]', errorData);
-                    if (errorData.fatal) {
-                        switch (errorData.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                console.warn("Network HLS error, attempting to recover...");
-                                window.hlsInstance.startLoad();
-                                break;
-                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                console.warn("Media HLS error, attempting to recover...");
-                                window.hlsInstance.recoverMediaError();
-                                break;
-                            default:
-                                console.error("Fatal HLS playback crash.");
-                                break;
-                        }
-                    }
-                });
-            } else if (video && video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = manifestBlobUrl;
-                video.addEventListener('loadedmetadata', () => {
-                    if (spinner) spinner.classList.add('hidden');
-                    if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
-                    if (typeof window.initPlayerControls === 'function') {
-                        window.initPlayerControls();
-                    }
-                });
-            } else {
-                alert("This browser does not support HLS streaming.");
-            }
-
-        } catch (err) {
-            console.error('[Stream Launch] Failed to load stream:', err);
+        let manifestText = data.manifest.replace(/^\uFEFF/, '').trimStart();
+        if (!manifestText.startsWith('#EXTM3U')) {
+            console.warn("[Stream Resolver] Manifest does not contain EXTM3U header");
             if (spinner) spinner.classList.add('hidden');
             if (typeof window.renderEmptyStreamFallback === 'function') {
-                window.renderEmptyStreamFallback(epNum);
+                window.renderEmptyStreamFallback(epNum, "No sub or dub streams found for this episode.");
             }
-        }
-    };
-
-    async function loadSubtitles(trackList, targetVideo) {
-        const videoEl = targetVideo || document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
-        if (!videoEl) return;
-
-        const existingTracks = videoEl.querySelectorAll('track');
-        existingTracks.forEach(t => t.remove());
-
-        if (!trackList || !Array.isArray(trackList) || trackList.length === 0) return;
-
-        let activeUrl = window.location.origin;
-        if (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
-            activeUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
-        } else if (typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
-            activeUrl = NODE_REGISTRY[0];
+            return;
         }
 
-        for (let track of trackList) {
-            const subUrl = track.file || track.url || track.rawFile || track.src;
-            if (!subUrl && !track.content) continue;
+        const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
 
-            const subLabel = track.label || track.language || track.lang || 'English';
-            const subKind = track.kind || 'captions';
-            const isDefault = Boolean(track.default || subLabel.toLowerCase().includes('eng') || subLabel.toLowerCase().includes('en'));
+        window.introTimes = data.intro;
+        window.outroTimes = data.outro;
+        window.currentSubtitles = data.subtitles || [];
+        window.currentStreamData = data;
 
-            try {
-                let vttText;
-                if (track.content) {
-                    vttText = track.content;
-                } else {
-                    const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
-                    const response = await fetch(proxyUrl);
-                    if (!response.ok) throw new Error("Sandbox load error");
-                    vttText = await response.text();
+        // Synchronized Subtitle track injection BEFORE HLS segment attachment
+        await loadSubtitles(data.subtitles || [], video);
+        if (typeof window.populateCaptionsMenu === 'function') {
+            window.populateCaptionsMenu(data.subtitles || []);
+        }
+
+        const blob = new Blob([manifestText], { type: 'application/x-mpegURL' });
+        const manifestBlobUrl = URL.createObjectURL(blob);
+        console.log('[HLS Engine] Manifest Blob URL:', manifestBlobUrl);
+
+        if (window.hlsInstance) {
+            window.hlsInstance.destroy();
+        }
+
+        if (Hls.isSupported()) {
+            window.hlsInstance = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+                maxBufferLength: 30,
+                maxMaxBufferLength: 60,
+                maxBufferSize: 30 * 1024 * 1024,
+                backBufferLength: 10,
+                xhrSetup: function (xhr, url) {
+                    xhr.withCredentials = false;
                 }
+            });
+            window.hlsInstance.loadSource(manifestBlobUrl);
+            if (video) window.hlsInstance.attachMedia(video);
 
-                const base64Vtt = btoa(unescape(encodeURIComponent(vttText)));
-                const dataUrl = 'data:text/vtt;base64,' + base64Vtt;
+            window.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                console.log('[HLS Engine] Manifest parsed successfully. Segment streaming ready.');
+                if (spinner) spinner.classList.add('hidden');
+                if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
+                if (typeof window.initPlayerControls === 'function') {
+                    window.initPlayerControls();
+                }
+            });
 
+            window.hlsInstance.on(Hls.Events.ERROR, (event, errData) => {
+                if (errData.fatal) {
+                    console.error('[HLS Engine] Fatal playback error:', errData);
+                    if (spinner) spinner.classList.add('hidden');
+                    if (typeof window.renderEmptyStreamFallback === 'function') {
+                        window.renderEmptyStreamFallback(epNum, "No sub or dub streams found for this episode.");
+                    }
+                }
+            });
+        } else if (video && video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = manifestBlobUrl;
+            video.addEventListener('loadedmetadata', () => {
+                if (spinner) spinner.classList.add('hidden');
+                if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
+                if (typeof window.initPlayerControls === 'function') {
+                    window.initPlayerControls();
+                }
+            });
+        }
+    } catch (err) {
+        console.error("[Stream Resolver] Failed to resolve media stream:", err);
+        if (spinner) spinner.classList.add('hidden');
+        if (typeof window.renderEmptyStreamFallback === 'function') {
+            window.renderEmptyStreamFallback(epNum, "No sub or dub streams found for this episode.");
+        }
+    }
+};
+
+async function loadSubtitles(trackList, targetVideo) {
+    const videoEl = targetVideo || document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
+    if (!videoEl) return;
+
+    const existingTracks = videoEl.querySelectorAll('track');
+    existingTracks.forEach(t => t.remove());
+
+    window.currentSubtitles = trackList || [];
+
+    if (!trackList || !Array.isArray(trackList) || trackList.length === 0) return;
+
+    let activeUrl = window.location.origin;
+    if (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+        activeUrl = decodeRegistryUrl(NODE_REGISTRY[0]);
+    } else if (typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
+        activeUrl = NODE_REGISTRY[0];
+    }
+
+    const preferredCaption = localStorage.getItem('preferredCaption') || '';
+
+    for (let track of trackList) {
+        const subUrl = track.file || track.url || track.rawFile || track.src;
+        if (!subUrl && !track.content) continue;
+
+        const subLabel = track.label || track.language || track.lang || 'English';
+        const subKind = track.kind || 'captions';
+        const isDefault = Boolean(preferredCaption ? (preferredCaption !== 'Off' && subLabel.toLowerCase() === preferredCaption.toLowerCase()) : (track.default || subLabel.toLowerCase() === 'english'));
+
+        try {
+            let vttText;
+            if (track.content) {
+                vttText = track.content;
+            } else {
+                const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error("Sandbox load error");
+                vttText = await response.text();
+            }
+
+            const base64Vtt = btoa(unescape(encodeURIComponent(vttText)));
+            const dataUrl = 'data:text/vtt;base64,' + base64Vtt;
+
+            const trackEl = document.createElement('track');
+            trackEl.kind = subKind;
+            trackEl.label = subLabel;
+            trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
+            trackEl.src = dataUrl;
+
+            if (isDefault) {
+                trackEl.default = true;
+            }
+
+            videoEl.appendChild(trackEl);
+        } catch (err) {
+            console.warn(`[Subtitles Fallback] CORS track fetch failure for "${subLabel}". Loading via proxy directly.`);
+            if (subUrl) {
+                const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
                 const trackEl = document.createElement('track');
                 trackEl.kind = subKind;
                 trackEl.label = subLabel;
                 trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
-                trackEl.src = dataUrl;
-
-                if (isDefault) {
-                    trackEl.default = true;
-                }
-
+                trackEl.src = proxyUrl;
+                if (isDefault) trackEl.default = true;
                 videoEl.appendChild(trackEl);
-            } catch (err) {
-                console.warn(`[Subtitles Fallback] CORS track fetch failure for "${subLabel}". Loading via proxy directly.`);
-                if (subUrl) {
-                    const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
-                    const trackEl = document.createElement('track');
-                    trackEl.kind = subKind;
-                    trackEl.label = subLabel;
-                    trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
-                    trackEl.src = proxyUrl;
-                    if (isDefault) trackEl.default = true;
-                    videoEl.appendChild(trackEl);
-                }
             }
         }
-
-        enableDefaultTextTrack(videoEl);
     }
 
-    function enableDefaultTextTrack(videoEl) {
-        setTimeout(() => {
-            if (!videoEl) return;
-            const textTracks = videoEl.textTracks;
-            if (!textTracks || textTracks.length === 0) return;
+    enableDefaultTextTrack(videoEl);
+}
+window.loadSubtitles = loadSubtitles;
 
-            let defaultIndex = -1;
+function enableDefaultTextTrack(videoEl) {
+    setTimeout(() => {
+        if (!videoEl) return;
+        const textTracks = videoEl.textTracks;
+        if (!textTracks || textTracks.length === 0) return;
+
+        const preferredCaption = localStorage.getItem('preferredCaption');
+        if (preferredCaption === 'Off') {
+            for (let i = 0; i < textTracks.length; i++) {
+                textTracks[i].mode = 'disabled';
+            }
+            const activeLabel = document.getElementById('captions-active-track-label');
+            if (activeLabel) activeLabel.innerText = "Off";
+            if (typeof window.populateCaptionsMenu === 'function') {
+                window.populateCaptionsMenu();
+            }
+            return;
+        }
+
+        let defaultIndex = -1;
+        if (preferredCaption) {
             for (let i = 0; i < textTracks.length; i++) {
                 const track = textTracks[i];
-                if ((track.language && track.language.includes('en')) || (track.label && (track.label.toLowerCase().includes('eng') || track.label.toLowerCase().includes('en')))) {
+                if ((track.label && track.label.toLowerCase() === preferredCaption.toLowerCase()) ||
+                    (track.language && track.language.toLowerCase() === preferredCaption.toLowerCase())) {
                     defaultIndex = i;
                     break;
                 }
             }
+        }
 
-            if (defaultIndex !== -1) {
-                for (let i = 0; i < textTracks.length; i++) {
-                    if (i === defaultIndex) {
-                        textTracks[i].mode = 'showing';
-                    } else {
-                        textTracks[i].mode = 'hidden';
-                    }
+        if (defaultIndex === -1 && preferredCaption !== 'Off') {
+            for (let i = 0; i < textTracks.length; i++) {
+                const track = textTracks[i];
+                const lbl = (track.label || track.language || '').toLowerCase();
+                if (lbl === 'english' || lbl.includes('full subtitles') || lbl.includes('eng')) {
+                    defaultIndex = i;
+                    break;
                 }
             }
-        }, 100);
+            if (defaultIndex === -1 && textTracks.length > 0) {
+                defaultIndex = 0;
+            }
+        }
+
+        for (let i = 0; i < textTracks.length; i++) {
+            if (i === defaultIndex) {
+                textTracks[i].mode = 'showing';
+            } else {
+                textTracks[i].mode = 'disabled';
+            }
+        }
+
+        const activeLabel = document.getElementById('captions-active-track-label');
+        if (activeLabel) {
+            activeLabel.innerText = defaultIndex !== -1 ? (textTracks[defaultIndex].label || 'On') : 'Off';
+        }
+
+        if (typeof window.populateCaptionsMenu === 'function') {
+            window.populateCaptionsMenu();
+        }
+    }, 100);
+}
+window.enableDefaultTextTrack = enableDefaultTextTrack;
+
+window.showCinemaHandshake = function () {
+    const overlay = document.getElementById('autoplay-handshake-overlay');
+    if (overlay) {
+        overlay.classList.remove('opacity-0', 'pointer-events-none');
+        overlay.classList.add('opacity-100');
     }
+};
 
-    window.showCinemaHandshake = function() {
-        const overlay = document.getElementById('autoplay-handshake-overlay');
-        if (overlay) {
-            overlay.classList.remove('opacity-0', 'pointer-events-none');
-            overlay.classList.add('opacity-100');
-        }
-    };
-
-    window.initializeCinemaMatrix = function() {
-        const overlay = document.getElementById('autoplay-handshake-overlay');
-        if (overlay) {
-            overlay.classList.remove('opacity-100');
-            overlay.classList.add('opacity-0', 'pointer-events-none');
-        }
-
-        const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
-        if (video) {
-            video.play()
-                .then(() => {
-                    console.log("[Autoplay Matrix] Playback launched unmuted successfully.");
-                })
-                .catch(err => {
-                    console.warn("[Autoplay Matrix] Playback blocked, trying muted...", err);
-                    video.muted = true;
-                    video.play().catch(() => {});
-                });
-        }
-    };
+window.initializeCinemaMatrix = function () {
+    const overlay = document.getElementById('autoplay-handshake-overlay');
+    if (overlay) {
+        overlay.classList.remove('opacity-100');
+        overlay.classList.add('opacity-0', 'pointer-events-none');
+    }
 
     const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
-    const skipBtnsContainer = document.getElementById('skip-buttons-container');
-    const skipIntroBtn = document.getElementById('skip-intro-btn');
-    const skipOutroBtn = document.getElementById('skip-outro-btn');
-
     if (video) {
-        video.addEventListener('timeupdate', () => {
-            const currentTime = video.currentTime;
-
-            if (video.duration && Math.abs(currentTime - window.lastSavedTime) > 8) {
-                const percentage = (currentTime / video.duration) * 100;
-                updateContinueWatchingHistory(percentage);
-                window.lastSavedTime = currentTime;
-            }
-
-            // MANUAL SKIP BUTTONS VISIBILITY SYNC
-            if (!video.paused && video.duration > 0 && currentTime > 0) {
-                if (skipBtnsContainer) {
-                    skipBtnsContainer.style.setProperty('display', 'flex', 'important');
-                }
-
-                // Intro Skip Button
-                if (window.introTimes && window.introTimes.start > 0 && window.introTimes.end > 0 &&
-                    currentTime >= window.introTimes.start && currentTime < (window.introTimes.end - 0.5)) {
-                    if (skipIntroBtn) {
-                        skipIntroBtn.style.setProperty('display', 'block', 'important');
-                        skipIntroBtn.classList.remove('opacity-0', 'pointer-events-none');
-                        skipIntroBtn.classList.add('opacity-100');
-                    }
-                } else if (skipIntroBtn) {
-                    skipIntroBtn.classList.remove('opacity-100');
-                    skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
-                    skipIntroBtn.style.setProperty('display', 'none', 'important');
-                }
-
-                // Outro Skip Button
-                if (window.outroTimes && window.outroTimes.start > 0 && window.outroTimes.end > 0 &&
-                    currentTime >= window.outroTimes.start && currentTime < (window.outroTimes.end - 0.5)) {
-                    if (skipOutroBtn) {
-                        skipOutroBtn.style.setProperty('display', 'block', 'important');
-                        skipOutroBtn.classList.remove('opacity-0', 'pointer-events-none');
-                        skipOutroBtn.classList.add('opacity-100');
-                    }
-                } else if (skipOutroBtn) {
-                    skipOutroBtn.classList.remove('opacity-100');
-                    skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
-                    skipOutroBtn.style.setProperty('display', 'none', 'important');
-                }
-            } else {
-                if (skipBtnsContainer) {
-                    skipBtnsContainer.style.setProperty('display', 'none', 'important');
-                }
-                if (skipIntroBtn) {
-                    skipIntroBtn.classList.remove('opacity-100');
-                    skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
-                    skipIntroBtn.style.setProperty('display', 'none', 'important');
-                }
-                if (skipOutroBtn) {
-                    skipOutroBtn.classList.remove('opacity-100');
-                    skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
-                    skipOutroBtn.style.setProperty('display', 'none', 'important');
-                }
-            }
-        });
+        video.play()
+            .then(() => {
+                console.log("[Autoplay Matrix] Playback launched unmuted successfully.");
+            })
+            .catch(err => {
+                console.warn("[Autoplay Matrix] Playback blocked, trying muted...", err);
+                video.muted = true;
+                video.play().catch(() => { });
+            });
     }
+};
 
-    if (skipIntroBtn) {
-        skipIntroBtn.addEventListener('click', () => {
-            const v = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
-            if (window.introTimes && v) {
-                v.currentTime = window.introTimes.end;
+const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+const skipBtnsContainer = document.getElementById('skip-buttons-container');
+const skipIntroBtn = document.getElementById('skip-intro-btn');
+const skipOutroBtn = document.getElementById('skip-outro-btn');
+
+if (video) {
+    video.addEventListener('timeupdate', () => {
+        const currentTime = video.currentTime;
+
+        if (video.duration && Math.abs(currentTime - window.lastSavedTime) > 8) {
+            const percentage = (currentTime / video.duration) * 100;
+            updateContinueWatchingHistory(percentage);
+            window.lastSavedTime = currentTime;
+        }
+
+        // MANUAL SKIP BUTTONS VISIBILITY SYNC
+        if (!video.paused && video.duration > 0 && currentTime > 0) {
+            if (skipBtnsContainer) {
+                skipBtnsContainer.style.setProperty('display', 'flex', 'important');
+            }
+
+            // Intro Skip Button
+            if (window.introTimes && window.introTimes.start > 0 && window.introTimes.end > 0 &&
+                currentTime >= window.introTimes.start && currentTime < (window.introTimes.end - 0.5)) {
+                if (skipIntroBtn) {
+                    skipIntroBtn.style.setProperty('display', 'block', 'important');
+                    skipIntroBtn.classList.remove('opacity-0', 'pointer-events-none');
+                    skipIntroBtn.classList.add('opacity-100');
+                }
+            } else if (skipIntroBtn) {
                 skipIntroBtn.classList.remove('opacity-100');
                 skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
                 skipIntroBtn.style.setProperty('display', 'none', 'important');
             }
-        });
-    }
 
-    if (skipOutroBtn) {
-        skipOutroBtn.addEventListener('click', () => {
-            const v = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
-            if (window.outroTimes && v) {
-                v.currentTime = window.outroTimes.end;
+            // Outro Skip Button
+            if (window.outroTimes && window.outroTimes.start > 0 && window.outroTimes.end > 0 &&
+                currentTime >= window.outroTimes.start && currentTime < (window.outroTimes.end - 0.5)) {
+                if (skipOutroBtn) {
+                    skipOutroBtn.style.setProperty('display', 'block', 'important');
+                    skipOutroBtn.classList.remove('opacity-0', 'pointer-events-none');
+                    skipOutroBtn.classList.add('opacity-100');
+                }
+            } else if (skipOutroBtn) {
                 skipOutroBtn.classList.remove('opacity-100');
                 skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
                 skipOutroBtn.style.setProperty('display', 'none', 'important');
             }
-        });
-    }
+        } else {
+            if (skipBtnsContainer) {
+                skipBtnsContainer.style.setProperty('display', 'none', 'important');
+            }
+            if (skipIntroBtn) {
+                skipIntroBtn.classList.remove('opacity-100');
+                skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+                skipIntroBtn.style.setProperty('display', 'none', 'important');
+            }
+            if (skipOutroBtn) {
+                skipOutroBtn.classList.remove('opacity-100');
+                skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
+                skipOutroBtn.style.setProperty('display', 'none', 'important');
+            }
+        }
+    });
+}
+
+if (skipIntroBtn) {
+    skipIntroBtn.addEventListener('click', () => {
+        const v = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+        if (window.introTimes && v) {
+            v.currentTime = window.introTimes.end;
+            skipIntroBtn.classList.remove('opacity-100');
+            skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+            skipIntroBtn.style.setProperty('display', 'none', 'important');
+        }
+    });
+}
+
+if (skipOutroBtn) {
+    skipOutroBtn.addEventListener('click', () => {
+        const v = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+        if (window.outroTimes && v) {
+            v.currentTime = window.outroTimes.end;
+            skipOutroBtn.classList.remove('opacity-100');
+            skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
+            skipOutroBtn.style.setProperty('display', 'none', 'important');
+        }
+    });
+}
 
 // -------------------------------------------------------------------------
 // PERSISTENT WATCH VAULT & EPISODE TRACKING ENGINE
@@ -1972,7 +2121,7 @@ function toggleClusterModeDebug() {
 async function renderAnimeDetailsView() {
     const homepageWrapper = document.getElementById('homepage-sections-wrapper');
     if (homepageWrapper) homepageWrapper.classList.add('hidden');
-    
+
     const searchResultsLayout = document.getElementById('search-results-layout');
     if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
 
@@ -2017,7 +2166,7 @@ async function renderAnimeDetailsView() {
         if (cached && parseInt(cached.id, 10) === anilistId && cached.characters) {
             showData = cached;
         }
-    } catch (e) {}
+    } catch (e) { }
 
     if (!showData) {
         try {
@@ -2052,7 +2201,7 @@ async function renderAnimeDetailsView() {
     const studios = showData.studios?.nodes?.map(n => n.name).join(', ') || 'N/A';
     const score = showData.averageScore || showData.meanScore ? `★ ${showData.averageScore || showData.meanScore}%` : '★ N/A';
     const genres = showData.genres?.map(g => `<span class="px-2.5 py-1 bg-white/5 border border-white/10 text-xs text-white rounded-full font-medium">${g}</span>`).join(' ') || '';
-    
+
     // Synopsis with "Read More" Toggle
     const synopsisHtml = `
         <div class="glass-panel p-6 rounded-2xl border border-white/5 flex flex-col gap-3 relative">
@@ -2086,16 +2235,16 @@ async function renderAnimeDetailsView() {
                 <h3 class="text-lg font-bold text-white uppercase tracking-wider mb-4 border-l-4 border-themeCyan pl-3">Cast & Voice Actors</h3>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                     ${charactersList.map(edge => {
-                        const charNode = edge.node;
-                        const charName = charNode.name.userPreferred || charNode.name.full;
-                        const charImage = charNode.image.large || '';
-                        const charRole = edge.role || 'SUPPORTING';
-                        
-                        const vaNode = edge.voiceActors?.[0];
-                        const vaName = vaNode ? vaNode.name.full : '';
-                        const vaImage = vaNode ? vaNode.image.large : '';
-                        
-                        return `
+            const charNode = edge.node;
+            const charName = charNode.name.userPreferred || charNode.name.full;
+            const charImage = charNode.image.large || '';
+            const charRole = edge.role || 'SUPPORTING';
+
+            const vaNode = edge.voiceActors?.[0];
+            const vaName = vaNode ? vaNode.name.full : '';
+            const vaImage = vaNode ? vaNode.image.large : '';
+
+            return `
                             <div class="bg-white/[0.02] border border-white/5 rounded-xl p-3 flex justify-between items-center gap-3 transition-all duration-300 hover:border-themeCyan/30">
                                 <div class="flex items-center gap-3 min-w-0">
                                     <img class="w-10 h-14 rounded-lg object-cover border border-white/10 flex-shrink-0" src="${charImage}" alt="${charName}" loading="lazy" decoding="async">
@@ -2117,7 +2266,7 @@ async function renderAnimeDetailsView() {
                                 `}
                             </div>
                         `;
-                    }).join('')}
+        }).join('')}
                 </div>
             </div>
         `;
@@ -2132,12 +2281,12 @@ async function renderAnimeDetailsView() {
                 <h3 class="text-lg font-bold text-white uppercase tracking-wider border-l-4 border-themeCyan pl-3">User Reviews</h3>
                 <div class="flex flex-col gap-4">
                     ${reviewsList.map(review => {
-                        const username = review.user?.name || 'Anonymous';
-                        const avatarUrl = review.user?.avatar?.large || '';
-                        const reviewSummary = review.summary;
-                        const reviewScore = review.score;
-                        const reviewBody = review.body ? review.body.replace(/__+/g, '').replace(/~~+/g, '').replace(/\*+/g, '').substring(0, 300) + '...' : '';
-                        return `
+            const username = review.user?.name || 'Anonymous';
+            const avatarUrl = review.user?.avatar?.large || '';
+            const reviewSummary = review.summary;
+            const reviewScore = review.score;
+            const reviewBody = review.body ? review.body.replace(/__+/g, '').replace(/~~+/g, '').replace(/\*+/g, '').substring(0, 300) + '...' : '';
+            return `
                             <div class="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex flex-col gap-3">
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center gap-3">
@@ -2157,7 +2306,7 @@ async function renderAnimeDetailsView() {
                                 </div>
                             </div>
                         `;
-                    }).join('')}
+        }).join('')}
                 </div>
             </div>
         `;
@@ -2184,11 +2333,11 @@ async function renderAnimeDetailsView() {
                 <span class="text-[10px] text-steelGray uppercase tracking-wider block mb-2">Score Distribution</span>
                 <div class="flex items-end gap-1.5 h-14 bg-white/[0.02] border border-white/5 rounded-xl p-2.5">
                     ${scoreDist.map(d => {
-                        const heightPct = Math.round((d.amount / maxAmount) * 100);
-                        return `
+            const heightPct = Math.round((d.amount / maxAmount) * 100);
+            return `
                             <div class="flex-grow bg-themeCyan/20 hover:bg-themeCyan transition-all duration-300 rounded-t" style="height: ${heightPct}%" title="Score ${d.score}: ${d.amount.toLocaleString()} users"></div>
                         `;
-                    }).join('')}
+        }).join('')}
                 </div>
                 <div class="flex justify-between text-[9px] text-steelGray mt-1 px-1">
                     <span>10%</span>
@@ -2299,13 +2448,13 @@ async function renderAnimeDetailsView() {
         </div>
     `;
 
-    window.setDetailsAudioPref = function(showId, lang) {
+    window.setDetailsAudioPref = function (showId, lang) {
         localStorage.setItem(`lang_${showId}`, lang);
         toggleUserPreference('preferredLang', lang);
     };
 
     // Initialize the details episode picker
-    window.renderDetailsEpisodePicker = function(totalEps) {
+    window.renderDetailsEpisodePicker = function (totalEps) {
         const selector = document.getElementById('details-batch-selector');
         if (!selector) return;
         const batchSize = 100;
@@ -2348,7 +2497,7 @@ async function renderAnimeDetailsView() {
         const activeLang = localStorage.getItem(`lang_${showData.id}`) || 'sub';
         const isDub = (activeLang === 'dub');
         const validEps = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
-                              : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+            : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
 
         const totalValidEps = validEps.length;
         const batchSize = 100;
@@ -2381,7 +2530,7 @@ async function renderAnimeDetailsView() {
 
     window.renderDetailsEpisodePicker(totalEpisodes);
 
-    window.toggleDetailsSynopsis = function() {
+    window.toggleDetailsSynopsis = function () {
         const wrapper = document.getElementById('details-synopsis-wrapper');
         const btn = document.getElementById('details-read-more-btn');
         if (!wrapper || !btn) return;
@@ -2398,7 +2547,7 @@ async function renderAnimeDetailsView() {
     };
 }
 
-window.navigateWatchEpisode = function(epNum, forcedLang) {
+window.navigateWatchEpisode = function (epNum, forcedLang) {
     const show = window.showData;
     const detailsLangSelector = document.getElementById('details-lang-selector');
     const selectedLang = forcedLang || (detailsLangSelector ? detailsLangSelector.value : null) || window.currentLang || 'sub';
@@ -2844,7 +2993,7 @@ async function pushVaultToCloud() {
             const vaultData = localStorage.getItem('anime_watch_vault');
             let vaultObj = {};
             if (vaultData) {
-                try { vaultObj = JSON.parse(vaultData); } catch (e) {}
+                try { vaultObj = JSON.parse(vaultData); } catch (e) { }
             }
             const vaultArray = Object.values(vaultObj);
             const url = getAuthWorkerApiUrl('/api/user/sync');
@@ -2906,7 +3055,7 @@ async function pullVaultFromCloud() {
         try {
             const raw = localStorage.getItem('anime_watch_vault');
             if (raw) localVault = JSON.parse(raw);
-        } catch (e) {}
+        } catch (e) { }
 
         json.vault.forEach(item => {
             if (!item || !item.id) return;
