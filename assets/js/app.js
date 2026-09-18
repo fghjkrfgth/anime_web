@@ -1232,6 +1232,25 @@ function setupWatchGlobalFunctions() {
         }
         window.renderEpisodePicker();
 
+        // FAST AUDIO-ONLY SWITCHING IF VIDEO IS ALREADY LOADED:
+        if (window.hlsInstance && Array.isArray(window.hlsInstance.audioTracks) && window.hlsInstance.audioTracks.length > 1) {
+            const tracks = window.hlsInstance.audioTracks;
+            let targetIdx = -1;
+            if (lang === 'dub') {
+                targetIdx = tracks.findIndex(t => /eng|dub/i.test(t.lang || '') || /english|dub/i.test(t.name || ''));
+            } else {
+                targetIdx = tracks.findIndex(t => /jpn|jap|sub|native/i.test(t.lang || '') || /native|japanese/i.test(t.name || ''));
+            }
+
+            if (targetIdx !== -1) {
+                if (window.hlsInstance.audioTrack !== targetIdx) {
+                    console.log(`[HLS Audio Switch] Video already loaded. Switching audio track to ${lang} (index ${targetIdx}):`, tracks[targetIdx]);
+                    window.hlsInstance.audioTrack = targetIdx;
+                }
+                return; // Stop here! Video remains playing; HLS.js only fetches the audio stream.
+            }
+        }
+
         if (window.activeServer) {
             window.loadEpisodeStream(window.currentEp, window.activeServer.dataLink, window.activeServer.dataType);
         } else {
@@ -1634,6 +1653,21 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
                 if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
                 if (typeof window.initPlayerControls === 'function') {
                     window.initPlayerControls();
+                }
+
+                // Synchronize active audio track with user's selected language
+                const curLang = window.currentLang || localStorage.getItem('preferredLang') || 'sub';
+                if (window.hlsInstance && Array.isArray(window.hlsInstance.audioTracks) && window.hlsInstance.audioTracks.length > 1) {
+                    const tracks = window.hlsInstance.audioTracks;
+                    let targetIdx = -1;
+                    if (curLang === 'dub') {
+                        targetIdx = tracks.findIndex(t => /eng|dub/i.test(t.lang || '') || /english|dub/i.test(t.name || ''));
+                    } else {
+                        targetIdx = tracks.findIndex(t => /jpn|jap|sub|native/i.test(t.lang || '') || /native|japanese/i.test(t.name || ''));
+                    }
+                    if (targetIdx !== -1 && window.hlsInstance.audioTrack !== targetIdx) {
+                        window.hlsInstance.audioTrack = targetIdx;
+                    }
                 }
             });
 
