@@ -283,6 +283,25 @@ function initPlayerControls() {
     const introMarker = document.getElementById('player-progress-intro-marker');
     const outroMarker = document.getElementById('player-progress-outro-marker');
 
+    // Restore user playback preferences (volume and playback speed)
+    const userPrefs = (typeof window.getUserPreferences === 'function') ? window.getUserPreferences() : {};
+    if (typeof userPrefs.volume === 'number') {
+        video.volume = Math.max(0, Math.min(1, userPrefs.volume));
+        if (volSlider) volSlider.value = video.volume;
+        video.muted = (video.volume === 0);
+    }
+    if (typeof userPrefs.playbackSpeed === 'number' && userPrefs.playbackSpeed > 0) {
+        video.playbackRate = userPrefs.playbackSpeed;
+        if (btnSpeed) btnSpeed.innerText = `${userPrefs.playbackSpeed}x`;
+        if (speedPopover) {
+            speedPopover.querySelectorAll('.speed-option').forEach(b => {
+                const spd = parseFloat(b.getAttribute('data-speed'));
+                b.classList.toggle('font-bold', spd === userPrefs.playbackSpeed);
+                b.classList.toggle('text-themeCyan', spd === userPrefs.playbackSpeed);
+            });
+        }
+    }
+
     function togglePlay() {
         if (video.paused) {
             video.play().catch(() => {});
@@ -627,6 +646,9 @@ function initPlayerControls() {
                 btn.classList.add('font-bold', 'text-themeCyan');
                 speedPopover.classList.add('hidden');
                 showOverlayTemporarily();
+                if (typeof window.toggleUserPreference === 'function') {
+                    window.toggleUserPreference('playbackSpeed', spd);
+                }
             };
         });
     }
@@ -670,6 +692,9 @@ function initPlayerControls() {
             video.volume = val;
             video.muted = (val === 0);
             updateVolumeUI();
+            if (typeof window.toggleUserPreference === 'function') {
+                window.toggleUserPreference('volume', val);
+            }
         };
     }
 
@@ -820,6 +845,9 @@ function setupPlayerKeyboardShortcuts() {
             video.playbackRate = prev;
             const btn = document.getElementById('btn-speed-toggle');
             if (btn) btn.innerText = `${prev}x`;
+            if (typeof window.toggleUserPreference === 'function') {
+                window.toggleUserPreference('playbackSpeed', prev);
+            }
         } else if (key === '.' || key === '>') {
             e.preventDefault();
             const current = video.playbackRate;
@@ -827,6 +855,9 @@ function setupPlayerKeyboardShortcuts() {
             video.playbackRate = next;
             const btn = document.getElementById('btn-speed-toggle');
             if (btn) btn.innerText = `${next}x`;
+            if (typeof window.toggleUserPreference === 'function') {
+                window.toggleUserPreference('playbackSpeed', next);
+            }
         } else if (key === 'c') {
             e.preventDefault();
             const textTracks = Array.from(video.textTracks || []);
@@ -847,12 +878,18 @@ function setupPlayerKeyboardShortcuts() {
             video.muted = false;
             const slider = document.getElementById('player-volume-slider');
             if (slider) slider.value = video.volume;
+            if (typeof window.toggleUserPreference === 'function') {
+                window.toggleUserPreference('volume', video.volume);
+            }
         } else if (code === 'ArrowDown') {
             e.preventDefault();
             video.volume = Math.max(0, video.volume - 0.1);
             if (video.volume === 0) video.muted = true;
             const slider = document.getElementById('player-volume-slider');
             if (slider) slider.value = video.volume;
+            if (typeof window.toggleUserPreference === 'function') {
+                window.toggleUserPreference('volume', video.volume);
+            }
         }
     });
 }
