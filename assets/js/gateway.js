@@ -204,6 +204,23 @@ function updateActiveNodeDisplay() {
     }
 }
 
+// 3.5 FLIXCLOUD EPISODE SERVERS FETCHER
+async function fetchEpisodeServers(anilistId, epNum) {
+    try {
+        const activeWorkerUrl = (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0])
+            ? decodeRegistryUrl(NODE_REGISTRY[0])
+            : window.location.origin;
+        const res = await fetch(`${activeWorkerUrl}/api/servers?id=${encodeURIComponent(anilistId)}&e=${encodeURIComponent(epNum)}`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data.servers || [];
+    } catch (err) {
+        console.warn("[Servers Gateway] Failed to fetch episode servers:", err);
+        return [];
+    }
+}
+window.fetchEpisodeServers = fetchEpisodeServers;
+
 // 4. FILLER EPISODE DATA FETCHING & CACHING (STRICT JIKAN PAGINATION)
 const fillerCache = new Map();
 
@@ -225,32 +242,40 @@ async function fetchFillerEpisodes(anilistId, malId = null) {
 
     const fillerSet = new Set();
     const targetMalId = malId || anilistId;
+    const maxPages = 3; // Safe cap to prevent hammering Jikan rate limits
 
     try {
         let page = 1;
         let hasNextPage = true;
-        while (hasNextPage && page <= 50) {
+        while (hasNextPage && page <= maxPages) {
+            if (page > 1) {
+                // Minimum 400ms delay between consecutive Jikan requests
+                await new Promise(res => setTimeout(res, 400));
+            }
+
             const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes?page=${page}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data && Array.isArray(data.data)) {
-                    data.data.forEach((item, idx) => {
-                        if (item.filler === true) {
-                            const epNum = item.mal_id || item.episode_id || (idx + 1 + (page - 1) * 100);
-                            if (epNum) fillerSet.add(parseInt(epNum, 10));
-                        }
-                    });
-                }
-                hasNextPage = data?.pagination?.has_next_page || false;
-                page++;
-            } else {
+            // If Jikan responds with 429 or any non-OK status, break immediately without throwing
+            if (!res.ok) {
                 break;
             }
+
+            const data = await res.json().catch(() => null);
+            if (data && Array.isArray(data.data)) {
+                data.data.forEach((item, idx) => {
+                    if (item.filler === true) {
+                        const epNum = item.mal_id || item.episode_id || (idx + 1 + (page - 1) * 100);
+                        if (epNum) fillerSet.add(parseInt(epNum, 10));
+                    }
+                });
+            }
+            hasNextPage = data?.pagination?.has_next_page || false;
+            page++;
         }
     } catch (err) {
-        console.warn("[Filler API] Jikan paginated fetch error:", err);
+        // Silent catch to avoid console spam
     }
 
+    // Cache empty or partial results in sessionStorage to prevent redundant queries
     try {
         sessionStorage.setItem(sessionKey, JSON.stringify(Array.from(fillerSet)));
     } catch (e) {}
