@@ -876,6 +876,7 @@ async function renderWatchView() {
 
     window.currentEp = epNum;
     window.currentLang = localStorage.getItem(`lang_${anilistId}`) || 'sub';
+    window.streamRetryCount = 0;
 
     let showData = null;
     try {
@@ -1143,10 +1144,49 @@ function setupWatchGlobalFunctions() {
         container.innerHTML = html;
 
         container.querySelectorAll('.server-btn').forEach(btn => {
-            btn.onclick = () => {
+            btn.onclick = async () => {
                 const dataLink = decodeURIComponent(btn.getAttribute('data-link'));
                 const sName = btn.getAttribute('data-name');
                 const sType = btn.getAttribute('data-type');
+
+                console.log(`[Server Switch] Changing server to ${sName} (${sType}). Fetching again from start like a page refresh.`);
+
+                // Reset retry counter on server change
+                window.streamRetryCount = 0;
+
+                // Close any existing error/fallback popup overlay immediately
+                const existingFallback = document.getElementById('empty-stream-fallback-overlay');
+                if (existingFallback) existingFallback.remove();
+
+                // Teardown active player & reset video element completely
+                if (window.hlsInstance) {
+                    window.hlsInstance.destroy();
+                    window.hlsInstance = null;
+                }
+                const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
+                if (video) {
+                    video.pause();
+                    video.removeAttribute('src');
+                    video.load();
+                    const oldTracks = video.querySelectorAll('track');
+                    oldTracks.forEach(t => t.remove());
+                }
+
+                // Reset stream state variables
+                window.introTimes = null;
+                window.outroTimes = null;
+                window.currentSubtitles = [];
+                window.currentStreamData = null;
+
+                // Reset skip intro/outro buttons
+                const skipIntroBtn = document.getElementById('skip-intro-btn');
+                const skipOutroBtn = document.getElementById('skip-outro-btn');
+                if (skipIntroBtn) skipIntroBtn.classList.add('opacity-0', 'pointer-events-none');
+                if (skipOutroBtn) skipOutroBtn.classList.add('opacity-0', 'pointer-events-none');
+
+                // Show loading spinner
+                const spinner = document.getElementById('player-loading-spinner');
+                if (spinner) spinner.classList.remove('hidden');
 
                 const selectedServer = (window.episodeServers || []).find(s => (s.dataLink || s.link) === dataLink && (s.dataType || '').toLowerCase() === sType.toLowerCase()) || {
                     serverName: sName,
@@ -1155,11 +1195,19 @@ function setupWatchGlobalFunctions() {
                 };
 
                 window.activeServer = selectedServer;
+                window.currentLang = (selectedServer.dataType || sType || 'sub').toLowerCase();
                 localStorage.setItem('preferredServer', sName);
-                localStorage.setItem('preferredLang', sType);
+                localStorage.setItem('preferredLang', window.currentLang);
+                if (window.showData?.id) {
+                    localStorage.setItem(`lang_${window.showData.id}`, window.currentLang);
+                }
 
                 window.renderServerButtonsUI();
-                window.loadEpisodeStream(window.currentEp, selectedServer.dataLink, selectedServer.dataType);
+                if (typeof window.updateSubDubButtonsUI === 'function') {
+                    window.updateSubDubButtonsUI();
+                }
+
+                await window.loadEpisodeStream(window.currentEp, selectedServer.dataLink, selectedServer.dataType);
             };
         });
     };
@@ -1396,6 +1444,7 @@ window.changeEpisode = async function (epNum, bypassFillerCheck = false) {
     }
 
     window.currentEp = epNum;
+    window.streamRetryCount = 0;
 
     const slug = slugify(window.showData.title.english || window.showData.title.romaji || window.showData.title.userPreferred);
     const newPath = `/watch/anime/${slug}-${window.showData.id}?ep=${epNum}`;
@@ -1538,6 +1587,9 @@ window.viewRelatedShow = async function (relatedId) {
 };
 
 window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) {
+    const existingFallback = document.getElementById('empty-stream-fallback-overlay');
+    if (existingFallback) existingFallback.remove();
+
     const spinner = document.getElementById('player-loading-spinner');
     if (spinner) spinner.classList.remove('hidden');
 
@@ -1649,6 +1701,7 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
 
             window.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
                 console.log('[HLS Engine] Manifest parsed successfully. Segment streaming ready.');
+                window.streamRetryCount = 0;
                 if (spinner) spinner.classList.add('hidden');
                 if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
                 if (typeof window.initPlayerControls === 'function') {
@@ -1683,6 +1736,7 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
         } else if (video && video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = manifestBlobUrl;
             video.addEventListener('loadedmetadata', () => {
+                window.streamRetryCount = 0;
                 if (spinner) spinner.classList.add('hidden');
                 if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
                 if (typeof window.initPlayerControls === 'function') {
