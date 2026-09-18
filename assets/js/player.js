@@ -28,7 +28,7 @@ function applySubtitleStyles(fontSize, styleType) {
     `;
 }
 
-function renderEmptyStreamFallback(epNum) {
+function renderEmptyStreamFallback(epNum, customMessage = null) {
     const playerContainer = document.getElementById('player-container') || document.querySelector('#watch-page-layout .aspect-video') || document.querySelector('.aspect-video');
     if (!playerContainer) return;
 
@@ -44,8 +44,9 @@ function renderEmptyStreamFallback(epNum) {
     const fallback = document.createElement('div');
     fallback.id = 'empty-stream-fallback-overlay';
     fallback.className = 'absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/80 backdrop-blur-2xl text-center select-none animate-crystal-in';
-    
+
     const epText = epNum ? `Episode ${epNum}` : 'this episode';
+    const messageContent = customMessage || `Neither Sub nor Dub segments could be resolved for <strong class="text-white font-medium">${epText}</strong>.`;
 
     fallback.innerHTML = `
         <div class="glass-crystal p-8 md:p-10 rounded-3xl max-w-md w-full flex flex-col items-center gap-6 shadow-2xl relative overflow-hidden">
@@ -63,7 +64,7 @@ function renderEmptyStreamFallback(epNum) {
                     Stream Segment Unresolved
                 </h3>
                 <p class="text-xs md:text-sm text-slate-300 leading-relaxed font-light max-w-xs">
-                    Neither Sub nor Dub segments could be resolved for <strong class="text-white font-medium">${epText}</strong>.
+                    ${messageContent}
                 </p>
             </div>
 
@@ -79,7 +80,7 @@ function renderEmptyStreamFallback(epNum) {
             </div>
         </div>
     `;
-    
+
     playerContainer.appendChild(fallback);
 }
 
@@ -283,28 +284,9 @@ function initPlayerControls() {
     const introMarker = document.getElementById('player-progress-intro-marker');
     const outroMarker = document.getElementById('player-progress-outro-marker');
 
-    // Restore user playback preferences (volume and playback speed)
-    const userPrefs = (typeof window.getUserPreferences === 'function') ? window.getUserPreferences() : {};
-    if (typeof userPrefs.volume === 'number') {
-        video.volume = Math.max(0, Math.min(1, userPrefs.volume));
-        if (volSlider) volSlider.value = video.volume;
-        video.muted = (video.volume === 0);
-    }
-    if (typeof userPrefs.playbackSpeed === 'number' && userPrefs.playbackSpeed > 0) {
-        video.playbackRate = userPrefs.playbackSpeed;
-        if (btnSpeed) btnSpeed.innerText = `${userPrefs.playbackSpeed}x`;
-        if (speedPopover) {
-            speedPopover.querySelectorAll('.speed-option').forEach(b => {
-                const spd = parseFloat(b.getAttribute('data-speed'));
-                b.classList.toggle('font-bold', spd === userPrefs.playbackSpeed);
-                b.classList.toggle('text-themeCyan', spd === userPrefs.playbackSpeed);
-            });
-        }
-    }
-
     function togglePlay() {
         if (video.paused) {
-            video.play().catch(() => {});
+            video.play().catch(() => { });
         } else {
             video.pause();
         }
@@ -563,38 +545,88 @@ function initPlayerControls() {
     }
 
     // Subtitles & Captions Menu Populate & Listeners
-    function populateCaptionsMenu() {
+    function populateCaptionsMenu(subtitlesData) {
         const tracksList = document.getElementById('captions-tracks-list');
         const activeLabel = document.getElementById('captions-active-track-label');
         if (!tracksList) return;
 
-        const textTracks = Array.from(video.textTracks || []);
-        let html = `<button class="caption-track-option text-left px-2 py-1 rounded hover:bg-white/10 font-bold text-themeCyan" data-index="-1">Off</button>`;
-        
-        let activeFound = false;
-        textTracks.forEach((tr, idx) => {
-            const isShowing = tr.mode === 'showing';
-            if (isShowing) activeFound = true;
-            html += `<button class="caption-track-option text-left px-2 py-1 rounded hover:bg-white/10 ${isShowing ? 'font-bold text-themeCyan' : ''}" data-index="${idx}">${tr.label || tr.language || 'Track ' + (idx + 1)}</button>`;
-        });
+        tracksList.innerHTML = '';
 
-        tracksList.innerHTML = html;
-        if (activeLabel) {
-            const activeTr = textTracks.find(t => t.mode === 'showing');
-            activeLabel.innerText = activeTr ? (activeTr.label || activeTr.language || 'On') : 'Off';
+        const rawSubtitles = (subtitlesData && Array.isArray(subtitlesData))
+            ? subtitlesData
+            : (window.currentStreamData && Array.isArray(window.currentStreamData.subtitles))
+                ? window.currentStreamData.subtitles
+                : (window.currentSubtitles && Array.isArray(window.currentSubtitles))
+                    ? window.currentSubtitles
+                    : [];
+
+        const textTracks = Array.from(video ? (video.textTracks || []) : []);
+        const preferredCaption = localStorage.getItem('preferredCaption') || '';
+
+        // Check if any track is currently showing
+        let activeTrackIndex = -1;
+        for (let i = 0; i < textTracks.length; i++) {
+            if (textTracks[i].mode === 'showing') {
+                activeTrackIndex = i;
+                break;
+            }
         }
 
-        tracksList.querySelectorAll('.caption-track-option').forEach(btn => {
+        const isOffActive = (activeTrackIndex === -1 || preferredCaption === 'Off');
+
+        // 1. "Off" Option
+        const offBtn = document.createElement('button');
+        offBtn.className = `caption-track-option w-full text-left px-3 py-1.5 text-xs rounded-lg transition-all duration-200 hover:bg-white/10 ${isOffActive ? 'font-extrabold text-[var(--anime-accent-color,#f59e0b)] bg-white/5' : 'text-steelGray hover:text-white'}`;
+        offBtn.innerText = "Off";
+        offBtn.onclick = () => {
+            textTracks.forEach(tr => { tr.mode = 'disabled'; });
+            localStorage.setItem('preferredCaption', 'Off');
+            if (activeLabel) activeLabel.innerText = "Off";
+            populateCaptionsMenu(rawSubtitles);
+            if (captionsPopover) captionsPopover.classList.add('hidden');
+        };
+        tracksList.appendChild(offBtn);
+
+        // 2. Subtitle tracks provided in data.subtitles (e.g. "English", "English (Full Subtitles)", "English (Dubtitle)")
+        const trackCount = Math.max(textTracks.length, rawSubtitles.length);
+        for (let idx = 0; idx < trackCount; idx++) {
+            const raw = rawSubtitles[idx] || {};
+            const tr = textTracks[idx];
+
+            const optionName = (tr && tr.label) || raw.label || raw.language || raw.lang || `Track ${idx + 1}`;
+            const isShowing = (!isOffActive && (activeTrackIndex === idx || (tr && tr.mode === 'showing') || (preferredCaption && preferredCaption.toLowerCase() === optionName.toLowerCase())));
+
+            const btn = document.createElement('button');
+            btn.className = `caption-track-option w-full text-left px-3 py-1.5 text-xs rounded-lg transition-all duration-200 hover:bg-white/10 ${isShowing ? 'font-extrabold text-[var(--anime-accent-color,#f59e0b)] bg-white/5' : 'text-steelGray hover:text-white'}`;
+            btn.innerText = optionName;
             btn.onclick = () => {
-                const index = parseInt(btn.getAttribute('data-index'), 10);
-                textTracks.forEach((tr, i) => {
-                    tr.mode = (i === index) ? 'showing' : 'disabled';
+                textTracks.forEach((otherTr, i) => {
+                    otherTr.mode = (i === idx) ? 'showing' : 'disabled';
                 });
-                populateCaptionsMenu();
+                localStorage.setItem('preferredCaption', optionName);
+                if (activeLabel) activeLabel.innerText = optionName;
+                populateCaptionsMenu(rawSubtitles);
                 if (captionsPopover) captionsPopover.classList.add('hidden');
             };
-        });
+            tracksList.appendChild(btn);
+        }
+
+        // Update active label display
+        if (activeLabel) {
+            if (isOffActive) {
+                activeLabel.innerText = "Off";
+            } else if (activeTrackIndex !== -1 && textTracks[activeTrackIndex]) {
+                const tr = textTracks[activeTrackIndex];
+                const raw = rawSubtitles[activeTrackIndex];
+                activeLabel.innerText = tr.label || (raw && (raw.label || raw.language || raw.lang)) || 'On';
+            } else if (preferredCaption && preferredCaption !== 'Off') {
+                activeLabel.innerText = preferredCaption;
+            } else {
+                activeLabel.innerText = textTracks.length > 0 ? 'Off' : 'None';
+            }
+        }
     }
+    window.populateCaptionsMenu = populateCaptionsMenu;
 
     if (btnCaptions) {
         btnCaptions.onclick = (e) => {
@@ -646,9 +678,6 @@ function initPlayerControls() {
                 btn.classList.add('font-bold', 'text-themeCyan');
                 speedPopover.classList.add('hidden');
                 showOverlayTemporarily();
-                if (typeof window.toggleUserPreference === 'function') {
-                    window.toggleUserPreference('playbackSpeed', spd);
-                }
             };
         });
     }
@@ -692,9 +721,6 @@ function initPlayerControls() {
             video.volume = val;
             video.muted = (val === 0);
             updateVolumeUI();
-            if (typeof window.toggleUserPreference === 'function') {
-                window.toggleUserPreference('volume', val);
-            }
         };
     }
 
@@ -716,8 +742,8 @@ function initPlayerControls() {
 
     function isAnyPopoverOpen() {
         return (captionsPopover && !captionsPopover.classList.contains('hidden')) ||
-               (speedPopover && !speedPopover.classList.contains('hidden')) ||
-               (autoPopover && !autoPopover.classList.contains('hidden'));
+            (speedPopover && !speedPopover.classList.contains('hidden')) ||
+            (autoPopover && !autoPopover.classList.contains('hidden'));
     }
 
     function hideOverlay() {
@@ -812,7 +838,7 @@ function setupPlayerKeyboardShortcuts() {
 
         if (code === 'Space' || key === 'k') {
             e.preventDefault();
-            if (video.paused) video.play().catch(() => {}); else video.pause();
+            if (video.paused) video.play().catch(() => { }); else video.pause();
         } else if (code === 'ArrowLeft' || key === 'j') {
             e.preventDefault();
             if (video.duration) video.currentTime = Math.max(0, video.currentTime - 10);
@@ -845,9 +871,6 @@ function setupPlayerKeyboardShortcuts() {
             video.playbackRate = prev;
             const btn = document.getElementById('btn-speed-toggle');
             if (btn) btn.innerText = `${prev}x`;
-            if (typeof window.toggleUserPreference === 'function') {
-                window.toggleUserPreference('playbackSpeed', prev);
-            }
         } else if (key === '.' || key === '>') {
             e.preventDefault();
             const current = video.playbackRate;
@@ -855,9 +878,6 @@ function setupPlayerKeyboardShortcuts() {
             video.playbackRate = next;
             const btn = document.getElementById('btn-speed-toggle');
             if (btn) btn.innerText = `${next}x`;
-            if (typeof window.toggleUserPreference === 'function') {
-                window.toggleUserPreference('playbackSpeed', next);
-            }
         } else if (key === 'c') {
             e.preventDefault();
             const textTracks = Array.from(video.textTracks || []);
@@ -878,18 +898,12 @@ function setupPlayerKeyboardShortcuts() {
             video.muted = false;
             const slider = document.getElementById('player-volume-slider');
             if (slider) slider.value = video.volume;
-            if (typeof window.toggleUserPreference === 'function') {
-                window.toggleUserPreference('volume', video.volume);
-            }
         } else if (code === 'ArrowDown') {
             e.preventDefault();
             video.volume = Math.max(0, video.volume - 0.1);
             if (video.volume === 0) video.muted = true;
             const slider = document.getElementById('player-volume-slider');
             if (slider) slider.value = video.volume;
-            if (typeof window.toggleUserPreference === 'function') {
-                window.toggleUserPreference('volume', video.volume);
-            }
         }
     });
 }
@@ -916,27 +930,27 @@ async function fetchVastXml(url) {
 
 function parseVastData(xmlDoc) {
     if (!xmlDoc) return null;
-    
+
     const mediaFiles = Array.from(xmlDoc.querySelectorAll("MediaFile"));
     let mediaUrl = null;
-    
+
     const mp4File = mediaFiles.find(mf => {
         const type = mf.getAttribute("type") || "";
         return type.includes("mp4") || type.includes("video");
     }) || mediaFiles[0];
-    
+
     if (mp4File) {
         mediaUrl = mp4File.textContent.trim();
     }
-    
+
     if (!mediaUrl) return null;
-    
+
     const clickThroughEl = xmlDoc.querySelector("ClickThrough");
     const clickThroughUrl = clickThroughEl ? clickThroughEl.textContent.trim() : null;
-    
+
     const impressionEls = xmlDoc.querySelectorAll("Impression");
     const impressions = Array.from(impressionEls).map(el => el.textContent.trim()).filter(Boolean);
-    
+
     const trackingEls = xmlDoc.querySelectorAll("Tracking");
     const trackingEvents = {};
     trackingEls.forEach(el => {
@@ -946,7 +960,7 @@ function parseVastData(xmlDoc) {
             trackingEvents[event].push(el.textContent.trim());
         }
     });
-    
+
     return {
         mediaUrl,
         clickThroughUrl,
@@ -971,7 +985,7 @@ function playVastPreRoll(mainVideo, vastUrl, onAdComplete) {
         if (onAdComplete) onAdComplete();
         return;
     }
-    
+
     const container = mainVideo?.parentElement || document.getElementById('player-container');
     if (!container) {
         if (onAdComplete) onAdComplete();
@@ -1025,7 +1039,7 @@ function playVastPreRoll(mainVideo, vastUrl, onAdComplete) {
         const skipBtn = adContainer.querySelector('#vast-skip-btn');
 
         adVideo.src = adData.mediaUrl;
-        
+
         let skipCountdown = 5;
         let firedEvents = new Set();
 
@@ -1033,7 +1047,7 @@ function playVastPreRoll(mainVideo, vastUrl, onAdComplete) {
             if (!adVideo.duration) return;
             const remaining = Math.max(0, Math.ceil(adVideo.duration - adVideo.currentTime));
             if (timerEl) timerEl.innerText = `0:${remaining < 10 ? '0' : ''}${remaining}`;
-            
+
             const pct = adVideo.currentTime / adVideo.duration;
             if (pct >= 0 && !firedEvents.has('start')) {
                 firedEvents.add('start');
