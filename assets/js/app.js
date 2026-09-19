@@ -500,6 +500,36 @@ function setupMobileBottomNav() {
 async function initApp() {
     console.log('[BlackLeg Init] Initializing SPA router...');
 
+    // Theme Switcher Persistence & System
+    function applyTheme(isDark) {
+        const html = document.documentElement;
+        const sun = document.getElementById('theme-icon-sun');
+        const moon = document.getElementById('theme-icon-moon');
+        if (isDark) {
+            html.classList.add('dark-theme');
+            if (sun) sun.classList.remove('hidden');
+            if (moon) moon.classList.add('hidden');
+            localStorage.setItem('appTheme', 'dark');
+        } else {
+            html.classList.remove('dark-theme');
+            if (sun) sun.classList.add('hidden');
+            if (moon) moon.classList.remove('hidden');
+            localStorage.setItem('appTheme', 'light');
+        }
+    }
+    window.applyTheme = applyTheme;
+
+    const savedTheme = localStorage.getItem('appTheme') || 'light';
+    applyTheme(savedTheme === 'dark');
+
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    if (themeBtn) {
+        themeBtn.onclick = () => {
+            const isDark = document.documentElement.classList.contains('dark-theme');
+            applyTheme(!isDark);
+        };
+    }
+
     try {
         if (!localStorage.getItem('userLanguagePref')) {
             localStorage.setItem('userLanguagePref', 'en');
