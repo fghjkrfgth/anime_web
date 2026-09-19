@@ -1418,10 +1418,18 @@ function setupWatchGlobalFunctions() {
         if (modal) modal.classList.add('hidden');
 
         const totalEps = getActualEpisodeCount(window.showData);
-        const fillerSet = await fetchFillerEpisodes(window.showData.id);
+        const currentBatch = Math.floor((currentEp - 1) / 100);
+        let fillerSet = await fetchFillerEpisodes(window.showData.id, null, currentBatch);
 
         let nextCanonEp = currentEp + 1;
-        while (nextCanonEp <= totalEps && fillerSet.has(nextCanonEp)) {
+        while (nextCanonEp <= totalEps) {
+            const nextBatch = Math.floor((nextCanonEp - 1) / 100);
+            if (nextBatch !== currentBatch) {
+                fillerSet = await fetchFillerEpisodes(window.showData.id, null, nextBatch);
+            }
+            if (!fillerSet.has(nextCanonEp)) {
+                break;
+            }
             nextCanonEp++;
         }
 
@@ -1454,7 +1462,8 @@ window.changeEpisode = async function (epNum, bypassFillerCheck = false) {
     if (epNum < 1 || epNum > totalEps) return;
 
     if (!bypassFillerCheck) {
-        const fillerSet = await fetchFillerEpisodes(window.showData.id);
+        const currentBatch = Math.floor((epNum - 1) / 100);
+        const fillerSet = await fetchFillerEpisodes(window.showData.id, null, currentBatch);
         if (fillerSet.has(epNum)) {
             window.showFillerWarningModal(epNum);
             return;
@@ -1536,7 +1545,7 @@ window.renderEpisodesGridForBatch = async function (batchIdx, totalEps) {
     const container = document.getElementById('episodes-grid');
     if (!container) return;
 
-    const fillerSet = await fetchFillerEpisodes(window.showData.id);
+    const fillerSet = await fetchFillerEpisodes(window.showData.id, null, batchIdx);
     const subDubData = await fetchSubDubCounts(window.showData.id);
 
     const isDub = (window.currentLang === 'dub');
@@ -2652,7 +2661,7 @@ async function renderAnimeDetailsView() {
     async function renderDetailsGridForBatch(batchIdx, totalEps) {
         const container = document.getElementById('details-episodes-grid');
         if (!container) return;
-        const fillerSet = await fetchFillerEpisodes(showData.id);
+        const fillerSet = await fetchFillerEpisodes(showData.id, null, batchIdx);
         const subDubData = await fetchSubDubCounts(showData.id);
 
         const detailsLangSelector = document.getElementById('details-lang-selector');
@@ -3276,4 +3285,3 @@ if (document.readyState === 'loading') {
 } else {
     initApp();
 }
-
