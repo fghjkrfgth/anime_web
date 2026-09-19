@@ -221,67 +221,63 @@ async function fetchEpisodeServers(anilistId, epNum) {
 }
 window.fetchEpisodeServers = fetchEpisodeServers;
 
-// 4. FILLER EPISODE DATA FETCHING & CACHING (STRICT JIKAN PAGINATION)
+// 4. FILLER EPISODE DATA FETCHING & CACHING (TARGETED BATCH FETCHING)
 const fillerCache = new Map();
 
-async function fetchFillerEpisodes(anilistId, malId = null) {
+async function fetchFillerEpisodes(anilistId, malId = null, targetBatchIdx = 0) {
     if (!anilistId) return new Set();
 
-    const sessionKey = `fillers_${anilistId}`;
+    const batchIdx = Math.max(0, parseInt(targetBatchIdx || 0, 10) || 0);
+    const sessionKey = `fillers_${anilistId}_batch_${batchIdx}`;
+
+    // 1. Check in-memory cache first
+    if (fillerCache.has(sessionKey)) {
+        return fillerCache.get(sessionKey);
+    }
+
+    // 2. Check sessionStorage cache
     try {
         const stored = sessionStorage.getItem(sessionKey);
         if (stored) {
             const arr = JSON.parse(stored);
             const cachedSet = new Set(arr);
-            fillerCache.set(anilistId, cachedSet);
+            fillerCache.set(sessionKey, cachedSet);
             return cachedSet;
         }
     } catch (e) {}
 
-    if (fillerCache.has(anilistId)) return fillerCache.get(anilistId);
-
     const fillerSet = new Set();
-    const targetMalId = malId || anilistId;
-    const maxPages = 3; // Safe cap to prevent hammering Jikan rate limits
+    const targetMalId = malId || (window.showData && (window.showData.idMal || window.showData.malId)) || anilistId;
+    const page = batchIdx + 1;
 
     try {
-        let page = 1;
-        let hasNextPage = true;
-        while (hasNextPage && page <= maxPages) {
-            if (page > 1) {
-                // Minimum 400ms delay between consecutive Jikan requests
-                await new Promise(res => setTimeout(res, 400));
-            }
-
-            const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes?page=${page}`);
-            // If Jikan responds with 429 or any non-OK status, break immediately without throwing
-            if (!res.ok) {
-                break;
-            }
-
-            const data = await res.json().catch(() => null);
-            if (data && Array.isArray(data.data)) {
-                data.data.forEach((item, idx) => {
-                    if (item.filler === true) {
-                        const epNum = item.mal_id || item.episode_id || (idx + 1 + (page - 1) * 100);
-                        if (epNum) fillerSet.add(parseInt(epNum, 10));
-                    }
-                });
-            }
-            hasNextPage = data?.pagination?.has_next_page || false;
-            page++;
+        const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes?page=${page}`);
+        if (!res.ok) {
+            console.warn(`[Jikan Filler API] Non-200 response (${res.status}) for batch ${batchIdx}`);
+            return fillerSet;
         }
+
+        const data = await res.json().catch(() => null);
+        if (data && Array.isArray(data.data)) {
+            data.data.forEach((item, idx) => {
+                if (item && item.filler === true) {
+                    const epNum = item.mal_id || item.episode_id || (idx + 1 + batchIdx * 100);
+                    if (epNum) fillerSet.add(parseInt(epNum, 10));
+                }
+            });
+        }
+
+        // Cache results in sessionStorage and memory
+        try {
+            sessionStorage.setItem(sessionKey, JSON.stringify(Array.from(fillerSet)));
+        } catch (e) {}
+
+        fillerCache.set(sessionKey, fillerSet);
+        return fillerSet;
     } catch (err) {
-        // Silent catch to avoid console spam
+        console.warn(`[Jikan Filler API] Failed to fetch batch ${batchIdx}:`, err);
+        return fillerSet;
     }
-
-    // Cache empty or partial results in sessionStorage to prevent redundant queries
-    try {
-        sessionStorage.setItem(sessionKey, JSON.stringify(Array.from(fillerSet)));
-    } catch (e) {}
-
-    fillerCache.set(anilistId, fillerSet);
-    return fillerSet;
 }
 
 window.fetchFillerEpisodes = fetchFillerEpisodes;
