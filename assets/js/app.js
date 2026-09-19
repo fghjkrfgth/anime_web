@@ -1129,8 +1129,8 @@ function setupWatchGlobalFunctions() {
             const sName = server.serverName || server.name || 'HD-1';
             const sLink = server.dataLink || server.link || '';
             const isActive = window.activeServer && (
-                (window.activeServer.dataLink && window.activeServer.dataLink === sLink) ||
-                ((window.activeServer.serverName || window.activeServer.name) === sName)
+                ((window.activeServer.serverName || window.activeServer.name) === sName) &&
+                ((window.activeServer.dataType || window.currentLang || '').toLowerCase() === (server.dataType || currentLang).toLowerCase())
             );
 
             const activeClass = "px-3 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)]";
@@ -1167,10 +1167,13 @@ function setupWatchGlobalFunctions() {
                 if (video) {
                     video.pause();
                     video.removeAttribute('src');
-                    video.load();
                     const oldTracks = video.querySelectorAll('track');
                     oldTracks.forEach(t => t.remove());
                 }
+
+                // Hide pre-roll poster so controls and video are unblocked
+                const posterOverlay = document.getElementById('player-poster-overlay');
+                if (posterOverlay) posterOverlay.classList.add('hidden');
 
                 // Reset stream state variables
                 window.introTimes = null;
@@ -1188,7 +1191,7 @@ function setupWatchGlobalFunctions() {
                 const spinner = document.getElementById('player-loading-spinner');
                 if (spinner) spinner.classList.remove('hidden');
 
-                const selectedServer = (window.episodeServers || []).find(s => (s.dataLink || s.link) === dataLink && (s.dataType || '').toLowerCase() === sType.toLowerCase()) || {
+                const selectedServer = (window.episodeServers || []).find(s => (s.serverName || s.name || '').toLowerCase() === sName.toLowerCase() && (s.dataType || '').toLowerCase() === sType.toLowerCase()) || {
                     serverName: sName,
                     dataLink: dataLink,
                     dataType: sType
@@ -1325,14 +1328,29 @@ function setupWatchGlobalFunctions() {
 
         posterOverlay.className = "absolute inset-0 z-30 flex items-center justify-center bg-cover bg-center cursor-pointer group transition-all duration-500";
         posterOverlay.style.backgroundImage = `url('${posterUrl}')`;
-        posterOverlay.onclick = function () {
+        posterOverlay.onclick = function (e) {
+            if (e) e.stopPropagation();
             posterOverlay.classList.add('hidden');
+            if (typeof window.initPlayerControls === 'function') {
+                window.initPlayerControls();
+            }
+            if (typeof window.showOverlayTemporarily === 'function') {
+                window.showOverlayTemporarily();
+            }
             if (typeof window.playVastPreRoll === 'function' && window.VAST_TAG_URL) {
                 window.playVastPreRoll(video, window.VAST_TAG_URL, () => {
-                    if (video) video.play().catch(() => { });
+                    if (video) {
+                        video.play().catch(() => {
+                            video.muted = true;
+                            video.play().catch(() => { });
+                        });
+                    }
                 });
             } else if (video) {
-                video.play().catch(() => { });
+                video.play().catch(() => {
+                    video.muted = true;
+                    video.play().catch(() => { });
+                });
             }
         };
 
@@ -1445,6 +1463,12 @@ window.changeEpisode = async function (epNum, bypassFillerCheck = false) {
 
     window.currentEp = epNum;
     window.streamRetryCount = 0;
+
+    const existingFallback = document.getElementById('empty-stream-fallback-overlay');
+    if (existingFallback) existingFallback.remove();
+
+    const posterOverlay = document.getElementById('player-poster-overlay');
+    if (posterOverlay) posterOverlay.classList.add('hidden');
 
     const slug = slugify(window.showData.title.english || window.showData.title.romaji || window.showData.title.userPreferred);
     const newPath = `/watch/anime/${slug}-${window.showData.id}?ep=${epNum}`;
@@ -1617,7 +1641,10 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
 
         const anilistId = window.showData.id;
         const selectedLang = lang || (window.activeServer ? window.activeServer.dataType : null) || window.currentLang || localStorage.getItem('preferredLang') || 'sub';
-        const selectedDataLink = (dataLink !== null && dataLink !== undefined) ? dataLink : (window.activeServer ? window.activeServer.dataLink : '');
+        let selectedDataLink = (dataLink !== null && dataLink !== undefined) ? dataLink : (window.activeServer ? window.activeServer.dataLink : '');
+        if (selectedDataLink && typeof selectedDataLink === 'string') {
+            selectedDataLink = selectedDataLink.replace(/([?&])v=2\b/, '$1v=1');
+        }
 
         const url = `${primaryWorkerUrl}/rating?id=${encodeURIComponent(anilistId)}&e=${encodeURIComponent(epNum)}&server=${encodeURIComponent(selectedDataLink || '')}&lang=${encodeURIComponent(selectedLang)}`;
 
@@ -1682,7 +1709,16 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
 
         if (window.hlsInstance) {
             window.hlsInstance.destroy();
+            window.hlsInstance = null;
         }
+
+        // Hide pre-roll overlays so video and controls are completely visible
+        const posterOverlay = document.getElementById('player-poster-overlay');
+        if (posterOverlay) posterOverlay.classList.add('hidden');
+        const legacyOverlay = document.getElementById('autoplay-handshake-overlay');
+        if (legacyOverlay) legacyOverlay.classList.add('hidden');
+        const existingFallback = document.getElementById('empty-stream-fallback-overlay');
+        if (existingFallback) existingFallback.remove();
 
         if (Hls.isSupported()) {
             window.hlsInstance = new Hls({
@@ -1703,9 +1739,34 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
                 console.log('[HLS Engine] Manifest parsed successfully. Segment streaming ready.');
                 window.streamRetryCount = 0;
                 if (spinner) spinner.classList.add('hidden');
-                if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
+
+                const pOverlay = document.getElementById('player-poster-overlay');
+                if (pOverlay) pOverlay.classList.add('hidden');
+
                 if (typeof window.initPlayerControls === 'function') {
                     window.initPlayerControls();
+                }
+                if (typeof window.showOverlayTemporarily === 'function') {
+                    window.showOverlayTemporarily();
+                }
+
+                // Autoplay with graceful muted fallback
+                if (video) {
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            console.log('[Player Engine] Playback started successfully.');
+                        }).catch(err => {
+                            console.warn('[Player Engine] Unmuted autoplay blocked by browser. Trying muted...', err);
+                            video.muted = true;
+                            video.play().catch(mErr => {
+                                console.warn('[Player Engine] Playback blocked by policy:', mErr);
+                                if (typeof window.showOverlayTemporarily === 'function') {
+                                    window.showOverlayTemporarily();
+                                }
+                            });
+                        });
+                    }
                 }
 
                 // Synchronize active audio track with user's selected language
@@ -1726,10 +1787,24 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
 
             window.hlsInstance.on(Hls.Events.ERROR, (event, errData) => {
                 if (errData.fatal) {
-                    console.error('[HLS Engine] Fatal playback error:', errData);
+                    console.warn('[HLS Engine] Fatal playback error caught:', errData.type, errData.details);
+                    switch (errData.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            console.warn('[HLS Engine] Fatal network error. Attempting hlsInstance.startLoad()...');
+                            window.hlsInstance.startLoad();
+                            return;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            console.warn('[HLS Engine] Fatal media error. Attempting hlsInstance.recoverMediaError()...');
+                            window.hlsInstance.recoverMediaError();
+                            return;
+                        default:
+                            console.error('[HLS Engine] Unrecoverable fatal error:', errData);
+                            break;
+                    }
+
                     if (spinner) spinner.classList.add('hidden');
                     if (typeof window.renderEmptyStreamFallback === 'function') {
-                        window.renderEmptyStreamFallback(epNum, "No sub or dub streams found for this episode.");
+                        window.renderEmptyStreamFallback(epNum, "Playback failed on this server. Please try switching server.");
                     }
                 }
             });
@@ -1738,10 +1813,18 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
             video.addEventListener('loadedmetadata', () => {
                 window.streamRetryCount = 0;
                 if (spinner) spinner.classList.add('hidden');
-                if (typeof window.showCinemaHandshake === 'function') window.showCinemaHandshake();
+                const pOverlay = document.getElementById('player-poster-overlay');
+                if (pOverlay) pOverlay.classList.add('hidden');
                 if (typeof window.initPlayerControls === 'function') {
                     window.initPlayerControls();
                 }
+                if (typeof window.showOverlayTemporarily === 'function') {
+                    window.showOverlayTemporarily();
+                }
+                video.play().catch(() => {
+                    video.muted = true;
+                    video.play().catch(() => { });
+                });
             });
         }
     } catch (err) {
@@ -3193,3 +3276,4 @@ if (document.readyState === 'loading') {
 } else {
     initApp();
 }
+
