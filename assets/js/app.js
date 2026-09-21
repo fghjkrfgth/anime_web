@@ -691,8 +691,13 @@ async function loadHomeCatalog() {
         renderSpotlight(trendingList);
         renderContinueWatching();
         if (typeof renderGenreGrid === 'function') renderGenreGrid();
-        renderThumbnailRow('trending-container', trendingList);
-        renderThumbnailRow('popular-container', popularList);
+        if (typeof renderCoverflowTrack === 'function') {
+            renderCoverflowTrack('trending-container', trendingList);
+            renderCoverflowTrack('popular-container', popularList);
+        } else {
+            renderThumbnailRow('trending-container', trendingList);
+            renderThumbnailRow('popular-container', popularList);
+        }
         renderThumbnailRow('recent-container', popularList.slice(6) || []);
 
         fetchClusterNode({ action: 'schedule' })
@@ -713,7 +718,11 @@ async function loadHomeCatalog() {
 
         renderThumbnailRow('action-extremes-container', trendingList.slice(4, 10) || []);
         renderThumbnailRow('drama-container', popularList.slice(0, 6) || []);
-        renderThumbnailRow('hidden-gems-container', trendingList.slice(8, 12) || []);
+        if (typeof renderCoverflowTrack === 'function') {
+            renderCoverflowTrack('hidden-gems-container', trendingList.slice(8, 20) || []);
+        } else {
+            renderThumbnailRow('hidden-gems-container', trendingList.slice(8, 12) || []);
+        }
 
     } catch (err) {
         console.error('[App Launch] Initialization failed:', err);
@@ -3049,6 +3058,11 @@ function openAuthModal(tab = 'login') {
     if (dropdown) dropdown.classList.add('hidden');
     if (modal) modal.classList.remove('hidden');
     switchAuthTab(tab);
+
+    window.isAnyModalOrPreviewOpen = true;
+    if (window.coverflowInstances) {
+        Object.values(window.coverflowInstances).forEach(inst => inst && inst.stopAutoRotate());
+    }
 }
 
 function closeAuthModal() {
@@ -3056,6 +3070,11 @@ function closeAuthModal() {
     if (modal) modal.classList.add('hidden');
     const errEl = document.getElementById('auth-error-msg');
     if (errEl) errEl.classList.add('hidden');
+
+    window.isAnyModalOrPreviewOpen = false;
+    if (window.coverflowInstances) {
+        Object.values(window.coverflowInstances).forEach(inst => inst && inst.scheduleResume());
+    }
 }
 
 function switchAuthTab(tab) {
