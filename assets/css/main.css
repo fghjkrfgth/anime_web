@@ -1,35 +1,39 @@
 /* =========================================================================
-   BLACKLEG DESIGN SYSTEM - GLASSMORPHIC LIGHT-GREY DEFAULT & DYNAMIC DARK THEME
+   BLACKLEG DESIGN SYSTEM - CHARCOAL-OBSIDIAN & CRIMSON STREAMING DASHBOARD
    ========================================================================= */
 
 :root {
-    --bg-base: #e9ecf2;
-    --bg-gradient: radial-gradient(at 0% 0%, rgba(255, 255, 255, 0.8) 0px, transparent 50%),
-                   radial-gradient(at 100% 100%, rgba(200, 210, 230, 0.4) 0px, transparent 50%),
-                   #eef2f7;
-    --surface-glass: rgba(255, 255, 255, 0.55);
-    --surface-glass-card: rgba(255, 255, 255, 0.65);
-    --surface-glass-border: rgba(255, 255, 255, 0.8);
+    --bg-base: #0a0b0f;
+    --bg-gradient: radial-gradient(at 0% 0%, rgba(229, 9, 20, 0.08) 0px, transparent 45%),
+                   radial-gradient(at 100% 100%, rgba(30, 32, 45, 0.5) 0px, transparent 50%),
+                   #0a0b0f;
+    --surface-glass: rgba(18, 19, 26, 0.75);
+    --surface-glass-card: #12131a;
+    --surface-glass-border: rgba(255, 255, 255, 0.06);
     --surface-blur: 24px;
-    --text-primary: #1e2330;
-    --text-secondary: #5a6478;
-    --card-title-bg: rgba(255, 255, 255, 0.7);
-    --header-bg: rgba(238, 242, 247, 0.75);
-    --shadow-soft: 0 12px 35px 0 rgba(31, 38, 135, 0.08);
+    --text-primary: #ffffff;
+    --text-secondary: #9499ad;
+    --card-title-bg: rgba(18, 19, 26, 0.85);
+    --header-bg: rgba(10, 11, 15, 0.85);
+    --shadow-soft: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
+    --brand-crimson: #e50914;
+    --brand-crimson-hover: #ff1e27;
 }
 
 html.dark-theme {
     --bg-base: #07070a;
-    --bg-gradient: radial-gradient(at 0% 0%, rgba(30, 30, 45, 0.5) 0px, transparent 50%),
-                   #08080c;
-    --surface-glass: rgba(18, 18, 26, 0.6);
-    --surface-glass-card: rgba(24, 24, 35, 0.55);
-    --surface-glass-border: rgba(255, 255, 255, 0.08);
+    --bg-gradient: radial-gradient(at 0% 0%, rgba(229, 9, 20, 0.1) 0px, transparent 40%),
+                   #07070a;
+    --surface-glass: rgba(14, 15, 22, 0.85);
+    --surface-glass-card: #0f1017;
+    --surface-glass-border: rgba(255, 255, 255, 0.05);
     --text-primary: #ffffff;
-    --text-secondary: #a0a5b5;
-    --card-title-bg: rgba(10, 10, 15, 0.75);
-    --header-bg: rgba(8, 8, 12, 0.8);
-    --shadow-soft: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+    --text-secondary: #8e93a6;
+    --card-title-bg: rgba(14, 15, 22, 0.9);
+    --header-bg: rgba(7, 7, 10, 0.9);
+    --shadow-soft: 0 16px 45px 0 rgba(0, 0, 0, 0.8);
+    --brand-crimson: #e50914;
+    --brand-crimson-hover: #ff1e27;
 }
 
 html, body {
@@ -43,11 +47,11 @@ html, body {
     overflow-x: hidden !important;
     position: relative;
     padding-bottom: env(safe-area-inset-bottom);
-    transition: background-color 0.4s ease, color 0.4s ease;
+    transition: background-color 0.3s ease, color 0.3s ease;
     touch-action: manipulation;
 }
 
-/* Glassmorphic Surface System */
+/* Glassmorphic Surfaces */
 .glass-panel,
 .glass-crystal {
     background: var(--surface-glass) !important;
@@ -57,26 +61,74 @@ html, body {
     border: 1px solid var(--surface-glass-border) !important;
 }
 
+/* =========================================================================
+   SPLIT DESKTOP SHELL (SIDEBAR & MAIN HUB)
+   ========================================================================= */
+
+/* Desktop Fixed Sidebar (w-60 / 240px) */
+#desktop-sidebar {
+    width: 240px;
+    background-color: #0a0b0f;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.75rem 1rem;
+    border-radius: 9999px;
+    color: #9499ad;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.25s ease;
+    position: relative;
+}
+
+.sidebar-nav-item:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-nav-item.active {
+    color: #ffffff;
+    background: rgba(229, 9, 20, 0.12);
+    font-weight: 700;
+}
+
+.sidebar-nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 25%;
+    bottom: 25%;
+    width: 3.5px;
+    background: #e50914;
+    border-radius: 9999px;
+    box-shadow: 0 0 10px #e50914;
+}
+
+/* Main Hub */
+#main-content-hub {
+    min-width: 0;
+    width: 100%;
+    max-width: 1600px;
+}
+
+@media (min-width: 1024px) {
+    #main-content-hub {
+        margin-left: 240px;
+        padding: 1.5rem 2rem 3rem 2rem;
+    }
+}
+
+/* Header Elements & Search Bar */
 header {
     background: var(--header-bg) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
     border-bottom: 1px solid var(--surface-glass-border) !important;
-    transition: background 0.4s ease, border-color 0.4s ease;
-}
-
-/* Header Elements Dynamic Theme Contrast */
-html:not(.dark-theme) header a,
-html:not(.dark-theme) header button {
-    color: var(--text-primary) !important;
-}
-
-html:not(.dark-theme) header .text-white {
-    color: var(--text-primary) !important;
-}
-
-html:not(.dark-theme) header .text-slate-300 {
-    color: var(--text-secondary) !important;
+    transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 #theme-toggle-btn {
@@ -89,7 +141,7 @@ html:not(.dark-theme) header .text-slate-300 {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    background: var(--surface-glass) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
     border: 1px solid var(--surface-glass-border) !important;
     color: var(--text-primary) !important;
     box-shadow: var(--shadow-soft) !important;
@@ -97,86 +149,57 @@ html:not(.dark-theme) header .text-slate-300 {
 }
 
 #theme-toggle-btn:hover {
-    background: var(--surface-glass-card) !important;
-    transform: scale(1.08);
-}
-
-/* Headings Light Mode Dynamic Typography */
-html:not(.dark-theme) h1:not(#player-container *):not(#spotlight-outer-container *),
-html:not(.dark-theme) h2:not(#player-container *):not(#spotlight-outer-container *),
-html:not(.dark-theme) h3:not(#player-container *):not(#spotlight-outer-container *):not(.anime-card *),
-html:not(.dark-theme) h4:not(#player-container *):not(#spotlight-outer-container *),
-html:not(.dark-theme) .section-title,
-html:not(.dark-theme) #genre-title,
-html:not(.dark-theme) #search-query-display {
-    color: var(--text-primary) !important;
-}
-
-html:not(.dark-theme) .text-steelGray:not(#player-container *):not(#spotlight-outer-container *) {
-    color: var(--text-secondary) !important;
-}
-
-/* Card Titles */
-.anime-card-title-box {
-    background: var(--card-title-bg) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    color: var(--text-primary) !important;
-    border-top: none !important;
-    padding: 0.75rem !important;
-    width: 100% !important;
-    height: auto !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: flex-start !important;
-}
-
-.anime-title-text,
-.continue-title-text {
-    color: var(--text-primary) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    transform: scale(1.06);
 }
 
 /* =========================================================================
-   1. REMOVE BORDER LINES FROM CARDS & HERO SLIDER
+   HERO SPOTLIGHT BANNER (21:9 Widescreen Cinematic)
    ========================================================================= */
-.anime-card,
-.anime-card:hover,
-#spotlight-outer-container,
-#spotlight-card-content,
-.glass-crystal-card,
-.glass-crystal-card:hover,
-.details-poster-card,
-.details-poster-card:hover {
-    border: none !important;
-    border-color: transparent !important;
-    outline: none !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08) !important;
+#spotlight-outer-container {
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+    border-radius: 1.5rem !important; /* rounded-3xl */
+    overflow: hidden !important;
+    position: relative;
+    width: 100%;
 }
 
-html.dark-theme .anime-card,
-html.dark-theme #spotlight-outer-container,
-html.dark-theme #spotlight-card-content,
-html.dark-theme .glass-crystal-card,
-html.dark-theme .details-poster-card {
-    border: none !important;
-    border-color: transparent !important;
-    outline: none !important;
-    box-shadow: 0 12px 35px 0 rgba(0, 0, 0, 0.5) !important;
+.spotlight-page-dot {
+    font-family: monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-html.dark-theme .anime-card:hover,
-html.dark-theme .glass-crystal-card:hover,
-html.dark-theme .details-poster-card:hover {
-    border: none !important;
-    border-color: transparent !important;
-    box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.65) !important;
+.spotlight-page-dot:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.15);
 }
 
+.spotlight-page-dot.active {
+    color: #ffffff;
+    background: #e50914;
+    border-color: #e50914;
+    box-shadow: 0 0 12px rgba(229, 9, 20, 0.5);
+}
+
+/* =========================================================================
+   CARDS & POSTERS SYSTEM
+   ========================================================================= */
 .anime-card {
     background: var(--surface-glass-card) !important;
     border-radius: 1rem !important;
     overflow: hidden !important;
-    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+    transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.35s cubic-bezier(0.25, 1, 0.5, 1), border-color 0.35s ease !important;
     will-change: transform, box-shadow;
     transform: translateZ(0);
     contain: content;
@@ -204,36 +227,98 @@ html.dark-theme .details-poster-card:hover {
 
 .anime-card:hover {
     transform: scale(1.04) translateY(-4px) translateZ(0);
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12) !important;
-    border-color: transparent !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(229, 9, 20, 0.2) !important;
+    border-color: rgba(229, 9, 20, 0.4) !important;
     z-index: 10;
 }
 
 .anime-card:hover img {
-    transform: scale(1.08);
+    transform: scale(1.07);
 }
 
+.anime-card-title-box {
+    background: var(--card-title-bg) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    color: var(--text-primary) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.04) !important;
+    padding: 0.75rem !important;
+    width: 100% !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+}
+
+.anime-title-text,
+.continue-title-text {
+    color: var(--text-primary) !important;
+}
+
+/* Widescreen 16:9 Continue Watching Cards */
+.continue-card-landscape {
+    width: 260px !important;
+    min-width: 260px !important;
+    aspect-ratio: 16/9 !important;
+    border-radius: 1rem !important;
+    overflow: hidden !important;
+    background: var(--surface-glass-card) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+    position: relative !important;
+    transition: transform 0.35s ease, box-shadow 0.35s ease, border-color 0.35s ease !important;
+}
+
+@media (min-width: 640px) {
+    .continue-card-landscape {
+        width: 280px !important;
+        min-width: 280px !important;
+    }
+}
+
+.continue-card-landscape:hover {
+    transform: scale(1.03) translateY(-2px);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(229, 9, 20, 0.25) !important;
+    border-color: rgba(229, 9, 20, 0.5) !important;
+}
+
+/* Explore by Genre Compact Landscape Cards */
+.genre-compact-card {
+    height: 3.5rem !important; /* h-14 */
+    border-radius: 1rem !important; /* rounded-2xl */
+    background: #151722 !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    cursor: pointer !important;
+    transition: all 0.25s ease !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.genre-compact-card:hover {
+    background: #1a1d2c !important;
+    border-color: rgba(229, 9, 20, 0.5) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(229, 9, 20, 0.15);
+}
+
+/* Glass Crystal Components */
 .glass-crystal-card {
     background: var(--surface-glass-card) !important;
     backdrop-filter: blur(var(--surface-blur)) saturate(180%) !important;
     -webkit-backdrop-filter: blur(var(--surface-blur)) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
     transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-crystal-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.14) !important;
-    border-color: transparent !important;
-}
-
-#spotlight-outer-container {
-    background: transparent !important;
-    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
-}
-
-#spotlight-card-content {
-    background: #050508 !important;
-    transition: opacity 0.3s ease;
+    box-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.5) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Custom Scrollbars */
@@ -248,13 +333,13 @@ html.dark-theme .details-poster-card:hover {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(212, 175, 55, 0.35);
+    background: rgba(229, 9, 20, 0.4);
     border-radius: 10px;
     transition: background 0.3s;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: rgba(212, 175, 55, 0.75);
+    background: rgba(229, 9, 20, 0.8);
 }
 
 /* Slide-Up & Scale Pop-up Animation */
@@ -273,21 +358,43 @@ html.dark-theme .details-poster-card:hover {
     animation: popSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Non-hovered neighbor cards in horizontal rows */
-#trending-container:hover .anime-card:not(:hover),
-#popular-container:hover .anime-card:not(:hover) {
-    transform: scale(0.96);
-    opacity: 0.75;
+/* Horizontal Track Carousel Overrides with Edge Padding */
+#trending-container,
+#popular-container,
+#recent-container,
+#action-extremes-container,
+#drama-container,
+#hidden-gems-container,
+#continue-watching-container {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: scroll !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-snap-type: x mandatory !important;
+    touch-action: pan-x pan-y !important;
+    transform: translateZ(0);
+    will-change: scroll-position;
+    contain: content;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
 }
 
-/* Mobile Touch-Swipe Momentum snap physics */
-.snap-track {
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
-}
-
-.snap-item {
-    scroll-snap-align: start;
+#trending-container .anime-card,
+#popular-container .anime-card,
+#recent-container .anime-card,
+#action-extremes-container .anime-card,
+#drama-container .anime-card,
+#hidden-gems-container .anime-card,
+#continue-watching-container .anime-card,
+#continue-watching-container .continue-card-landscape {
+    flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
+    scroll-snap-align: start !important;
 }
 
 /* Subtitle / Caption Positioning & Styling Overrides */
@@ -316,45 +423,23 @@ video::cue {
 .btn-crystal:hover,
 .server-btn:not([class*="bg-\[var"]):hover {
     transform: translateY(-2px);
-    background: var(--surface-glass-card) !important;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(229, 9, 20, 0.5) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4) !important;
 }
 
-.btn-crystal:active,
-.server-btn:not([class*="bg-\[var"]):active {
-    transform: translateY(0) scale(0.98);
-}
-
-@keyframes fadeInCrystal {
-    from {
-        opacity: 0;
-        transform: translateY(6px) scale(0.99);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
-.animate-crystal-in {
-    animation: fadeInCrystal 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Mobile Drawer Styling */
+/* Mobile Drawer & Bottom Navigation */
 #mobile-drawer {
-    background: var(--surface-glass-card) !important;
-    backdrop-filter: blur(var(--surface-blur)) saturate(190%) !important;
-    -webkit-backdrop-filter: blur(var(--surface-blur)) saturate(190%) !important;
-    border-right: 1px solid var(--surface-glass-border) !important;
+    background: #0a0b0f !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
     color: var(--text-primary) !important;
 }
 
-#mobile-drawer nav a {
-    color: var(--text-secondary);
-}
-
-#mobile-drawer nav a:hover {
-    color: var(--text-primary);
+#mobile-bottom-nav {
+    background: rgba(10, 11, 15, 0.9) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 
 #mobile-bottom-nav a.mobile-nav-item {
@@ -363,10 +448,10 @@ video::cue {
 
 #mobile-bottom-nav a.mobile-nav-item:hover,
 #mobile-bottom-nav a.mobile-nav-item.active {
-    color: var(--text-primary) !important;
+    color: #e50914 !important;
 }
 
-/* Touch-Scrollable Carousel Helpers & Gesture Physics */
+/* Scrollbar None & Touch Helpers */
 .scrollbar-none::-webkit-scrollbar {
     display: none !important;
     width: 0 !important;
@@ -383,84 +468,20 @@ video::cue {
     touch-action: pan-y pan-x !important;
 }
 
-/* Fix grid/flex child expansion */
-#trending-section {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    overflow: hidden !important;
-}
-
-/* Horizontal Track Carousel Overrides with Edge Padding */
-#trending-container,
-#popular-container,
-#recent-container,
-#action-extremes-container,
-#drama-container,
-#hidden-gems-container,
-#continue-watching-container {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    overflow-x: scroll !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
-    scroll-snap-type: x mandatory !important;
-    touch-action: pan-x pan-y !important;
-    transform: translateZ(0);
-    will-change: scroll-position;
-    contain: content;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-}
-
-#trending-container .anime-card,
-#popular-container .anime-card,
-#recent-container .anime-card,
-#action-extremes-container .anime-card,
-#drama-container .anime-card,
-#hidden-gems-container .anime-card,
-#continue-watching-container .anime-card {
-    flex: 0 0 auto !important;
-    flex-shrink: 0 !important;
-    scroll-snap-align: start !important;
-}
-
 .anime-title-text,
 .continue-title-text,
 .search-title-text,
 .explore-title-text {
     display: -webkit-box !important;
-    -webkit-line-clamp: 3 !important;
-    line-clamp: 3 !important;
+    -webkit-line-clamp: 2 !important;
+    line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: normal !important;
     line-height: 1.3 !important;
-    min-height: 3.9em !important;
-    max-height: 3.9em !important;
     word-break: break-word !important;
 }
-
-/* Player Overlay & Popovers */
-#player-captions-popover,
-#player-speed-popover,
-#player-auto-popover {
-    background: rgba(8, 8, 14, 0.85) !important;
-    backdrop-filter: blur(28px) !important;
-    -webkit-backdrop-filter: blur(28px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
-    color: #ffffff !important;
-}
-
-/* =========================================================================
-   3. MOBILE GRID & TOUCH UX OPTIMIZATION
-   ========================================================================= */
 
 /* Touch Targets: minimum 40px touch bounds with rounded pill corners */
 #episodes-grid button,
@@ -500,32 +521,6 @@ video::cue {
 }
 
 @media (max-width: 768px) {
-    .glass-panel,
-    .glass-crystal,
-    .glass-crystal-card,
-    .btn-crystal {
-        background: var(--surface-glass) !important;
-        backdrop-filter: blur(12px) !important;
-        -webkit-backdrop-filter: blur(12px) !important;
-    }
-
-    /* Disable scale-down effects on non-hovered neighbor cards in horizontal rows */
-    #trending-container:hover .anime-card:not(:hover),
-    #popular-container:hover .anime-card:not(:hover),
-    #recent-container:hover .anime-card:not(:hover),
-    #action-extremes-container:hover .anime-card:not(:hover),
-    #drama-container:hover .anime-card:not(:hover),
-    #hidden-gems-container:hover .anime-card:not(:hover),
-    #continue-watching-container:hover .anime-card:not(:hover) {
-        transform: none !important;
-        opacity: 1 !important;
-    }
-
-    #spotlight-outer-container {
-        border: none !important;
-        background: transparent !important;
-    }
-
     video::cue, ::cue {
         font-size: 13px !important;
         line-height: 1.3 !important;
@@ -559,44 +554,19 @@ video::cue {
         margin: 0 auto !important;
         aspect-ratio: 2/3 !important;
     }
-
-    /* Hide non-interactive background decorations to preserve performance */
-    .particle-overlay,
-    .background-glow,
-    .glow-layer,
-    .spark-overlay,
-    .bg-sparks {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-    }
 }
 
-/* Touch & Performance: Suppress Hover Popups and Scale Animations on Touch Devices */
+/* Touch & Performance: Suppress Scale Animations on Touch Devices */
 @media (pointer: coarse), (max-width: 768px) {
     .anime-card:hover {
         transform: none !important;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08) !important;
-        border: none !important;
-        border-color: transparent !important;
-    }
-    html.dark-theme .anime-card:hover {
-        box-shadow: 0 12px 35px 0 rgba(0, 0, 0, 0.5) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
     }
     .anime-card:hover img {
         transform: none !important;
     }
-    #trending-container:hover .anime-card:not(:hover),
-    #popular-container:hover .anime-card:not(:hover),
-    #recent-container:hover .anime-card:not(:hover) {
+    .continue-card-landscape:hover {
         transform: none !important;
-        opacity: 1 !important;
-    }
-    .anime-card-hover-preview,
-    #hover-preview-popup,
-    [data-hover-preview="true"] {
-        display: none !important;
-        pointer-events: none !important;
     }
 }
 
@@ -604,21 +574,10 @@ video::cue {
 #episodes-grid button.bg-amber-400,
 #details-episodes-grid button.bg-amber-400,
 button.bg-amber-400 {
-    background-color: #fbbf24 !important;
-    color: #000000 !important;
+    background-color: #e50914 !important;
+    color: #ffffff !important;
     font-weight: 900 !important;
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.6) !important;
-}
-
-@media (max-width: 767px) {
-    .bg-amber-500 {
-        background-color: #f59e0b !important;
-        color: #000000 !important;
-    }
-    .bg-slate-800 {
-        background-color: #1e293b !important;
-        color: #e2e8f0 !important;
-    }
+    box-shadow: 0 0 12px rgba(229, 9, 20, 0.6) !important;
 }
 
 /* Ad Slot Box Layout Stability & Styling */
