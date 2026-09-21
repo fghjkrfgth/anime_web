@@ -690,6 +690,7 @@ async function loadHomeCatalog() {
 
         renderSpotlight(trendingList);
         renderContinueWatching();
+        if (typeof renderGenreGrid === 'function') renderGenreGrid();
         renderThumbnailRow('trending-container', trendingList);
         renderThumbnailRow('popular-container', popularList);
         renderThumbnailRow('recent-container', popularList.slice(6) || []);
