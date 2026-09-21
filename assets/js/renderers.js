@@ -199,7 +199,7 @@ function renderSpotlight(mediaList) {
 }
 
 function rotateSpotlight(clickedIdx) {
-    if (!window.spotlightState) return;
+    if (!window.spotlightState || !window.spotlightState.items) return;
     const { items } = window.spotlightState;
     window.spotlightState.centerIdx = clickedIdx;
 
@@ -211,31 +211,79 @@ function rotateSpotlight(clickedIdx) {
 
         setTimeout(() => {
             const title = getShowTitle(centerItem);
-            // Prioritize vertical portrait poster artwork (coverImage.extraLarge or coverImage.large)
-            const coverUrl = (centerItem.coverImage && (centerItem.coverImage.extraLarge || centerItem.coverImage.large)) || centerItem.bannerImage || '';
+            const bannerUrl = centerItem.bannerImage || (centerItem.coverImage && (centerItem.coverImage.extraLarge || centerItem.coverImage.large)) || '';
             const desc = cleanDescription(centerItem.description);
 
             const bgImg = document.getElementById('spotlight-bg-img');
             if (bgImg) {
-                bgImg.style.backgroundImage = `url('${coverUrl}')`;
+                bgImg.style.backgroundImage = `url('${bannerUrl}')`;
             }
+
+            const badgeEl = document.getElementById('spotlight-trend-badge');
+            if (badgeEl) {
+                badgeEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> #${clickedIdx + 1} Trending`;
+            }
+
+            const genreTagsEl = document.getElementById('spotlight-genre-tags');
+            if (genreTagsEl) {
+                const genres = (centerItem.genres || []).slice(0, 4);
+                genreTagsEl.innerHTML = genres.map(g => `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/10 text-zinc-300 backdrop-blur-md border border-white/10">${g}</span>`).join('');
+            }
+
             const titleEl = document.getElementById('spotlight-title');
             if (titleEl) titleEl.innerText = title;
             const descEl = document.getElementById('spotlight-desc');
             if (descEl) descEl.innerText = desc;
 
-            const spotlightBtn = document.getElementById('spotlight-watch-btn');
-            if (spotlightBtn) {
-                spotlightBtn.innerText = 'Details';
-                spotlightBtn.onclick = function() {
+            const watchBtn = document.getElementById('spotlight-watch-btn');
+            if (watchBtn) {
+                watchBtn.innerHTML = `<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>Watch Now</span>`;
+                watchBtn.onclick = function() {
                     watchShow(centerItem);
                 };
+            }
+
+            const listBtn = document.getElementById('spotlight-list-btn');
+            if (listBtn) {
+                listBtn.onclick = function() {
+                    if (typeof window.toggleMyList === 'function') {
+                        window.toggleMyList(centerItem);
+                    } else if (typeof window.showToast === 'function') {
+                        window.showToast('Saved to list');
+                    }
+                };
+            }
+
+            // Update slide pagination dots
+            const dotsContainer = document.getElementById('spotlight-pagination-dots');
+            if (dotsContainer) {
+                dotsContainer.innerHTML = items.map((_, i) => `
+                    <span class="spotlight-page-dot ${i === clickedIdx ? 'active' : ''}" onclick="rotateSpotlight(${i})">
+                        ${String(i + 1).padStart(2, '0')}
+                    </span>
+                `).join('');
             }
 
             cardContent.classList.remove('opacity-0');
         }, 300);
     }
 }
+
+function rotateSpotlightPrev() {
+    if (!window.spotlightState || !window.spotlightState.items) return;
+    const len = window.spotlightState.items.length;
+    const prevIdx = (window.spotlightState.centerIdx - 1 + len) % len;
+    rotateSpotlight(prevIdx);
+}
+window.rotateSpotlightPrev = rotateSpotlightPrev;
+
+function rotateSpotlightNext() {
+    if (!window.spotlightState || !window.spotlightState.items) return;
+    const len = window.spotlightState.items.length;
+    const nextIdx = (window.spotlightState.centerIdx + 1) % len;
+    rotateSpotlight(nextIdx);
+}
+window.rotateSpotlightNext = rotateSpotlightNext;
 
 function renderGenreSpotlight() {
     const container = document.getElementById('genre-spotlight-container');
@@ -353,7 +401,7 @@ function searchAndPlay(title, slug) {
     checkUrlParamsAndSearch();
 }
 
-function createCardHTML(show) {
+function createCardHTML(show, rank = null) {
     const title = getShowTitle(show);
     const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || '';
     const rating = show.meanScore ? `${(show.meanScore / 10).toFixed(1)}` : 'N/A';
@@ -374,21 +422,35 @@ function createCardHTML(show) {
         displayBadgeText = show.format;
     }
 
-    const badgeHTML = isNewEpisode
-        ? `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-amber-500 text-black font-black uppercase text-[9px] rounded shadow-md z-10">${displayBadgeText}</div>`
-        : `<div class="absolute bottom-2 left-2 px-2 py-0.5 bg-slate-800 text-slate-200 border border-white/10 font-bold uppercase text-[9px] rounded z-10">${displayBadgeText}</div>`;
+    // Stylized semi-transparent rank number for numbered trending row
+    const rankHTML = rank ? `
+        <span class="absolute top-1 left-2.5 text-4xl sm:text-5xl font-extrabold text-white/30 font-mono select-none pointer-events-none drop-shadow-md z-10 leading-none">
+            ${rank}
+        </span>
+    ` : '';
+
+    // Top-right frosted score badge: ★ 9.1
+    const scoreBadgeHTML = `
+        <div class="absolute top-2 right-2 px-2 py-0.5 bg-black/60 backdrop-blur-md rounded-full text-[10px] md:text-xs font-bold text-white border border-white/10 shadow-md z-10 flex items-center gap-1">
+            <span class="text-[#ffb703]">★</span> ${rating}
+        </div>
+    `;
+
+    // Bottom status tag: Red pill badge for Ongoing or New
+    const statusBadgeHTML = isNewEpisode
+        ? `<div class="absolute bottom-2 left-2 px-2.5 py-0.5 bg-[#e50914] text-white font-extrabold uppercase text-[9px] rounded-full shadow-lg shadow-red-900/40 z-10 tracking-wider">Ongoing</div>`
+        : `<div class="absolute bottom-2 left-2 px-2.5 py-0.5 bg-black/60 backdrop-blur-md text-zinc-300 border border-white/10 font-bold uppercase text-[9px] rounded-full z-10 tracking-wider">${displayBadgeText}</div>`;
 
     return `
-        <div class="anime-card flex-none w-[140px] md:w-[185px] bg-[#0b0c10]/60 rounded-2xl overflow-hidden border border-white/10 hover:border-[#d4af37] relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_25px_rgba(212,175,55,0.35)] snap-start" onclick="watchShow(${stringifiedShow})" data-anime-data="${stringifiedShow}">
+        <div class="anime-card flex-none w-[140px] md:w-[185px] bg-[#12131a] rounded-2xl overflow-hidden border border-white/[0.06] hover:border-[#e50914]/40 relative cursor-pointer group transition-all duration-300 hover:shadow-[0_10px_30px_rgba(229,9,20,0.25)] snap-start" onclick="watchShow(${stringifiedShow})" data-anime-data="${stringifiedShow}">
             <div class="relative aspect-[3/4] w-full overflow-hidden bg-[#050508]">
                 <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
-                <div class="absolute top-2 right-2 px-1.5 py-0.5 bg-black/85 backdrop-blur-md rounded text-[9px] md:text-[11px] font-extrabold text-[#d4af37] border border-[#d4af37]/30 shadow-md z-10">
-                    ★ ${rating}
-                </div>
-                ${badgeHTML}
+                ${rankHTML}
+                ${scoreBadgeHTML}
+                ${statusBadgeHTML}
             </div>
             <div class="anime-card-title-box">
-                <h3 class="anime-title-text text-white text-xs md:text-sm font-semibold group-hover:text-[#d4af37] transition-colors duration-300" title="${title}">
+                <h3 class="anime-title-text text-white text-xs md:text-sm font-semibold truncate group-hover:text-[#ff3b45] transition-colors duration-300" title="${title}">
                     ${title}
                 </h3>
             </div>
@@ -471,7 +533,7 @@ function showHoverPreview(card, show) {
     // Animated Preview Pop-up Card
     activePreviewCard = document.createElement('div');
     activePreviewCard.id = 'anime-preview-popup-card';
-    activePreviewCard.className = 'fixed z-50 animate-pop-slide-up w-[90vw] max-w-[380px] bg-[#0b0c10] border border-[#d4af37]/40 shadow-[0_15px_50px_rgba(0,0,0,0.9),0_0_30px_rgba(212,175,55,0.2)] rounded-3xl overflow-hidden pointer-events-auto';
+    activePreviewCard.className = 'fixed z-50 animate-pop-slide-up w-[90vw] max-w-[380px] bg-[#12131a] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(229,9,20,0.15)] rounded-3xl overflow-hidden pointer-events-auto';
 
     const rect = card.getBoundingClientRect();
     const topPos = Math.max(20, Math.min(window.innerHeight - 420, rect.top - 20));
@@ -480,17 +542,17 @@ function showHoverPreview(card, show) {
     activePreviewCard.style.top = `${topPos}px`;
     activePreviewCard.style.left = `${leftPos}px`;
 
-    const genreChips = genres.map(g => `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30">${g}</span>`).join('');
+    const genreChips = genres.map(g => `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-zinc-300 border border-white/10">${g}</span>`).join('');
 
     activePreviewCard.innerHTML = `
         <div class="relative h-[150px] w-full overflow-hidden bg-[#050508]">
             <img src="${bannerUrl}" alt="${title}" class="w-full h-full object-cover">
-            <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c10] via-[#0b0c10]/40 to-transparent"></div>
-            <div class="absolute top-3 right-3 px-2.5 py-1 bg-black/80 backdrop-blur-md rounded-full text-xs font-extrabold text-[#d4af37] border border-[#d4af37]/30 flex items-center gap-1 shadow-lg">
-                ★ ${rating}
+            <div class="absolute inset-0 bg-gradient-to-t from-[#12131a] via-[#12131a]/40 to-transparent"></div>
+            <div class="absolute top-3 right-3 px-2.5 py-1 bg-black/80 backdrop-blur-md rounded-full text-xs font-bold text-white border border-white/10 flex items-center gap-1 shadow-lg">
+                <span class="text-[#ffb703]">★</span> ${rating}
             </div>
             <div class="absolute bottom-3 left-4 right-4 flex items-center justify-between">
-                <span class="px-2.5 py-0.5 bg-[#d4af37] text-[#050508] rounded-md text-[10px] font-extrabold uppercase tracking-wider">${format}</span>
+                <span class="px-2.5 py-0.5 bg-[#e50914] text-white rounded-md text-[10px] font-extrabold uppercase tracking-wider shadow-md">${format}</span>
                 <span class="text-white/80 text-xs font-mono">${epCount}</span>
             </div>
         </div>
@@ -498,7 +560,7 @@ function showHoverPreview(card, show) {
             <h3 class="text-white text-base font-bold leading-snug line-clamp-1">${title}</h3>
             <div class="flex flex-wrap gap-1.5">${genreChips}</div>
             <p class="text-steelGray text-xs line-clamp-3 font-light leading-relaxed">${synopsis}</p>
-            <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="mt-2 w-full py-2.5 bg-gradient-to-r from-[#d4af37] to-[#f59e0b] hover:from-[#e5bf47] hover:to-[#fbbf24] text-[#050508] font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)]">
+            <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="mt-2 w-full py-2.5 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-900/40 hover:scale-[1.02] active:scale-[0.98]">
                 View Details
             </button>
         </div>
@@ -520,10 +582,44 @@ function dismissHoverPreview() {
 window.dismissHoverPreview = dismissHoverPreview;
 window.initAnimeCardHoverPreviews = initAnimeCardHoverPreviews;
 
+// -------------------------------------------------------------------------
+// EXPLORE BY GENRE GRID COMPONENT
+// -------------------------------------------------------------------------
+const EXPLORE_GENRES = [
+    { name: "Action", icon: "⚡", color: "#e50914", bg: "rgba(229,9,20,0.15)" },
+    { name: "Fantasy", icon: "✨", color: "#8b5cf6", bg: "rgba(139,92,246,0.15)" },
+    { name: "Slice of Life", icon: "☕", color: "#10b981", bg: "rgba(16,185,129,0.15)" },
+    { name: "Comedy", icon: "🎭", color: "#f59e0b", bg: "rgba(245,158,11,0.15)" },
+    { name: "Mecha", icon: "🤖", color: "#06b6d4", bg: "rgba(6,182,212,0.15)" },
+    { name: "Supernatural", icon: "🔮", color: "#ec4899", bg: "rgba(236,72,153,0.15)" }
+];
+window.EXPLORE_GENRES = EXPLORE_GENRES;
+
+function renderGenreGrid() {
+    const grid = document.getElementById('explore-genre-grid');
+    if (!grid) return;
+    grid.innerHTML = EXPLORE_GENRES.map(g => `
+        <div onclick="searchGenre('${g.name}')" class="h-14 rounded-2xl bg-[#151722] border border-white/5 flex items-center justify-between px-4 hover:border-red-500/50 hover:bg-[#1c1e2c] cursor-pointer transition-all duration-200 group shadow-md">
+            <div class="flex items-center gap-3">
+                <span class="w-8 h-8 rounded-xl flex items-center justify-center text-sm" style="background: ${g.bg}; color: ${g.color};">
+                    ${g.icon}
+                </span>
+                <span class="text-xs sm:text-sm font-bold text-white group-hover:text-[#ff3b45] transition-colors">${g.name}</span>
+            </div>
+            <span class="text-zinc-500 text-sm font-bold group-hover:text-white group-hover:translate-x-0.5 transition-all">&gt;</span>
+        </div>
+    `).join('');
+}
+window.renderGenreGrid = renderGenreGrid;
+
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAnimeCardHoverPreviews);
+    document.addEventListener('DOMContentLoaded', () => {
+        initAnimeCardHoverPreviews();
+        renderGenreGrid();
+    });
 } else {
     initAnimeCardHoverPreviews();
+    renderGenreGrid();
 }
 
 function renderThumbnailRow(containerId, shows) {
@@ -533,8 +629,9 @@ function renderThumbnailRow(containerId, shows) {
         container.innerHTML = `<div class="text-steelGray py-8">No titles available.</div>`;
         return;
     }
-    container.className = "flex flex-nowrap overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-none gap-3 pb-4 touch-pan-x";
-    container.innerHTML = shows.map(show => createCardHTML(show)).join('');
+    container.className = "flex flex-nowrap overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-none gap-4 pb-4 touch-pan-x";
+    const isTrending = containerId === 'trending-container';
+    container.innerHTML = shows.map((show, idx) => createCardHTML(show, isTrending ? (idx + 1) : null)).join('');
 }
 
 function renderContinueWatching() {
@@ -596,23 +693,26 @@ function renderContinueWatching() {
         const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
 
         return `
-            <div class="anime-card flex-none w-[180px] md:w-[220px] bg-[#0b0c10]/70 rounded-2xl overflow-hidden border border-white/10 hover:border-[#d4af37]/60 relative cursor-pointer group transition-all duration-500 hover:shadow-[0_0_20px_rgba(212,175,55,0.25)] snap-start" onclick="watchShowProgress(${stringifiedShow}, ${epNum})" data-continue-show="${stringifiedShow}">
-                <div class="relative h-[100px] md:h-[125px] overflow-hidden bg-[#050508]">
-                    <img src="${bannerUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500">
-                    <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c10] via-[#0b0c10]/50 to-transparent flex flex-col justify-end p-3">
-                        <span class="continue-title-text text-white text-xs md:text-sm font-bold truncate group-hover:text-[#d4af37] transition-colors duration-300">
-                            ${title}
-                        </span>
-                        <div class="flex items-center justify-between mt-1">
-                            <span class="text-[#d4af37] text-[10px] md:text-xs font-extrabold uppercase tracking-wider">
-                                EP ${epNum}
-                            </span>
-                            <span class="text-steelGray text-[9px] font-mono">${percent}%</span>
-                        </div>
+            <div class="continue-card-landscape w-[260px] flex-none aspect-video rounded-2xl overflow-hidden relative cursor-pointer group snap-start bg-[#12131a] border border-white/[0.06] shadow-xl hover:scale-[1.03] transition-all duration-300" onclick="watchShowProgress(${stringifiedShow}, ${epNum})" data-continue-show="${stringifiedShow}">
+                <img src="${bannerUrl}" alt="${title}" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0a0b0f] via-[#0a0b0f]/60 to-transparent"></div>
+                
+                <!-- Center Floating Circular Frosted Glass Play Button -->
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="w-11 h-11 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white shadow-lg group-hover:bg-[#e50914] group-hover:scale-110 transition-all duration-300">
+                        <svg class="w-5 h-5 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     </div>
                 </div>
-                <div class="w-full h-1.5 bg-white/10 relative">
-                    <div class="h-full bg-gradient-to-r from-[#d4af37] to-[#f59e0b] transition-all duration-300" style="width: ${percent}%"></div>
+
+                <!-- Bottom Details -->
+                <div class="absolute bottom-0 inset-x-0 p-3 flex flex-col gap-0.5 z-10">
+                    <span class="text-sm font-bold truncate text-white group-hover:text-[#ff3b45] transition-colors">${title}</span>
+                    <span class="text-[11px] text-zinc-400 font-medium">EP ${epNum} · ${percent}% watched</span>
+                </div>
+
+                <!-- Thin Crimson Progress Line at Bottom Edge -->
+                <div class="absolute bottom-0 inset-x-0 h-1 bg-white/10 overflow-hidden">
+                    <div class="h-full bg-[#e50914] transition-all duration-300 shadow-[0_0_8px_#e50914]" style="width: ${percent}%"></div>
                 </div>
             </div>
         `;
