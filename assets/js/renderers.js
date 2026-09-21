@@ -676,7 +676,6 @@ class CoverflowCarousel {
 
         // Configure 3D Stage container
         this.container.className = "coverflow-stage";
-        this.container.style.overflow = "visible";
 
         this.renderCards();
         this.bindEvents();
