@@ -128,7 +128,7 @@ function setupLanguageListeners() {
     const langPrefDropdown = document.getElementById('lang-pref-dropdown');
 
     if (langPrefBtn && langPrefDropdown) {
-        langPrefBtn.onclick = function(e) {
+        langPrefBtn.onclick = function (e) {
             e.preventDefault();
             e.stopPropagation();
             langPrefDropdown.classList.toggle('hidden');
@@ -142,7 +142,7 @@ function setupLanguageListeners() {
     }
 
     document.querySelectorAll('.lang-option').forEach(btn => {
-        btn.onclick = function(e) {
+        btn.onclick = function (e) {
             e.preventDefault();
             e.stopPropagation();
             const val = btn.getAttribute('data-value');
@@ -167,6 +167,15 @@ function cleanDescription(desc) {
 }
 
 function scrollTrack(containerId, direction) {
+    if (window.coverflowInstances && window.coverflowInstances[containerId]) {
+        if (direction === 'left') {
+            window.coverflowInstances[containerId].prev();
+        } else {
+            window.coverflowInstances[containerId].next();
+        }
+        window.coverflowInstances[containerId].scheduleResume();
+        return;
+    }
     const container = document.getElementById(containerId);
     if (!container) return;
     const scrollAmount = 300;
@@ -176,6 +185,7 @@ function scrollTrack(containerId, direction) {
         container.scrollLeft += scrollAmount;
     }
 }
+window.scrollTrack = scrollTrack;
 
 function renderSpotlight(mediaList) {
     const titleEl = document.getElementById('spotlight-title');
@@ -238,14 +248,14 @@ function rotateSpotlight(clickedIdx) {
             const watchBtn = document.getElementById('spotlight-watch-btn');
             if (watchBtn) {
                 watchBtn.innerHTML = `<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>Watch Now</span>`;
-                watchBtn.onclick = function() {
+                watchBtn.onclick = function () {
                     watchShow(centerItem);
                 };
             }
 
             const listBtn = document.getElementById('spotlight-list-btn');
             if (listBtn) {
-                listBtn.onclick = function() {
+                listBtn.onclick = function () {
                     if (typeof window.toggleMyList === 'function') {
                         window.toggleMyList(centerItem);
                     } else if (typeof window.showToast === 'function') {
@@ -567,6 +577,12 @@ function showHoverPreview(card, show) {
     `;
 
     document.body.appendChild(activePreviewCard);
+
+    // Pause all 3D coverflow carousels while preview modal is visible
+    window.isAnyModalOrPreviewOpen = true;
+    if (window.coverflowInstances) {
+        Object.values(window.coverflowInstances).forEach(inst => inst && inst.stopAutoRotate());
+    }
 }
 
 function dismissHoverPreview() {
@@ -577,6 +593,12 @@ function dismissHoverPreview() {
     if (activePreviewCard) {
         activePreviewCard.remove();
         activePreviewCard = null;
+    }
+
+    // Resume 3D coverflow carousels after preview is dismissed
+    window.isAnyModalOrPreviewOpen = false;
+    if (window.coverflowInstances) {
+        Object.values(window.coverflowInstances).forEach(inst => inst && inst.scheduleResume());
     }
 }
 window.dismissHoverPreview = dismissHoverPreview;
@@ -622,7 +644,267 @@ if (document.readyState === 'loading') {
     renderGenreGrid();
 }
 
+// =========================================================================
+// 3D GLASSMORPHIC COVERFLOW CAROUSEL CONTROLLER
+// =========================================================================
+window.coverflowInstances = window.coverflowInstances || {};
+
+class CoverflowCarousel {
+    constructor(containerId, shows) {
+        this.containerId = containerId;
+        this.container = document.getElementById(containerId);
+        this.shows = shows || [];
+        this.currentIndex = 0;
+        this.timer = null;
+        this.resumeTimeout = null;
+        this.isHovered = false;
+        this.isDragging = false;
+        this.hasDragged = false;
+        this.startX = 0;
+        this.currentX = 0;
+        this.startTime = 0;
+
+        this.onPointerMove = this.onPointerMove.bind(this);
+        this.onPointerUp = this.onPointerUp.bind(this);
+
+        if (!this.container || this.shows.length === 0) return;
+        this.init();
+    }
+
+    init() {
+        this.destroy();
+
+        // Configure 3D Stage container
+        this.container.className = "coverflow-stage";
+        this.container.style.overflow = "visible";
+
+        this.renderCards();
+        this.bindEvents();
+        this.startAutoRotate();
+    }
+
+    destroy() {
+        this.stopAutoRotate();
+        if (this.resumeTimeout) {
+            clearTimeout(this.resumeTimeout);
+            this.resumeTimeout = null;
+        }
+        window.removeEventListener('mousemove', this.onPointerMove);
+        window.removeEventListener('mouseup', this.onPointerUp);
+        window.removeEventListener('touchmove', this.onPointerMove);
+        window.removeEventListener('touchend', this.onPointerUp);
+    }
+
+    renderCards() {
+        this.container.innerHTML = this.shows.map((show, idx) => {
+            const title = getShowTitle(show);
+            const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || show.bannerImage || '';
+            const epCount = show.episodes ? `${show.episodes} Episodes` : (show.status === 'RELEASING' ? 'Ongoing' : 'Completed');
+            const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
+            
+            // Dynamic aesthetic progress line for realism
+            const progressSeed = ((idx * 31) % 60) + 25;
+
+            return `
+                <div class="coverflow-card" data-index="${idx}" data-anime-data="${stringifiedShow}">
+                    <!-- Inner Thumbnail Frame -->
+                    <div class="coverflow-card-img-wrap">
+                        <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async">
+                        <!-- Glass Bookmark Pill -->
+                        <div class="coverflow-bookmark">
+                            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+                        </div>
+                    </div>
+
+                    <!-- Title & Metadata Area -->
+                    <div class="coverflow-content">
+                        <h3 class="coverflow-title" title="${title}">${title}</h3>
+                        <span class="coverflow-subtitle">${epCount}</span>
+                        <!-- Progress Slider Line -->
+                        <div class="coverflow-progress-bar">
+                            <div class="coverflow-progress-fill" style="width: ${progressSeed}%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Golden-Amber Glass Action Button -->
+                    <button class="coverflow-action-btn" type="button">
+                        <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <span>Watch Now</span>
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        this.updateSlots();
+    }
+
+    updateSlots() {
+        const total = this.shows.length;
+        if (total === 0) return;
+
+        const cards = this.container.querySelectorAll('.coverflow-card');
+        cards.forEach((card, i) => {
+            let diff = ((i - this.currentIndex) % total + total) % total;
+            if (diff > total / 2) diff -= total;
+
+            let slot = 'hidden-right';
+            if (diff === 0) slot = '0';
+            else if (diff === 1) slot = '1';
+            else if (diff === -1) slot = '-1';
+            else if (diff === 2) slot = '2';
+            else if (diff === -2) slot = '-2';
+            else if (diff > 2) slot = 'hidden-right';
+            else if (diff < -2) slot = 'hidden-left';
+
+            card.setAttribute('data-slot', slot);
+        });
+    }
+
+    goTo(index) {
+        const total = this.shows.length;
+        if (total === 0) return;
+        this.currentIndex = ((index % total) + total) % total;
+        this.updateSlots();
+    }
+
+    next() {
+        this.goTo(this.currentIndex + 1);
+    }
+
+    prev() {
+        this.goTo(this.currentIndex - 1);
+    }
+
+    startAutoRotate() {
+        this.stopAutoRotate();
+        if (this.isHovered || this.isDragging || window.isAnyModalOrPreviewOpen) return;
+
+        this.timer = setInterval(() => {
+            if (this.isHovered || this.isDragging || window.isAnyModalOrPreviewOpen) return;
+            this.next();
+        }, 4500);
+    }
+
+    stopAutoRotate() {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+    }
+
+    scheduleResume() {
+        if (this.resumeTimeout) clearTimeout(this.resumeTimeout);
+        this.resumeTimeout = setTimeout(() => {
+            this.startAutoRotate();
+        }, 5000);
+    }
+
+    onPointerMove(e) {
+        if (!this.isDragging) return;
+        const clientX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX) || 0;
+        this.currentX = clientX;
+        if (Math.abs(this.currentX - this.startX) > 8) {
+            this.hasDragged = true;
+        }
+    }
+
+    onPointerUp(e) {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+
+        const deltaX = this.currentX - this.startX;
+        const deltaTime = Math.max(1, performance.now() - this.startTime);
+        const velocity = deltaX / deltaTime; // px/ms
+
+        if (Math.abs(deltaX) > 40 || Math.abs(velocity) > 0.3) {
+            if (deltaX < 0) {
+                this.next();
+            } else {
+                this.prev();
+            }
+        }
+
+        this.scheduleResume();
+
+        setTimeout(() => {
+            this.hasDragged = false;
+        }, 120);
+    }
+
+    bindEvents() {
+        const onDown = (e) => {
+            this.isDragging = true;
+            this.hasDragged = false;
+            const clientX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX) || 0;
+            this.startX = clientX;
+            this.currentX = clientX;
+            this.startTime = performance.now();
+            this.stopAutoRotate();
+        };
+
+        this.container.addEventListener('mousedown', onDown);
+        window.addEventListener('mousemove', this.onPointerMove);
+        window.addEventListener('mouseup', this.onPointerUp);
+
+        this.container.addEventListener('touchstart', onDown, { passive: true });
+        window.addEventListener('touchmove', this.onPointerMove, { passive: true });
+        window.addEventListener('touchend', this.onPointerUp);
+
+        this.container.addEventListener('mouseenter', () => {
+            this.isHovered = true;
+            this.stopAutoRotate();
+        });
+
+        this.container.addEventListener('mouseleave', () => {
+            this.isHovered = false;
+            this.scheduleResume();
+        });
+
+        this.container.addEventListener('click', (e) => {
+            if (this.hasDragged) return;
+
+            const card = e.target.closest('.coverflow-card');
+            if (!card) return;
+
+            const slot = card.getAttribute('data-slot');
+            const targetIdx = parseInt(card.getAttribute('data-index'), 10);
+            const rawData = card.getAttribute('data-anime-data');
+
+            const actionBtn = e.target.closest('.coverflow-action-btn');
+            if (actionBtn && rawData) {
+                try {
+                    const show = JSON.parse(rawData);
+                    watchShow(show);
+                    return;
+                } catch (err) {}
+            }
+
+            if (slot !== '0') {
+                this.goTo(targetIdx);
+                this.scheduleResume();
+            } else if (rawData) {
+                try {
+                    const show = JSON.parse(rawData);
+                    watchShow(show);
+                } catch (err) {}
+            }
+        });
+    }
+}
+
+function renderCoverflowTrack(containerId, shows) {
+    if (!shows || shows.length === 0) return;
+    window.coverflowInstances[containerId] = new CoverflowCarousel(containerId, shows);
+}
+window.renderCoverflowTrack = renderCoverflowTrack;
+
+const COVERFLOW_CONTAINERS = ['trending-container', 'popular-container', 'hidden-gems-container'];
+
 function renderThumbnailRow(containerId, shows) {
+    if (COVERFLOW_CONTAINERS.includes(containerId)) {
+        renderCoverflowTrack(containerId, shows);
+        return;
+    }
     const container = document.getElementById(containerId);
     if (!container) return;
     if (!shows || shows.length === 0) {
@@ -630,8 +912,7 @@ function renderThumbnailRow(containerId, shows) {
         return;
     }
     container.className = "flex flex-nowrap overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-none gap-4 pb-4 touch-pan-x";
-    const isTrending = containerId === 'trending-container';
-    container.innerHTML = shows.map((show, idx) => createCardHTML(show, isTrending ? (idx + 1) : null)).join('');
+    container.innerHTML = shows.map((show, idx) => createCardHTML(show)).join('');
 }
 
 function renderContinueWatching() {
@@ -670,7 +951,7 @@ function renderContinueWatching() {
         try {
             const legacy = JSON.parse(localStorage.getItem('continueWatching')) || [];
             items = legacy.filter(item => item && item.show && item.epNum);
-        } catch (e) {}
+        } catch (e) { }
     }
 
     // Retain up to last 15 shows
@@ -861,8 +1142,8 @@ function renderFranchiseSectionsHTML(categories) {
                 <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 pl-3" style="border-color: var(--anime-accent-color, #f59e0b);">${sec.title}</h3>
                 <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin">
                     ${sec.items.map(item => {
-                        const posterUrl = item.image || '';
-                        return `
+            const posterUrl = item.image || '';
+            return `
                             <div class="flex-none w-[110px] md:w-[130px] cursor-pointer group" onclick="viewRelatedShow('${item.anilistId}')">
                                 <div class="w-full aspect-[2/3] rounded-xl overflow-hidden relative border border-white/5 group-hover:border-[var(--anime-accent-color,#f59e0b)] transition-all duration-300">
                                     <img class="w-full h-full object-cover" src="${posterUrl}" alt="${item.title}" loading="lazy" decoding="async">
@@ -874,7 +1155,7 @@ function renderFranchiseSectionsHTML(categories) {
                                 <div class="text-[9px] text-steelGray mt-0.5 uppercase">${item.type}</div>
                             </div>
                         `;
-                    }).join('')}
+        }).join('')}
                 </div>
             </div>
         `;
@@ -892,7 +1173,7 @@ function renderDualSubDubButtonsHTML(activeLang, dubUnavailable = false) {
     const subActiveStyle = !isDub
         ? "bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)] font-extrabold"
         : "text-steelGray hover:text-white bg-transparent font-bold";
-    
+
     let dubActiveStyle = "";
     let dubDisabledAttr = "";
     let dubText = "🎙️ DUB";
@@ -924,7 +1205,7 @@ window.renderDualSubDubButtonsHTML = renderDualSubDubButtonsHTML;
 // -------------------------------------------------------------------------
 // IMMERSIVE LANDING PAGE RENDERER (/)
 // -------------------------------------------------------------------------
-window.renderLandingView = function() {
+window.renderLandingView = function () {
     let landingLayout = document.getElementById('landing-page-layout');
     if (!landingLayout) {
         landingLayout = document.createElement('div');
@@ -1069,7 +1350,7 @@ window.renderLandingView = function() {
     `;
 };
 
-window.renderTrendingExploreView = async function() {
+window.renderTrendingExploreView = async function () {
     const container = document.getElementById('trending-explore-layout');
     if (!container) return;
 
@@ -1175,7 +1456,7 @@ window.renderTrendingExploreView = async function() {
     }
 };
 
-window.renderDedicatedScheduleView = async function() {
+window.renderDedicatedScheduleView = async function () {
     const container = document.getElementById('dedicated-schedule-layout');
     if (!container) return;
 
@@ -1263,7 +1544,7 @@ window.renderDedicatedScheduleView = async function() {
     `;
 };
 
-window.selectDedicatedScheduleDay = function(index) {
+window.selectDedicatedScheduleDay = function (index) {
     activeScheduleDayIndex = index;
     if (typeof window.renderDedicatedScheduleView === 'function') {
         window.renderDedicatedScheduleView();
