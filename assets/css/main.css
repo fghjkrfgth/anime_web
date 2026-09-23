@@ -450,8 +450,7 @@ video::cue {
 #btn-sub-toggle,
 #btn-dub-toggle,
 #prev-ep-btn,
-#next-ep-btn,
-#theme-toggle-btn {
+#next-ep-btn {
     min-height: 40px !important;
     min-width: 40px !important;
     border-radius: 9999px !important;
@@ -796,4 +795,3 @@ section {
     transform: scale(1.02);
     box-shadow: 0 8px 22px rgba(245, 158, 11, 0.45);
 }
-z
