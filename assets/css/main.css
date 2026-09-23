@@ -98,38 +98,44 @@ header {
     filter: brightness(1.05) contrast(1.02);
 }
 
-/* Silky, gradual fade-down gradient mask on the bottom 28% of the Spotlight */
+/* Extended, gradual fade-down gradient blend starting from the bottom 48% */
 #spotlight-outer-container::after {
     content: '';
     position: absolute;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 28%;
+    height: 48%;
     pointer-events: none;
     z-index: 5;
-    background: linear-gradient(to bottom, rgba(8, 8, 12, 0) 0%, rgba(8, 8, 12, 0.45) 50%, #08080c 100%);
+    background: linear-gradient(to bottom, transparent 0%, rgba(8, 8, 12, 0.15) 30%, rgba(8, 8, 12, 0.6) 65%, #08080c 100%);
 }
 
-/* Subtle local frosted text-backing cluster for title & metadata readability */
+/* Unboxed, completely uncontained floating typography & controls */
 .spotlight-info-cluster {
-    position: relative;
-    max-width: 44rem;
-    padding: 1.25rem 1.5rem;
-    border-radius: 1.5rem;
-    background: linear-gradient(135deg, rgba(8, 8, 12, 0.6) 0%, rgba(8, 8, 12, 0.25) 70%, transparent 100%);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
 }
 
 #spotlight-title {
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 4px 20px rgba(0, 0, 0, 0.85);
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8));
 }
 
 #spotlight-desc {
     text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95), 0 2px 14px rgba(0, 0, 0, 0.8);
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8));
+}
+
+#spotlight-trend-badge,
+#spotlight-genre-tags span,
+#spotlight-watch-btn,
+#spotlight-list-btn {
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8));
 }
 
 /* Seamless Continue Watching merge: floats nested over the fading lower edge */
@@ -676,89 +682,126 @@ section {
     }
 }
 
-/* 3D Staggered Slots (Expanded 7 Visible Slots) */
+/* 3D Staggered Slots: 9 Visible Slots on Desktop, 5 on Mobile */
 .coverflow-card[data-slot="0"] {
-    transform: translate3d(0, 0, 90px) scale(1) rotateY(0deg);
-    z-index: 30;
+    transform: translate3d(0, 0, 100px) scale(1) rotateY(0deg);
+    z-index: 35;
     opacity: 1;
     pointer-events: auto;
 }
 
+/* First tier: data-slot="±1" (shift ±175px, scale 0.88, rotateY ∓16deg) */
 .coverflow-card[data-slot="1"] {
-    transform: translate3d(180px, 0, -20px) scale(0.84) rotateY(-18deg);
-    z-index: 22;
-    opacity: 0.85;
+    transform: translate3d(175px, 0, -20px) scale(0.88) rotateY(-16deg);
+    z-index: 28;
+    opacity: 0.9;
     pointer-events: auto;
 }
 
 .coverflow-card[data-slot="-1"] {
-    transform: translate3d(-180px, 0, -20px) scale(0.84) rotateY(18deg);
-    z-index: 22;
-    opacity: 0.85;
+    transform: translate3d(-175px, 0, -20px) scale(0.88) rotateY(16deg);
+    z-index: 28;
+    opacity: 0.9;
     pointer-events: auto;
 }
 
+/* Second tier: data-slot="±2" (shift ±330px, scale 0.76, rotateY ∓26deg) */
 .coverflow-card[data-slot="2"] {
-    transform: translate3d(335px, 0, -90px) scale(0.70) rotateY(-28deg);
-    z-index: 14;
-    opacity: 0.55;
+    transform: translate3d(330px, 0, -70px) scale(0.76) rotateY(-26deg);
+    z-index: 20;
+    opacity: 0.75;
     pointer-events: auto;
 }
 
 .coverflow-card[data-slot="-2"] {
-    transform: translate3d(-335px, 0, -90px) scale(0.70) rotateY(28deg);
-    z-index: 14;
+    transform: translate3d(-330px, 0, -70px) scale(0.76) rotateY(26deg);
+    z-index: 20;
+    opacity: 0.75;
+    pointer-events: auto;
+}
+
+/* Third tier: data-slot="±3" (shift ±470px, scale 0.64, rotateY ∓34deg) */
+.coverflow-card[data-slot="3"] {
+    transform: translate3d(470px, 0, -130px) scale(0.64) rotateY(-34deg);
+    z-index: 12;
     opacity: 0.55;
     pointer-events: auto;
 }
 
-.coverflow-card[data-slot="3"] {
-    transform: translate3d(470px, 0, -160px) scale(0.58) rotateY(-36deg);
-    z-index: 8;
-    opacity: 0.3;
-    pointer-events: auto;
-}
-
 .coverflow-card[data-slot="-3"] {
-    transform: translate3d(-470px, 0, -160px) scale(0.58) rotateY(36deg);
-    z-index: 8;
-    opacity: 0.3;
+    transform: translate3d(-470px, 0, -130px) scale(0.64) rotateY(34deg);
+    z-index: 12;
+    opacity: 0.55;
     pointer-events: auto;
 }
 
+/* Outer desktop tier: data-slot="±4" (shift ±590px, scale 0.52, rotateY ∓40deg, opacity ~0.35) */
+.coverflow-card[data-slot="4"] {
+    transform: translate3d(590px, 0, -190px) scale(0.52) rotateY(-40deg);
+    z-index: 6;
+    opacity: 0.35;
+    pointer-events: auto;
+}
+
+.coverflow-card[data-slot="-4"] {
+    transform: translate3d(-590px, 0, -190px) scale(0.52) rotateY(40deg);
+    z-index: 6;
+    opacity: 0.35;
+    pointer-events: auto;
+}
+
+/* Hidden slots for off-screen items */
 .coverflow-card[data-slot="hidden-right"] {
-    transform: translate3d(590px, 0, -240px) scale(0.46);
+    transform: translate3d(700px, 0, -260px) scale(0.42);
     z-index: 0;
     opacity: 0;
     pointer-events: none;
 }
 
 .coverflow-card[data-slot="hidden-left"] {
-    transform: translate3d(-590px, 0, -240px) scale(0.46);
+    transform: translate3d(-700px, 0, -260px) scale(0.42);
     z-index: 0;
     opacity: 0;
     pointer-events: none;
 }
 
-@media (max-width: 1024px) {
-    .coverflow-card[data-slot="3"],
-    .coverflow-card[data-slot="-3"] {
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
-}
-
+/* Mobile matrix (5 visible slots on screens <= 768px: 0, ±1, ±2) */
 @media (max-width: 768px) {
     .coverflow-card[data-slot="1"] {
-        transform: translate3d(120px, 0, -30px) scale(0.80) rotateY(-14deg);
+        transform: translate3d(120px, 0, -25px) scale(0.82) rotateY(-14deg) !important;
+        z-index: 20 !important;
+        opacity: 0.85 !important;
+        pointer-events: auto !important;
     }
     .coverflow-card[data-slot="-1"] {
-        transform: translate3d(-120px, 0, -30px) scale(0.80) rotateY(14deg);
+        transform: translate3d(-120px, 0, -25px) scale(0.82) rotateY(14deg) !important;
+        z-index: 20 !important;
+        opacity: 0.85 !important;
+        pointer-events: auto !important;
     }
-    .coverflow-card[data-slot="2"],
+    .coverflow-card[data-slot="2"] {
+        transform: translate3d(225px, 0, -65px) scale(0.68) rotateY(-22deg) !important;
+        z-index: 10 !important;
+        opacity: 0.55 !important;
+        pointer-events: auto !important;
+    }
     .coverflow-card[data-slot="-2"] {
+        transform: translate3d(-225px, 0, -65px) scale(0.68) rotateY(22deg) !important;
+        z-index: 10 !important;
+        opacity: 0.55 !important;
+        pointer-events: auto !important;
+    }
+    .coverflow-card[data-slot="3"],
+    .coverflow-card[data-slot="-3"],
+    .coverflow-card[data-slot="4"],
+    .coverflow-card[data-slot="-4"] {
         opacity: 0 !important;
         pointer-events: none !important;
+        transform: translate3d(320px, 0, -100px) scale(0.5) !important;
+    }
+    .coverflow-card[data-slot="-3"],
+    .coverflow-card[data-slot="-4"] {
+        transform: translate3d(-320px, 0, -100px) scale(0.5) !important;
     }
 }
 
