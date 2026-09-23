@@ -71,8 +71,6 @@
             <nav class="hidden lg:flex items-center gap-5 text-xs font-semibold text-zinc-400">
                 <a href="/home" class="hover:text-white transition-colors text-white">Home</a>
                 <a href="#trending-section" class="hover:text-white transition-colors">Trending</a>
-                <a href="#popular-section" class="hover:text-white transition-colors">Popular</a>
-                <a href="#explore-genre-section" class="hover:text-white transition-colors">Genres</a>
                 <a href="#airing-broadcast-section" class="hover:text-white transition-colors">Schedule</a>
             </nav>
         </div>
@@ -203,14 +201,6 @@
                     class="hover:text-white transition-colors py-2 border-b border-white/5">Explore</a>
                 <a href="#airing-broadcast-section"
                     class="hover:text-white transition-colors py-2 border-b border-white/5">Schedule</a>
-                <a href="#" id="drawer-filter-trigger"
-                    class="hover:text-white transition-colors py-2 border-b border-white/5 flex items-center justify-between">
-                    <span>Genres</span>
-                    <svg class="w-4 h-4 text-[#00f5ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                    </svg>
-                </a>
                 <a href="#" onclick="toggleClusterModeDebug()"
                     class="hover:text-white transition-colors py-2 border-b border-white/5 flex items-center justify-between">
                     <span>Cluster</span>
@@ -276,14 +266,25 @@
             <div class="w-full mb-8 flex flex-col gap-4">
                 <h2 class="text-white text-xl md:text-2xl font-extrabold uppercase tracking-wider">Search Anime Catalog
                 </h2>
-                <div class="relative w-full">
-                    <svg class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-steelGray pointer-events-none"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    <input id="search-input" type="text" placeholder="Type name, genre, or keywords..."
-                        class="w-full pl-12 pr-6 py-3.5 md:py-4 text-base md:text-lg text-white bg-slate-950/60 rounded-2xl border border-[#e50914]/20 outline-none transition-all duration-300 focus:border-[#e50914] focus:ring-2 focus:ring-[#e50914]/20 shadow-[0_0_15px_rgba(229,9,20,0.1)]">
+                <div class="flex items-center gap-3 w-full">
+                    <div class="relative flex-1">
+                        <svg class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-steelGray pointer-events-none"
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input id="search-input" type="text" placeholder="Type name, genre, or keywords..."
+                            class="w-full pl-12 pr-6 py-3.5 md:py-4 text-base md:text-lg text-white bg-slate-950/60 rounded-2xl border border-[#e50914]/20 outline-none transition-all duration-300 focus:border-[#e50914] focus:ring-2 focus:ring-[#e50914]/20 shadow-[0_0_15px_rgba(229,9,20,0.1)]">
+                    </div>
+                    <button id="apply-search-btn" type="button"
+                        class="px-5 sm:px-7 py-3.5 md:py-4 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs sm:text-sm uppercase tracking-wider rounded-2xl transition-all shadow-lg shadow-red-900/40 hover:scale-[1.02] active:scale-[0.98] shrink-0 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span class="hidden sm:inline">Search / Apply Filters</span>
+                        <span class="sm:hidden">Search</span>
+                    </button>
                 </div>
 
                 <!-- Compact Dropdown Packed Filters inline -->
