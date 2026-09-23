@@ -46,23 +46,35 @@ header {
 }
 
 /* =========================================================================
-   FULL-BLEED FADE-DOWN SPOTLIGHT HERO
+   FULL-BLEED SCREEN-EDGE HERO SPOTLIGHT & CONTINUE WATCHING TRANSITION
    ========================================================================= */
 #hero-spotlight-section {
-    width: 100% !important;
-    position: relative;
-    overflow: hidden;
-}
-
-#spotlight-outer-container {
+    width: 100vw !important;
+    position: relative !important;
+    left: 50% !important;
+    right: 50% !important;
+    margin-left: -50vw !important;
+    margin-right: -50vw !important;
+    margin-top: 0 !important;
+    padding: 0 !important;
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
     overflow: hidden !important;
-    position: relative;
+}
+
+#spotlight-outer-container {
     width: 100% !important;
-    min-height: 460px !important;
+    min-height: 480px !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
     background: transparent !important;
 }
 
@@ -70,7 +82,9 @@ header {
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
-    min-height: 460px !important;
+    min-height: 480px !important;
+    position: relative;
+    z-index: 10;
 }
 
 #spotlight-bg-img {
@@ -79,18 +93,56 @@ header {
     width: 100%;
     height: 100%;
     background-size: cover;
-    background-position: center 25%;
-    transition: transform 0.7s ease-out;
-    mask-image: linear-gradient(to bottom, rgba(8, 8, 12, 0.05) 0%, rgba(8, 8, 12, 0.4) 40%, rgba(8, 8, 12, 0.85) 75%, #08080c 100%);
-    -webkit-mask-image: linear-gradient(to bottom, rgba(8, 8, 12, 0.05) 0%, rgba(8, 8, 12, 0.4) 40%, rgba(8, 8, 12, 0.85) 75%, #08080c 100%);
+    background-position: center 20%;
+    transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    filter: brightness(1.05) contrast(1.02);
 }
 
+/* Silky, gradual fade-down gradient mask on the bottom 28% of the Spotlight */
 #spotlight-outer-container::after {
     content: '';
     position: absolute;
-    inset: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 28%;
     pointer-events: none;
-    background: linear-gradient(to bottom, rgba(8, 8, 12, 0.05) 0%, rgba(8, 8, 12, 0.4) 40%, rgba(8, 8, 12, 0.85) 75%, #08080c 100%);
+    z-index: 5;
+    background: linear-gradient(to bottom, rgba(8, 8, 12, 0) 0%, rgba(8, 8, 12, 0.45) 50%, #08080c 100%);
+}
+
+/* Subtle local frosted text-backing cluster for title & metadata readability */
+.spotlight-info-cluster {
+    position: relative;
+    max-width: 44rem;
+    padding: 1.25rem 1.5rem;
+    border-radius: 1.5rem;
+    background: linear-gradient(135deg, rgba(8, 8, 12, 0.6) 0%, rgba(8, 8, 12, 0.25) 70%, transparent 100%);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+#spotlight-title {
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 4px 20px rgba(0, 0, 0, 0.85);
+}
+
+#spotlight-desc {
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95), 0 2px 14px rgba(0, 0, 0, 0.8);
+}
+
+/* Seamless Continue Watching merge: floats nested over the fading lower edge */
+#continue-watching-section {
+    position: relative !important;
+    z-index: 20 !important;
+    margin-top: -4.5rem !important; /* -mt-18 */
+}
+
+@media (min-width: 768px) {
+    #continue-watching-section {
+        margin-top: -5rem !important; /* -mt-20 */
+    }
 }
 
 .spotlight-page-dot {
