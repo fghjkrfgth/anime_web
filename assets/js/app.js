@@ -760,6 +760,9 @@ async function handleSpaRouting() {
 
     // Pause video player if leaving watch view to free main thread CPU/GPU resources
     if (!isWatch) {
+        window.isAiringUnreleased = false;
+        const unreleasedOverlay = document.getElementById('unreleased-broadcast-overlay');
+        if (unreleasedOverlay) unreleasedOverlay.remove();
         const videoPlayer = document.getElementById('main-video-player');
         if (videoPlayer && !videoPlayer.paused) {
             videoPlayer.pause();
@@ -1036,6 +1039,10 @@ async function renderWatchView() {
 
     const pathname = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
+    const isUnreleased = urlParams.get('unreleased') === 'true' || window.isAiringUnreleased;
+    if (isUnreleased) {
+        window.isAiringUnreleased = true;
+    }
     const hasExplicitEp = urlParams.has('ep');
     let epNum = parseInt(urlParams.get('ep') || '1', 10);
     const match = pathname.match(/\/watch\/anime\/([a-z0-9\-]+)-(\d+)/i);
@@ -1048,6 +1055,41 @@ async function renderWatchView() {
     }
 
     if (!anilistId) {
+        let cachedShow = null;
+        try {
+            cachedShow = JSON.parse(localStorage.getItem('activeShowData'));
+        } catch (e) { }
+
+        if (cachedShow && cachedShow.id) {
+            anilistId = cachedShow.id;
+        } else if (isUnreleased) {
+            const slugMatch = pathname.match(/\/watch\/anime\/([^\/?#]+)/i);
+            const slugPart = slugMatch ? slugMatch[1] : '';
+            const searchKeyword = slugPart.replace(/-\d+$/, '').replace(/-/g, ' ').trim();
+            if (searchKeyword && typeof fetchAniListGraphQL === 'function') {
+                try {
+                    const searchRes = await fetchAniListGraphQL({
+                        query: `query ($search: String) { Media(search: $search, type: ANIME) { id } }`,
+                        variables: { search: searchKeyword }
+                    });
+                    if (searchRes?.data?.Media?.id) {
+                        anilistId = searchRes.data.Media.id;
+                    }
+                } catch (e) {
+                    console.warn('[Watch Router] Could not resolve AniList ID from slug:', e);
+                }
+            }
+        }
+    }
+
+    if (!anilistId) {
+        if (isUnreleased) {
+            window.currentEp = epNum;
+            if (typeof window.renderUnreleasedBroadcastOverlay === 'function') {
+                window.renderUnreleasedBroadcastOverlay(window.currentEp, 'This anime');
+            }
+            return;
+        }
         window.history.replaceState(null, '', '/home');
         handleSpaRouting();
         return;
@@ -1087,11 +1129,26 @@ async function renderWatchView() {
             }
         } catch (err) {
             console.error("Failed to fetch show details directly:", err);
+            if (isUnreleased) {
+                if (typeof window.renderUnreleasedBroadcastOverlay === 'function') {
+                    window.renderUnreleasedBroadcastOverlay(window.currentEp, 'This anime');
+                }
+                return;
+            }
             alert("Failed to load show details. Redirecting to home.");
             window.history.pushState(null, '', '/home');
             handleSpaRouting();
             return;
         }
+    }
+
+    // Guard: If unreleased broadcast episode, invoke overlay and short-circuit without fetching streams
+    if (isUnreleased) {
+        const showTitle = window.showData?.title?.english || window.showData?.title?.romaji || window.showData?.title?.userPreferred || 'This anime';
+        if (typeof window.renderUnreleasedBroadcastOverlay === 'function') {
+            window.renderUnreleasedBroadcastOverlay(window.currentEp, showTitle);
+        }
+        return;
     }
 
     // Fetch episode servers on watch page load before stream loading
@@ -1644,7 +1701,11 @@ window.toggleSynopsis = function () {
 };
 
 window.changeEpisode = async function (epNum, bypassFillerCheck = false) {
-    const totalEps = getActualEpisodeCount(window.showData);
+    window.isAiringUnreleased = false;
+    const unreleasedOverlay = document.getElementById('unreleased-broadcast-overlay');
+    if (unreleasedOverlay) unreleasedOverlay.remove();
+
+    const totalEps = Math.max(getActualEpisodeCount(window.showData), window.currentEp || 1);
     if (epNum < 1 || epNum > totalEps) return;
 
     if (!bypassFillerCheck) {
@@ -1806,6 +1867,17 @@ window.viewRelatedShow = async function (relatedId) {
 };
 
 window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isUnreleased = urlParams.get('unreleased') === 'true' || window.isAiringUnreleased;
+    if (isUnreleased) {
+        console.log(`[Stream Resolver] Suppressed stream playback for unreleased broadcast episode ${epNum}`);
+        if (typeof window.renderUnreleasedBroadcastOverlay === 'function') {
+            const showTitle = window.showData?.title?.english || window.showData?.title?.romaji || window.showData?.title?.userPreferred || 'This anime';
+            window.renderUnreleasedBroadcastOverlay(epNum, showTitle);
+        }
+        return;
+    }
+
     const existingFallback = document.getElementById('empty-stream-fallback-overlay');
     if (existingFallback) existingFallback.remove();
 
