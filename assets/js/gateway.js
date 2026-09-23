@@ -224,11 +224,11 @@ window.fetchEpisodeServers = fetchEpisodeServers;
 // 4. FILLER EPISODE DATA FETCHING & CACHING (TARGETED BATCH FETCHING)
 const fillerCache = new Map();
 
-async function fetchFillerEpisodes(anilistId, malId = null, targetBatchIdx = 0) {
+async function fetchFillerEpisodes(anilistId, malId, targetBatchIdx = 0) {
     if (!anilistId) return new Set();
 
     const batchIdx = Math.max(0, parseInt(targetBatchIdx || 0, 10) || 0);
-    const sessionKey = `fillers_${anilistId}_batch_${batchIdx}`;
+    const sessionKey = 'fillers_' + anilistId + '_batch_' + batchIdx;
 
     // 1. Check in-memory cache first
     if (fillerCache.has(sessionKey)) {
