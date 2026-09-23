@@ -369,10 +369,13 @@ function updateScheduleUI() {
     } else {
         shows.forEach(show => {
             const localTime = formatLocalTime(show.timestamp);
-            const searchParam = encodeURIComponent(show.title);
+            const encodedTitle = encodeURIComponent(show.title).replace(/'/g, '%27');
+            const safeSlug = (show.slug || '').replace(/'/g, "\\'");
+            const epNum = show.episode || 1;
+            const showId = show.id || show.anilistId || 'null';
 
             gridHtml += `
-                <div class="flex items-center justify-between p-3.5 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#d4af37]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98]" onclick="searchAndPlay('${searchParam}', '${show.slug}')">
+                <div class="flex items-center justify-between p-3.5 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#d4af37]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98]" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
                         <span class="text-[11px] font-extrabold text-[#d4af37] whitespace-nowrap bg-[#d4af37]/15 px-2.5 py-1 rounded-lg border border-[#d4af37]/30 shadow-[0_0_8px_rgba(212,175,55,0.15)]">
                             ${localTime}
@@ -398,18 +401,47 @@ function selectScheduleDay(index) {
     updateScheduleUI();
 }
 
-function searchAndPlay(title, slug) {
-    const cleanTitle = decodeURIComponent(title);
-    const url = new URL(window.location.href);
-    url.searchParams.set('search', cleanTitle);
-    url.searchParams.delete('genre');
-    url.searchParams.delete('status');
-    url.searchParams.delete('format');
-    url.searchParams.delete('year');
-    url.searchParams.delete('sort');
-    window.history.pushState({}, '', url.toString());
-    checkUrlParamsAndSearch();
+async function openBroadcastEpisode(showTitle, slug, epNum, showId) {
+    const cleanTitle = (typeof showTitle === 'string' && showTitle.includes('%')) ? decodeURIComponent(showTitle) : (showTitle || '');
+    window.isAiringUnreleased = true;
+
+    let validId = (showId && showId !== 'null' && showId !== 'undefined') ? showId : null;
+
+    // If showId is not directly present, resolve via AniList GraphQL query
+    if (!validId && cleanTitle && typeof fetchAniListGraphQL === 'function') {
+        try {
+            const query = `query ($search: String) { Media(search: $search, type: ANIME) { id title { english romaji userPreferred } } }`;
+            const res = await fetchAniListGraphQL({ query, variables: { search: cleanTitle } });
+            if (res?.data?.Media?.id) {
+                validId = res.data.Media.id;
+                try {
+                    localStorage.setItem('activeShowData', JSON.stringify(res.data.Media));
+                } catch (e) {}
+            }
+        } catch (e) {
+            console.warn('[Broadcast Router] AniList search resolution error:', e);
+        }
+    }
+
+    const safeSlug = (typeof window.slugify === 'function') ? window.slugify(cleanTitle || slug || 'anime') : (slug || 'anime');
+    const identifier = validId || slug || safeSlug;
+    const targetUrl = `/watch/anime/${safeSlug}-${identifier}?ep=${epNum || 1}&unreleased=true`;
+
+    window.history.pushState(null, '', targetUrl);
+    if (typeof handleSpaRouting === 'function') {
+        handleSpaRouting();
+    } else {
+        window.location.href = targetUrl;
+    }
 }
+window.openBroadcastEpisode = openBroadcastEpisode;
+
+// Deprecated fallback for backwards compatibility
+function searchAndPlay(title, slug) {
+    console.warn('[Deprecation] searchAndPlay is deprecated. Delegating to openBroadcastEpisode.');
+    openBroadcastEpisode(title, slug, 1, null);
+}
+window.searchAndPlay = searchAndPlay;
 
 function createCardHTML(show, rank = null) {
     const title = getShowTitle(show);
@@ -1598,10 +1630,13 @@ window.renderDedicatedScheduleView = async function () {
     } else {
         shows.forEach(show => {
             const localTime = formatLocalTime(show.timestamp);
-            const searchParam = encodeURIComponent(show.title);
+            const encodedTitle = encodeURIComponent(show.title).replace(/'/g, '%27');
+            const safeSlug = (show.slug || '').replace(/'/g, "\\'");
+            const epNum = show.episode || 1;
+            const showId = show.id || show.anilistId || 'null';
 
             showsListHtml += `
-                <div class="flex items-center justify-between p-4 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#00f5ff]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px]" onclick="searchAndPlay('${searchParam}', '${show.slug}')">
+                <div class="flex items-center justify-between p-4 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#00f5ff]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px]" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
                         <span class="text-xs font-extrabold text-[#00f5ff] whitespace-nowrap bg-[#00f5ff]/10 px-3 py-1.5 rounded-xl border border-[#00f5ff]/25 shadow-[0_0_10px_rgba(0,245,255,0.15)]">
                             ${localTime}
