@@ -42,86 +42,9 @@
 
 <body class="h-full flex flex-col scrollbar-thin bg-[#0a0b0f] text-white">
 
-    <!-- Desktop Fixed Left Sidebar (w-60 / 240px on lg screens) -->
-    <aside id="desktop-sidebar"
-        class="hidden lg:flex fixed inset-y-0 left-0 w-60 z-40 flex-col justify-between bg-[#0a0b0f] border-r border-white/[0.06] p-5">
-        <div class="flex flex-col gap-8">
-            <!-- Brand Logo at Top -->
-            <a href="/" class="flex items-center gap-2.5 px-2 py-1 select-none">
-                <span
-                    class="w-8 h-8 rounded-xl bg-gradient-to-br from-[#e50914] to-[#990000] flex items-center justify-center text-white shadow-lg shadow-red-900/40">
-                    <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                        <path
-                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
-                    </svg>
-                </span>
-                <span class="text-lg font-black tracking-widest text-white uppercase font-sans">
-                    ANIME<span class="text-[#e50914]">FLOW</span>
-                </span>
-            </a>
-
-            <!-- Vertical Navigation Tabs with Subtle Pill Active Indicators -->
-            <nav class="flex flex-col gap-1.5">
-                <a href="/home" class="sidebar-nav-item active" id="nav-item-home">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                    <span>Home</span>
-                </a>
-                <a href="#trending-section" class="sidebar-nav-item" id="nav-item-explore">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    <span>Explore</span>
-                </a>
-                <a href="#continue-watching-section" class="sidebar-nav-item" id="nav-item-library">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <span>My Library</span>
-                </a>
-                <a href="#popular-section" class="sidebar-nav-item" id="nav-item-collections">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                    </svg>
-                    <span>Collections</span>
-                </a>
-                <a href="javascript:void(0)" onclick="openAuthModal('login')" class="sidebar-nav-item"
-                    id="nav-item-profile">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    <span>Profile</span>
-                </a>
-            </nav>
-        </div>
-
-        <!-- Bottom Aesthetic Art Illustration Badge -->
-        <div
-            class="p-4 rounded-2xl bg-gradient-to-br from-[#161722] to-[#0d0e14] border border-white/[0.08] relative overflow-hidden flex flex-col gap-2 group shadow-xl">
-            <div
-                class="absolute -right-4 -bottom-4 w-20 h-20 rounded-full bg-[#e50914]/20 blur-xl pointer-events-none group-hover:bg-[#e50914]/30 transition-all">
-            </div>
-            <div class="flex items-center justify-between z-10">
-                <span
-                    class="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-[#e50914]/20 text-[#ff3b45] border border-[#e50914]/30">VIP
-                    Pass</span>
-                <span class="text-xs">⚡</span>
-            </div>
-            <div class="text-xs font-bold text-white z-10">Premium Hub</div>
-            <div class="text-[11px] text-zinc-400 z-10 font-light leading-snug">Ad-free streaming, 4K multi-audio HLS
-                renditions.</div>
-        </div>
-    </aside>
-
-    <!-- Header Bar with Top Search & Utility Chips (offset on desktop) -->
+    <!-- Header Bar with Top Search & Utility Chips -->
     <header
-        class="sticky top-0 z-30 w-full bg-[#0a0b0f]/90 backdrop-blur-xl border-b border-white/[0.06] px-4 md:px-8 py-3 lg:pl-68 flex items-center justify-between gap-4">
+        class="sticky top-0 z-30 w-full bg-[#0a0b0f]/90 backdrop-blur-xl border-b border-white/[0.06] px-4 md:px-8 py-3 flex items-center justify-between gap-4">
         <!-- Left: Hamburger Menu (Mobile Drawer Toggle) -->
         <button id="mobile-drawer-toggle"
             class="p-2 text-white hover:text-[#e50914] transition-colors focus:outline-none md:hidden">
@@ -130,11 +53,29 @@
             </svg>
         </button>
 
-        <!-- Center: Mobile Logo (< lg screens) -->
-        <a href="/"
-            class="flex items-center gap-1 text-white font-extralight text-lg tracking-[0.2em] select-none lg:hidden uppercase">
-            ANIME<span class="font-normal text-[#e50914]">FLOW</span>
-        </a>
+        <!-- Brand Logo (visible across all screen sizes) -->
+        <div class="flex items-center gap-6">
+            <a href="/"
+                class="flex items-center gap-2 text-white font-extralight text-lg tracking-[0.2em] select-none uppercase shrink-0">
+                <span
+                    class="w-7 h-7 rounded-xl bg-gradient-to-br from-[#e50914] to-[#990000] flex items-center justify-center text-white shadow-lg shadow-red-900/40">
+                    <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                        <path
+                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
+                    </svg>
+                </span>
+                ANIME<span class="font-normal text-[#e50914]">FLOW</span>
+            </a>
+
+            <!-- Desktop Horizontal Navigation Links -->
+            <nav class="hidden lg:flex items-center gap-5 text-xs font-semibold text-zinc-400">
+                <a href="/home" class="hover:text-white transition-colors text-white">Home</a>
+                <a href="#trending-section" class="hover:text-white transition-colors">Trending</a>
+                <a href="#popular-section" class="hover:text-white transition-colors">Popular</a>
+                <a href="#explore-genre-section" class="hover:text-white transition-colors">Genres</a>
+                <a href="#airing-broadcast-section" class="hover:text-white transition-colors">Schedule</a>
+            </nav>
+        </div>
 
         <!-- Desktop Top Search Bar -->
         <div class="relative flex-1 max-w-md hidden md:flex items-center">
@@ -320,9 +261,9 @@
         </a>
     </nav>
 
-    <!-- Main Feed Content Container (with offset on desktop) -->
+    <!-- Main Feed Content Container -->
     <main id="main-content"
-        class="min-w-0 flex-1 max-w-[1600px] w-full px-4 md:px-8 lg:pl-68 pb-24 md:pb-16 flex flex-col gap-8">
+        class="min-w-0 flex-1 max-w-[1700px] w-full mx-auto px-4 md:px-8 pb-24 md:pb-16 flex flex-col gap-8">
         <!-- Dedicated Trending Explore Layout Container -->
         <div id="trending-explore-layout" class="hidden w-full max-w-7xl mx-auto px-0 py-6"></div>
 
@@ -424,10 +365,10 @@
         </div>
 
         <div id="homepage-sections-wrapper" class="flex flex-col gap-10">
-            <!-- 2. HERO SPOTLIGHT BANNER: 21:9 Cinematic Widescreen Card -->
+            <!-- 2. HERO SPOTLIGHT BANNER: Full-Bleed Fade-Down -->
             <section id="hero-spotlight-section" class="w-full">
                 <div id="spotlight-outer-container"
-                    class="relative w-full aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[360px] lg:min-h-[440px] rounded-3xl overflow-hidden shadow-2xl bg-[#0e0f16] group/spotlight">
+                    class="relative w-full aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[460px] overflow-hidden group/spotlight">
                     <!-- Background Image Zoom -->
                     <div id="spotlight-bg-img"
                         class="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover/spotlight:scale-105"
@@ -714,9 +655,9 @@
         </div>
     </div>
 
-    <!-- Page Footer (with desktop offset) -->
+    <!-- Page Footer -->
     <footer
-        class="mt-auto w-full bg-[#08080c] border-t border-white/5 py-10 lg:pl-68 text-steelGray text-xs md:text-sm">
+        class="mt-auto w-full bg-[#08080c] border-t border-white/5 py-10 text-steelGray text-xs md:text-sm">
         <div class="max-w-7xl mx-auto px-4 flex flex-col items-center gap-6 text-center">
             <!-- Disclaimer -->
             <p class="max-w-3xl leading-relaxed text-steelGray/80 text-[11px] md:text-xs">
