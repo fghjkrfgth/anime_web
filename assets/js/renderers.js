@@ -766,8 +766,10 @@ class CoverflowCarousel {
             else if (diff === -2) slot = '-2';
             else if (diff === 3) slot = '3';
             else if (diff === -3) slot = '-3';
-            else if (diff > 3) slot = 'hidden-right';
-            else if (diff < -3) slot = 'hidden-left';
+            else if (diff === 4) slot = '4';
+            else if (diff === -4) slot = '-4';
+            else if (diff > 4) slot = 'hidden-right';
+            else if (diff < -4) slot = 'hidden-left';
 
             card.setAttribute('data-slot', slot);
         });
