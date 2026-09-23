@@ -367,24 +367,20 @@
 
         <div id="homepage-sections-wrapper" class="flex flex-col gap-10">
             <!-- 2. HERO SPOTLIGHT BANNER: Full-Bleed Fade-Down -->
-            <section id="hero-spotlight-section" class="w-full">
+            <section id="hero-spotlight-section" class="w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] overflow-hidden">
                 <div id="spotlight-outer-container"
-                    class="relative w-full aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[460px] overflow-hidden group/spotlight">
-                    <!-- Background Image Zoom -->
+                    class="relative w-full aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9] min-h-[480px] lg:min-h-[560px] overflow-hidden group/spotlight rounded-none border-0 p-0 m-0">
+                    <!-- Background Image Zoom (Crystal-Clear Vibrant Artwork) -->
                     <div id="spotlight-bg-img"
                         class="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover/spotlight:scale-105"
                         style="background-image: url('');"></div>
-                    <div
-                        class="absolute inset-0 bg-gradient-to-t from-[#0a0b0f] via-[#0a0b0f]/60 to-transparent lg:bg-gradient-to-r lg:from-[#0a0b0f] lg:via-[#0a0b0f]/75 lg:to-transparent">
-                    </div>
-                    <div class="absolute inset-0 bg-gradient-to-t from-[#0a0b0f] via-transparent to-transparent"></div>
 
                     <!-- Inner Card Details -->
                     <div id="spotlight-card-content"
-                        class="relative z-10 w-full h-full flex flex-col justify-end p-6 md:p-10 lg:p-12 transition-opacity duration-300">
+                        class="relative z-10 w-full max-w-[1700px] mx-auto h-full flex flex-col justify-end px-4 md:px-8 lg:px-12 pb-24 md:pb-28 lg:pb-32 pt-8 transition-opacity duration-300">
                         <div class="flex flex-col lg:flex-row items-end lg:items-end justify-between gap-6 w-full">
-                            <!-- Left-aligned Typography & Actions -->
-                            <div class="flex flex-col gap-3.5 max-w-2xl w-full">
+                            <!-- Left-aligned Typography & Actions with local frosted text-backing -->
+                            <div class="spotlight-info-cluster flex flex-col gap-3.5 max-w-2xl w-full">
                                 <div class="flex items-center gap-2.5 flex-wrap">
                                     <span id="spotlight-trend-badge"
                                         class="px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-[#e50914] text-white shadow-lg shadow-red-900/40 flex items-center gap-1.5">
@@ -403,11 +399,11 @@
                                 </div>
 
                                 <h1 id="spotlight-title"
-                                    class="text-2xl sm:text-3xl lg:text-5xl font-black text-white leading-tight tracking-tight drop-shadow-lg line-clamp-2">
+                                    class="text-2xl sm:text-3xl lg:text-5xl font-black text-white leading-tight tracking-tight drop-shadow-xl line-clamp-2">
                                     Loading Spotlight...
                                 </h1>
                                 <p id="spotlight-desc"
-                                    class="text-zinc-300 text-xs sm:text-sm line-clamp-2 font-normal leading-relaxed drop-shadow max-w-xl">
+                                    class="text-zinc-200 text-xs sm:text-sm line-clamp-2 font-normal leading-relaxed drop-shadow-md max-w-xl">
                                     Loading synopsis...
                                 </p>
                                 <div class="flex items-center gap-3 pt-2">
@@ -457,7 +453,7 @@
             </section>
 
             <!-- 3. WIDESCREEN CONTINUE WATCHING SECTION -->
-            <section id="continue-watching-section" class="hidden flex flex-col gap-4 w-full min-w-0 overflow-hidden">
+            <section id="continue-watching-section" class="hidden flex flex-col gap-4 w-full min-w-0 overflow-hidden relative z-20 -mt-16 md:-mt-20">
                 <div class="flex items-center justify-between">
                     <h2
                         class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 border-[#e50914] pl-3 flex items-center gap-2">
