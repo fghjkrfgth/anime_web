@@ -173,18 +173,17 @@ function populateYearDropdown() {
     selectYear.innerHTML = optionsHtml;
 }
 
-async function executeSearch(queryText = '') {
+async function executeSearch(queryText = '', customTitle = null, perPage = 50) {
     currentQueryText = (queryText || '').trim();
 
     const genre = document.getElementById('filter-genre')?.value || null;
     const status = document.getElementById('filter-status')?.value || null;
     const format = document.getElementById('filter-format')?.value || null;
     const seasonYear = document.getElementById('filter-year')?.value ? parseInt(document.getElementById('filter-year').value, 10) : null;
+    const sortVal = document.getElementById('filter-sort')?.value || null;
+    const sort = sortVal ? [sortVal] : ["POPULARITY_DESC"];
 
-    if (!currentQueryText && !genre && !status && !format && !seasonYear) {
-        clearSearch();
-        return;
-    }
+    const hasAnyFilter = Boolean(genre || status || format || seasonYear || sortVal);
 
     const homepageWrapper = document.getElementById('homepage-sections-wrapper');
     if (homepageWrapper) {
@@ -199,19 +198,48 @@ async function executeSearch(queryText = '') {
     const resultsHeader = document.getElementById('search-overlay-results-header');
     if (resultsHeader) resultsHeader.classList.remove('hidden');
 
+    if (!currentQueryText && !hasAnyFilter && !customTitle) {
+        const resultsGrid = document.getElementById('search-results-grid');
+        if (resultsGrid) {
+            resultsGrid.innerHTML = `
+                <div class="col-span-full text-center py-12 text-[#a0a5b5] text-sm">
+                    Use the search input or select any filter above to discover anime.
+                </div>
+            `;
+        }
+        const titleEl = document.getElementById('search-overlay-title');
+        if (titleEl) titleEl.innerText = 'Search Anime Catalog';
+        return;
+    }
+
+    const titleEl = document.getElementById('search-overlay-title');
+    if (titleEl) {
+        if (customTitle) {
+            titleEl.innerText = customTitle;
+        } else if (currentQueryText) {
+            titleEl.innerText = `Search Results: "${currentQueryText}"`;
+        } else if (genre && !status && !format && !seasonYear) {
+            titleEl.innerText = `Top ${perPage} in ${genre}`;
+        } else if (hasAnyFilter) {
+            titleEl.innerText = `Filtered Anime Catalog`;
+        } else {
+            titleEl.innerText = `Top ${perPage} Most Popular Anime`;
+        }
+    }
+
     const resultsGrid = document.getElementById('search-results-grid');
     if (resultsGrid) {
         resultsGrid.innerHTML = `
             <div class="col-span-full flex justify-center py-12">
-                <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-[#00f5ff]"></div>
+                <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-[#e50914]"></div>
             </div>
         `;
     }
 
     const payload = {
         query: `
-          query ($search: String, $genre: String, $status: MediaStatus, $format: MediaFormat, $seasonYear: Int, $sort: [MediaSort]) {
-            Page (page: 1, perPage: 100) {
+          query ($search: String, $genre: String, $status: MediaStatus, $format: MediaFormat, $seasonYear: Int, $sort: [MediaSort], $perPage: Int) {
+            Page (page: 1, perPage: $perPage) {
               media (search: $search, genre: $genre, status: $status, format: $format, seasonYear: $seasonYear, sort: $sort, type: ANIME) {
                 id
                 title {
@@ -222,7 +250,11 @@ async function executeSearch(queryText = '') {
                 }
                 coverImage {
                   large
+                  extraLarge
                 }
+                meanScore
+                format
+                status
                 episodes
                 nextAiringEpisode {
                   episode
@@ -237,7 +269,8 @@ async function executeSearch(queryText = '') {
             status: status || undefined,
             format: format || undefined,
             seasonYear: seasonYear || undefined,
-            sort: document.getElementById('filter-sort')?.value ? [document.getElementById('filter-sort').value] : ["POPULARITY_DESC"]
+            sort: sort,
+            perPage: perPage || 50
         }
     };
 
@@ -245,14 +278,15 @@ async function executeSearch(queryText = '') {
         let json = await fetchAniListGraphQL(payload);
         let mediaList = json.data?.Page?.media || [];
 
-        // Fallback 1: If search results are zero and filters were selected, reload query relaxing the filters
+        // Fallback 1: If search results are zero and filters were selected with text, retry relaxing filters
         if (mediaList.length === 0 && currentQueryText && (genre || status || format || seasonYear)) {
             console.log('[Search Fallback] Relaxing active filters to find sound-alikes for:', currentQueryText);
             const fallbackPayload = {
                 query: payload.query,
                 variables: {
                     search: currentQueryText,
-                    sort: ['POPULARITY_DESC']
+                    sort: ['POPULARITY_DESC'],
+                    perPage: perPage || 50
                 }
             };
             try {
@@ -266,7 +300,7 @@ async function executeSearch(queryText = '') {
             }
         }
 
-        // Fallback 2: If still empty, try substring match (first 4 characters if query is longer)
+        // Fallback 2: If still empty and text query is longer than 4 chars, try substring
         if (mediaList.length === 0 && currentQueryText.length > 4) {
             const sliceQuery = currentQueryText.slice(0, 4);
             console.log('[Search Fallback] Trying substring search:', sliceQuery);
@@ -274,7 +308,8 @@ async function executeSearch(queryText = '') {
                 query: payload.query,
                 variables: {
                     search: sliceQuery,
-                    sort: ['POPULARITY_DESC']
+                    sort: ['POPULARITY_DESC'],
+                    perPage: perPage || 50
                 }
             };
             try {
@@ -295,7 +330,7 @@ async function executeSearch(queryText = '') {
             if (status) criteriaParts.push(`Status: ${status}`);
             if (format) criteriaParts.push(`Format: ${format}`);
             if (seasonYear) criteriaParts.push(`Year: ${seasonYear}`);
-            const criteriaStr = criteriaParts.join(' + ');
+            const criteriaStr = criteriaParts.join(' + ') || 'selected filters';
 
             if (resultsGrid) {
                 resultsGrid.innerHTML = `
@@ -303,7 +338,7 @@ async function executeSearch(queryText = '') {
                         No anime found matching criteria: ${criteriaStr}
                     </div>
                     <div class="col-span-full border-t border-white/5 pt-6 mt-4">
-                        <h3 class="text-sm font-bold tracking-widest text-white uppercase mb-4 pl-3 border-l-4 border-[#00f5ff]">Trending Now</h3>
+                        <h3 class="text-sm font-bold tracking-widest text-white uppercase mb-4 pl-3 border-l-4 border-[#e50914]">Trending Now</h3>
                     </div>
                     ${(window.trendingCache || []).map(show => createCardHTML(show)).join('')}
                 `;
@@ -326,13 +361,19 @@ async function executeSearch(queryText = '') {
         }
     }
 }
+window.executeSearch = executeSearch;
 
 function clearSearch() {
-    document.getElementById('filter-genre').value = "";
-    document.getElementById('filter-status').value = "";
-    document.getElementById('filter-format').value = "";
-    document.getElementById('filter-year').value = "";
-    document.getElementById('filter-sort').value = "";
+    const filterGenre = document.getElementById('filter-genre');
+    if (filterGenre) filterGenre.value = "";
+    const filterStatus = document.getElementById('filter-status');
+    if (filterStatus) filterStatus.value = "";
+    const filterFormat = document.getElementById('filter-format');
+    if (filterFormat) filterFormat.value = "";
+    const filterYear = document.getElementById('filter-year');
+    if (filterYear) filterYear.value = "";
+    const filterSort = document.getElementById('filter-sort');
+    if (filterSort) filterSort.value = "";
 
     window.history.pushState(null, '', '/home');
 
@@ -351,6 +392,11 @@ function clearSearch() {
         searchInput.value = '';
     }
 
+    const headerSearch = document.getElementById('header-search-bar');
+    if (headerSearch) {
+        headerSearch.value = '';
+    }
+
     const resultsGrid = document.getElementById('search-results-grid');
     if (resultsGrid) {
         resultsGrid.innerHTML = '';
@@ -361,18 +407,60 @@ function clearSearch() {
         resultsHeader.classList.add('hidden');
     }
 
+    currentQueryText = '';
     handleSpaRouting();
 }
+window.clearSearch = clearSearch;
 
-function searchGenre(genreName) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('search', '');
+async function searchGenre(genreName) {
+    currentQueryText = '';
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
+
+    const headerSearch = document.getElementById('header-search-bar');
+    if (headerSearch) headerSearch.value = '';
+
+    // Synchronize the #filter-genre select dropdown to reflect the clicked genre
+    const filterGenre = document.getElementById('filter-genre');
+    if (filterGenre) filterGenre.value = genreName;
+
+    // Reset other filters
+    const filterStatus = document.getElementById('filter-status');
+    if (filterStatus) filterStatus.value = '';
+    const filterFormat = document.getElementById('filter-format');
+    if (filterFormat) filterFormat.value = '';
+    const filterYear = document.getElementById('filter-year');
+    if (filterYear) filterYear.value = '';
+    const filterSort = document.getElementById('filter-sort');
+    if (filterSort) filterSort.value = 'POPULARITY_DESC';
+
+    // Set URL parameters to ?genre=... and clear search param
+    const url = new URL(window.location.origin + '/home');
     url.searchParams.set('genre', genreName);
+    url.searchParams.delete('search');
     window.history.pushState({}, '', url.toString());
-    checkUrlParamsAndSearch();
-}
 
-function syncUrlAndExecuteSearch() {
+    // Display search results layout immediately
+    ['homepage-sections-wrapper', 'watch-page-layout', 'anime-details-layout', 'trending-explore-layout', 'dedicated-schedule-layout', 'contact-page-layout', 'dmca-page-layout', 'landing-page-layout'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+    const searchResultsLayout = document.getElementById('search-results-layout');
+    if (searchResultsLayout) searchResultsLayout.classList.remove('hidden');
+
+    const titleEl = document.getElementById('search-overlay-title');
+    if (titleEl) titleEl.innerText = `Top 50 in ${genreName}`;
+
+    // Automatically trigger query fetching top 50 anime matching genre
+    await executeSearch('', `Top 50 in ${genreName}`, 50);
+
+    if (searchResultsLayout) {
+        searchResultsLayout.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+window.searchGenre = searchGenre;
+
+function syncUrlAndExecuteSearch(isExplicitAction = false) {
     const searchInput = document.getElementById('search-input');
     const query = searchInput ? searchInput.value.trim() : '';
 
@@ -382,33 +470,57 @@ function syncUrlAndExecuteSearch() {
     const yearVal = document.getElementById('filter-year')?.value || '';
     const sortVal = document.getElementById('filter-sort')?.value || '';
 
+    const hasAnyFilter = Boolean(genreVal || statusVal || formatVal || yearVal || sortVal);
+
     const params = new URLSearchParams();
-    params.set('search', query);
+    if (query) params.set('search', query);
     if (genreVal) params.set('genre', genreVal);
     if (statusVal) params.set('status', statusVal);
     if (formatVal) params.set('format', formatVal);
     if (yearVal) params.set('year', yearVal);
     if (sortVal) params.set('sort', sortVal);
 
-    window.history.pushState(null, '', window.location.origin + '/home?' + params.toString());
+    const queryStr = params.toString();
+    window.history.pushState(null, '', window.location.origin + '/home' + (queryStr ? '?' + queryStr : ''));
 
-    if (query !== '') {
-        executeSearch(query);
+    if (query !== '' || hasAnyFilter) {
+        if (!query && genreVal && !statusVal && !formatVal && !yearVal) {
+            executeSearch('', `Top 50 in ${genreVal}`, 50);
+        } else {
+            executeSearch(query, null, 50);
+        }
+    } else if (isExplicitAction) {
+        executeSearch('', 'Top 50 Most Popular Anime', 50);
     } else {
         const resultsGrid = document.getElementById('search-results-grid');
-        if (resultsGrid) resultsGrid.innerHTML = '';
+        if (resultsGrid) {
+            resultsGrid.innerHTML = `
+                <div class="col-span-full text-center py-12 text-[#a0a5b5] text-sm">
+                    Use the search input or select any filter above to discover anime.
+                </div>
+            `;
+        }
+        const titleEl = document.getElementById('search-overlay-title');
+        if (titleEl) titleEl.innerText = 'Search Anime Catalog';
     }
 }
+window.syncUrlAndExecuteSearch = syncUrlAndExecuteSearch;
 
 function checkUrlParamsAndSearch() {
     const resultsLayout = document.getElementById('search-results-layout');
     const homeWrapper = document.getElementById('homepage-sections-wrapper');
     const params = new URLSearchParams(window.location.search);
     const searchVal = params.get('search');
+    const genreVal = params.get('genre');
+    const statusVal = params.get('status');
+    const formatVal = params.get('format');
+    const yearVal = params.get('year');
+    const sortVal = params.get('sort');
 
-    const hasSearchParam = window.location.search.includes('?search=') || window.location.search.includes('&search=');
+    const hasAnyFilter = Boolean(genreVal || statusVal || formatVal || yearVal || sortVal);
+    const hasSearchOrFilter = (searchVal !== null && searchVal.trim() !== '') || hasAnyFilter || window.location.search.includes('?search=');
 
-    if (hasSearchParam || searchVal !== null) {
+    if (hasSearchOrFilter) {
         if (homeWrapper) homeWrapper.classList.add('hidden');
         if (resultsLayout) resultsLayout.classList.remove('hidden');
 
@@ -418,29 +530,35 @@ function checkUrlParamsAndSearch() {
         }
 
         const filterGenre = document.getElementById('filter-genre');
-        if (filterGenre) filterGenre.value = params.get('genre') || '';
+        if (filterGenre) filterGenre.value = genreVal || '';
 
         const filterStatus = document.getElementById('filter-status');
-        if (filterStatus) filterStatus.value = params.get('status') || '';
+        if (filterStatus) filterStatus.value = statusVal || '';
 
         const filterFormat = document.getElementById('filter-format');
-        if (filterFormat) filterFormat.value = params.get('format') || '';
+        if (filterFormat) filterFormat.value = formatVal || '';
 
         const filterYear = document.getElementById('filter-year');
-        if (filterYear) filterYear.value = params.get('year') || '';
+        if (filterYear) filterYear.value = yearVal || '';
 
         const filterSort = document.getElementById('filter-sort');
-        if (filterSort) filterSort.value = params.get('sort') || '';
+        if (filterSort) filterSort.value = sortVal || '';
 
-        const resultsGrid = document.getElementById('search-results-grid');
-
-        if (!searchVal || searchVal.trim() === '') {
-            if (resultsGrid) resultsGrid.innerHTML = '';
-            if (searchInput) {
-                searchInput.focus();
-            }
+        if (genreVal && !searchVal && !statusVal && !formatVal && !yearVal) {
+            executeSearch('', `Top 50 in ${genreVal}`, 50);
+        } else if (searchVal || hasAnyFilter) {
+            executeSearch(searchVal || '', null, 50);
         } else {
-            executeSearch(searchVal);
+            const resultsGrid = document.getElementById('search-results-grid');
+            if (resultsGrid) {
+                resultsGrid.innerHTML = `
+                    <div class="col-span-full text-center py-12 text-[#a0a5b5] text-sm">
+                        Use the search input or select any filter above to discover anime.
+                    </div>
+                `;
+            }
+            const titleEl = document.getElementById('search-overlay-title');
+            if (titleEl) titleEl.innerText = 'Search Anime Catalog';
         }
     } else {
         if (resultsLayout) resultsLayout.classList.add('hidden');
@@ -453,6 +571,7 @@ function checkUrlParamsAndSearch() {
         if (resultsGrid) resultsGrid.innerHTML = '';
     }
 }
+window.checkUrlParamsAndSearch = checkUrlParamsAndSearch;
 
 function setupDropdownListeners() {
     const selectIds = ['filter-genre', 'filter-status', 'filter-format', 'filter-year', 'filter-sort'];
@@ -460,10 +579,58 @@ function setupDropdownListeners() {
         const el = document.getElementById(id);
         if (el) {
             el.addEventListener('change', () => {
-                syncUrlAndExecuteSearch();
+                syncUrlAndExecuteSearch(true);
             });
         }
     });
+
+    const applyBtn = document.getElementById('apply-search-btn');
+    if (applyBtn) {
+        applyBtn.onclick = (e) => {
+            e.preventDefault();
+            syncUrlAndExecuteSearch(true);
+        };
+    }
+
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                syncUrlAndExecuteSearch(true);
+            }
+        });
+
+        searchInput.addEventListener('input', debounce(() => {
+            syncUrlAndExecuteSearch(false);
+        }, 500));
+    }
+
+    const headerSearch = document.getElementById('header-search-bar');
+    if (headerSearch) {
+        headerSearch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const val = headerSearch.value.trim();
+                if (val) {
+                    const url = new URL(window.location.origin + '/home');
+                    url.searchParams.set('search', val);
+                    window.history.pushState({}, '', url.toString());
+                    handleSpaRouting();
+                    const mainSearchInput = document.getElementById('search-input');
+                    if (mainSearchInput) mainSearchInput.value = val;
+                }
+            }
+        });
+    }
+
+    const searchClear = document.getElementById('search-overlay-clear');
+    if (searchClear) {
+        searchClear.onclick = (e) => {
+            e.preventDefault();
+            clearSearch();
+        };
+    }
 }
 
 window.homeCatalogFetched = false;
@@ -501,7 +668,13 @@ async function initApp() {
     console.log('[BlackLeg Init] Initializing SPA router...');
 
     // Permanent Obsidian Dark Theme Lock
-    document.documentElement.classList.add('dark-theme');
+    function applyTheme(isDark) {
+        const html = document.documentElement;
+        html.classList.add('dark-theme');
+        localStorage.setItem('appTheme', 'dark');
+    }
+    window.applyTheme = applyTheme;
+    applyTheme(true);
 
     try {
         if (!localStorage.getItem('userLanguagePref')) {
@@ -2228,7 +2401,6 @@ function isEpisodeWatched(showId, epNum) {
 window.isEpisodeWatched = isEpisodeWatched;
 
 // Event Listeners setup
-const searchInputEl = document.getElementById('search-input');
 const searchToggleBtn = document.getElementById('search-toggle-btn');
 const drawerFilterTrigger = document.getElementById('drawer-filter-trigger');
 const dockFilterBtn = document.getElementById('dock-filter-btn');
@@ -2238,26 +2410,6 @@ if (searchToggleBtn) {
         e.preventDefault();
         window.history.pushState(null, '', '/home?search=');
         handleSpaRouting();
-    });
-}
-
-if (searchInputEl) {
-    searchInputEl.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            syncUrlAndExecuteSearch();
-        }
-    });
-
-    searchInputEl.addEventListener('input', debounce((e) => {
-        syncUrlAndExecuteSearch();
-    }, 500));
-}
-
-const searchOverlayClear = document.getElementById('search-overlay-clear');
-if (searchOverlayClear) {
-    searchOverlayClear.addEventListener('click', () => {
-        clearSearch();
     });
 }
 
