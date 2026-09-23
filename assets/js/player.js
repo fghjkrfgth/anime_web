@@ -140,6 +140,10 @@ window.handleStreamRetry = async function (epNum) {
 };
 
 function renderEmptyStreamFallback(epNum, customMessage = null) {
+    if (window.isAiringUnreleased || (typeof window.location !== 'undefined' && new URLSearchParams(window.location.search).get('unreleased') === 'true')) {
+        return;
+    }
+
     if ((window.streamRetryCount || 0) >= 3) {
         console.warn(`[Stream Fallback] Max tries (3) reached for Episode ${epNum}. Auto redirecting to details page...`);
         window.autoSendBackToDetailsPage();
@@ -204,6 +208,89 @@ function renderEmptyStreamFallback(epNum, customMessage = null) {
 }
 
 window.renderEmptyStreamFallback = renderEmptyStreamFallback;
+
+function renderUnreleasedBroadcastOverlay(epNum, showTitle) {
+    const playerContainer = document.getElementById('player-container') || document.querySelector('#watch-page-layout .aspect-video') || document.querySelector('.aspect-video');
+    if (!playerContainer) return;
+
+    // 1. Dismiss the loading spinner
+    const spinner = document.getElementById('player-loading-spinner');
+    if (spinner) spinner.classList.add('hidden');
+
+    // 2. Remove any existing controls overlays
+    const existingControls = document.getElementById('custom-player-controls-overlay');
+    if (existingControls) existingControls.remove();
+
+    // 3. Suppress and completely remove any empty stream fallback overlay
+    const existingFallback = document.getElementById('empty-stream-fallback-overlay');
+    if (existingFallback) existingFallback.remove();
+
+    // Clean up previous unreleased overlay if present
+    const existingUnreleased = document.getElementById('unreleased-broadcast-overlay');
+    if (existingUnreleased) existingUnreleased.remove();
+
+    // Pause video player if running
+    const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
+    if (video) {
+        video.pause();
+        video.removeAttribute('src');
+    }
+    if (window.hlsInstance) {
+        window.hlsInstance.destroy();
+        window.hlsInstance = null;
+    }
+
+    const numericEp = parseInt(epNum || window.currentEp || 1, 10);
+
+    // 4. Render frosted crystal overlay directly over the player container
+    const overlay = document.createElement('div');
+    overlay.id = 'unreleased-broadcast-overlay';
+    overlay.className = 'absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/85 backdrop-blur-2xl text-center select-none animate-crystal-in';
+
+    overlay.innerHTML = `
+        <div class="glass-crystal p-8 md:p-10 rounded-3xl max-w-md w-full flex flex-col items-center gap-6 shadow-2xl relative overflow-hidden border border-white/10 bg-[#0c0d14]/90">
+            <!-- Visual icon: Animated hourglass / broadcast antenna radar pulse -->
+            <div class="relative w-16 h-16 flex items-center justify-center rounded-2xl border border-amber-500/40 bg-amber-500/10 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)]">
+                <span class="absolute inset-0 rounded-2xl border border-amber-500/40 animate-ping opacity-30"></span>
+                <svg class="w-8 h-8 fill-none stroke-current stroke-2 animate-pulse" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2v4M4.93 4.93l2.83 2.83M2 12h4M19.07 4.93l-2.83 2.83M22 12h-4M7.76 16.24l-2.83 2.83M16.24 16.24l2.83 2.83M12 18v4"></path>
+                    <circle cx="12" cy="12" r="3" class="fill-amber-400/20"></circle>
+                </svg>
+            </div>
+
+            <!-- Badge, Heading & Message -->
+            <div class="flex flex-col items-center gap-2">
+                <span class="text-[10px] font-mono uppercase tracking-[0.2em] px-3.5 py-1 rounded-full bg-[#d4af37]/15 border border-[#d4af37]/40 text-[#f59e0b] shadow-[0_0_10px_rgba(212,175,55,0.15)] font-bold">
+                    UPCOMING BROADCAST · EPISODE ${numericEp}
+                </span>
+                <h3 class="text-xl md:text-2xl font-bold text-white tracking-wide mt-1">
+                    Stay Tuned!
+                </h3>
+                <p class="text-xs md:text-sm text-slate-300 leading-relaxed font-light max-w-sm mt-1">
+                    This episode has not aired yet or is currently being processed. It is yet to be published. Check back soon after the official release broadcast!
+                </p>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex items-center gap-3 w-full mt-1">
+                ${numericEp > 1 ? `
+                <button onclick="if(typeof window.changeEpisode === 'function'){ window.changeEpisode(${numericEp - 1}); }" class="btn-crystal flex-1 py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    Watch Previous Episode
+                </button>
+                ` : ''}
+                <button onclick="window.history.pushState(null, '', '/home'); if(typeof handleSpaRouting === 'function') handleSpaRouting();" class="btn-crystal ${numericEp > 1 ? '' : 'w-full'} py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Back to Home
+                </button>
+            </div>
+        </div>
+    `;
+
+    playerContainer.appendChild(overlay);
+}
+
+window.renderUnreleasedBroadcastOverlay = renderUnreleasedBroadcastOverlay;
 
 function initPlayerControls() {
     const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
