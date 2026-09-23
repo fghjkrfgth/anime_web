@@ -663,9 +663,16 @@ class CoverflowCarousel {
         this.startX = 0;
         this.currentX = 0;
         this.startTime = 0;
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.touchDirection = null;
 
-        this.onPointerMove = this.onPointerMove.bind(this);
-        this.onPointerUp = this.onPointerUp.bind(this);
+        this.onMouseDown = this.onMouseDown.bind(this);
+        this.onMouseMove = this.onMouseMove.bind(this);
+        this.onMouseUp = this.onMouseUp.bind(this);
+        this.onTouchStart = this.onTouchStart.bind(this);
+        this.onTouchMove = this.onTouchMove.bind(this);
+        this.onTouchEnd = this.onTouchEnd.bind(this);
 
         if (!this.container || this.shows.length === 0) return;
         this.init();
@@ -688,10 +695,15 @@ class CoverflowCarousel {
             clearTimeout(this.resumeTimeout);
             this.resumeTimeout = null;
         }
-        window.removeEventListener('mousemove', this.onPointerMove);
-        window.removeEventListener('mouseup', this.onPointerUp);
-        window.removeEventListener('touchmove', this.onPointerMove);
-        window.removeEventListener('touchend', this.onPointerUp);
+        window.removeEventListener('mousemove', this.onMouseMove);
+        window.removeEventListener('mouseup', this.onMouseUp);
+        if (this.container) {
+            this.container.removeEventListener('mousedown', this.onMouseDown);
+            this.container.removeEventListener('touchstart', this.onTouchStart);
+            this.container.removeEventListener('touchmove', this.onTouchMove);
+            this.container.removeEventListener('touchend', this.onTouchEnd);
+            this.container.removeEventListener('touchcancel', this.onTouchEnd);
+        }
     }
 
     renderCards() {
@@ -752,8 +764,10 @@ class CoverflowCarousel {
             else if (diff === -1) slot = '-1';
             else if (diff === 2) slot = '2';
             else if (diff === -2) slot = '-2';
-            else if (diff > 2) slot = 'hidden-right';
-            else if (diff < -2) slot = 'hidden-left';
+            else if (diff === 3) slot = '3';
+            else if (diff === -3) slot = '-3';
+            else if (diff > 3) slot = 'hidden-right';
+            else if (diff < -3) slot = 'hidden-left';
 
             card.setAttribute('data-slot', slot);
         });
@@ -798,16 +812,24 @@ class CoverflowCarousel {
         }, 5000);
     }
 
-    onPointerMove(e) {
+    onMouseDown(e) {
+        this.isDragging = true;
+        this.hasDragged = false;
+        this.startX = e.clientX;
+        this.currentX = e.clientX;
+        this.startTime = performance.now();
+        this.stopAutoRotate();
+    }
+
+    onMouseMove(e) {
         if (!this.isDragging) return;
-        const clientX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX) || 0;
-        this.currentX = clientX;
+        this.currentX = e.clientX;
         if (Math.abs(this.currentX - this.startX) > 8) {
             this.hasDragged = true;
         }
     }
 
-    onPointerUp(e) {
+    onMouseUp(e) {
         if (!this.isDragging) return;
         this.isDragging = false;
 
@@ -830,24 +852,90 @@ class CoverflowCarousel {
         }, 120);
     }
 
-    bindEvents() {
-        const onDown = (e) => {
-            this.isDragging = true;
+    onTouchStart(e) {
+        if (!e.touches || e.touches.length === 0) return;
+        this.isDragging = true;
+        this.hasDragged = false;
+        this.touchDirection = null;
+        this.touchStartX = e.touches[0].clientX;
+        this.touchStartY = e.touches[0].clientY;
+        this.startX = this.touchStartX;
+        this.currentX = this.touchStartX;
+        this.startTime = performance.now();
+        this.stopAutoRotate();
+    }
+
+    onTouchMove(e) {
+        if (!this.isDragging || !e.touches || e.touches.length === 0) return;
+        const currentTouchX = e.touches[0].clientX;
+        const currentTouchY = e.touches[0].clientY;
+        const diffX = currentTouchX - this.touchStartX;
+        const diffY = currentTouchY - this.touchStartY;
+
+        // Detect gesture direction if not already locked
+        if (!this.touchDirection) {
+            if (Math.abs(diffX) > 5 || Math.abs(diffY) > 5) {
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    this.touchDirection = 'horizontal';
+                } else {
+                    this.touchDirection = 'vertical';
+                    this.isDragging = false;
+                    return; // Allow native vertical page scrolling
+                }
+            }
+        }
+
+        // When horizontal swipe detected, lock container and isolate carousel rotation
+        if (this.touchDirection === 'horizontal') {
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+            this.currentX = currentTouchX;
+            if (Math.abs(diffX) > 8) {
+                this.hasDragged = true;
+            }
+        }
+    }
+
+    onTouchEnd(e) {
+        if (!this.isDragging && !this.hasDragged) {
+            this.touchDirection = null;
+            return;
+        }
+
+        if (this.touchDirection === 'horizontal') {
+            const deltaX = this.currentX - this.startX;
+            const deltaTime = Math.max(1, performance.now() - this.startTime);
+            const velocity = deltaX / deltaTime; // px/ms
+
+            if (Math.abs(deltaX) > 35 || Math.abs(velocity) > 0.25) {
+                if (deltaX < 0) {
+                    this.next();
+                } else {
+                    this.prev();
+                }
+            }
+        }
+
+        this.isDragging = false;
+        this.touchDirection = null;
+        this.scheduleResume();
+
+        setTimeout(() => {
             this.hasDragged = false;
-            const clientX = (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX) || 0;
-            this.startX = clientX;
-            this.currentX = clientX;
-            this.startTime = performance.now();
-            this.stopAutoRotate();
-        };
+        }, 120);
+    }
 
-        this.container.addEventListener('mousedown', onDown);
-        window.addEventListener('mousemove', this.onPointerMove);
-        window.addEventListener('mouseup', this.onPointerUp);
+    bindEvents() {
+        // Desktop Mouse Drag
+        this.container.addEventListener('mousedown', this.onMouseDown);
+        window.addEventListener('mousemove', this.onMouseMove);
+        window.addEventListener('mouseup', this.onMouseUp);
 
-        this.container.addEventListener('touchstart', onDown, { passive: true });
-        window.addEventListener('touchmove', this.onPointerMove, { passive: true });
-        window.addEventListener('touchend', this.onPointerUp);
+        // Mobile Touch Swipe with Directional Isolation
+        this.container.addEventListener('touchstart', this.onTouchStart, { passive: true });
+        this.container.addEventListener('touchmove', this.onTouchMove, { passive: false });
+        this.container.addEventListener('touchend', this.onTouchEnd);
+        this.container.addEventListener('touchcancel', this.onTouchEnd);
 
         this.container.addEventListener('mouseenter', () => {
             this.isHovered = true;
