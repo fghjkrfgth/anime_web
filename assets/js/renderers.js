@@ -579,6 +579,8 @@ function showHoverPreview(card, show) {
     const synopsis = cleanDescription(show.description);
     const genres = (show.genres || []).slice(0, 3);
     const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
+    const isLiked = typeof getLikedAnimeList === 'function' ? !!getLikedAnimeList()[String(show.id)] : false;
+    const isLater = typeof getWatchLaterList === 'function' ? !!getWatchLaterList()[String(show.id)] : false;
 
     // Viewport Backdrop Blur
     activeBackdrop = document.createElement('div');
@@ -617,15 +619,17 @@ function showHoverPreview(card, show) {
             <h3 class="text-white text-base font-bold leading-snug line-clamp-1">${title}</h3>
             <div class="flex flex-wrap gap-1.5">${genreChips}</div>
             <p class="text-steelGray text-xs line-clamp-3 font-light leading-relaxed">${synopsis}</p>
+            <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="w-full py-2.5 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-900/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+                View Details
+            </button>
             <div class="flex items-center gap-2 mt-2">
-                <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="flex-1 py-2.5 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-900/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
-                    View Details
+                <button data-action-like="${show.id}" onclick="toggleLikeAnime(${stringifiedShow}, event)" class="flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${isLiked ? 'text-[#e50914] border-[#e50914]/60 bg-red-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
+                    <svg class="w-4 h-4 ${isLiked ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <span>${isLiked ? 'Liked' : 'Like'}</span>
                 </button>
-                <button id="preview-like-btn-${show.id}" onclick="event.stopPropagation(); window.toggleAnimeLiked(${stringifiedShow})" class="p-2.5 rounded-xl border transition-all cursor-pointer ${(typeof window.isAnimeLiked === 'function' && window.isAnimeLiked(show.id)) ? 'bg-[#e50914] text-white border-[#e50914] shadow-md shadow-red-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10'}" title="${(typeof window.isAnimeLiked === 'function' && window.isAnimeLiked(show.id)) ? 'Unlike' : 'Like'}">
-                    <svg class="w-4 h-4 ${(typeof window.isAnimeLiked === 'function' && window.isAnimeLiked(show.id)) ? 'fill-white stroke-white' : 'fill-none stroke-current'}" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                </button>
-                <button id="preview-watchlater-btn-${show.id}" onclick="event.stopPropagation(); window.toggleAnimeWatchLater(${stringifiedShow})" class="p-2.5 rounded-xl border transition-all cursor-pointer ${(typeof window.isAnimeInWatchLater === 'function' && window.isAnimeInWatchLater(show.id)) ? 'bg-[#f59e0b] text-[#08080c] border-[#f59e0b] shadow-md shadow-amber-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10'}" title="${(typeof window.isAnimeInWatchLater === 'function' && window.isAnimeInWatchLater(show.id)) ? 'Remove from Watch Later' : 'Watch Later'}">
-                    <svg class="w-4 h-4 ${(typeof window.isAnimeInWatchLater === 'function' && window.isAnimeInWatchLater(show.id)) ? 'fill-[#08080c] stroke-[#08080c]' : 'fill-none stroke-current'}" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                <button data-action-later="${show.id}" onclick="toggleWatchLaterAnime(${stringifiedShow}, event)" class="flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${isLater ? 'text-amber-400 border-amber-400/60 bg-amber-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
+                    <svg class="w-4 h-4 ${isLater ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+                    <span>${isLater ? 'Saved' : 'Watch Later'}</span>
                 </button>
             </div>
         </div>
@@ -1428,7 +1432,7 @@ function renderActiveTabContent(activeTab, data) {
                                 </div>
 
                                 <!-- Unlike Button -->
-                                <button onclick="event.stopPropagation(); window.toggleAnimeLiked(${stringifiedItem});" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-[#e50914] text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Liked">
+                                <button onclick="event.stopPropagation(); toggleLikeAnime(${stringifiedItem}, event);" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-[#e50914] text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Liked">
                                     <svg class="w-3.5 h-3.5 fill-white stroke-white" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
                                 </button>
                             </div>
@@ -1484,7 +1488,7 @@ function renderActiveTabContent(activeTab, data) {
                                 </div>
 
                                 <!-- Remove from Queue Button -->
-                                <button onclick="event.stopPropagation(); window.toggleAnimeWatchLater(${stringifiedItem});" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Watch Later">
+                                <button onclick="event.stopPropagation(); toggleWatchLaterAnime(${stringifiedItem}, event);" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Watch Later">
                                     <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -1553,14 +1557,20 @@ window.renderDedicatedProfileView = async function () {
     // Authenticated state
     const uVault = typeof getUnifiedUserVault === 'function' ? getUnifiedUserVault() : { profile: {}, watched: {}, liked: {}, watchLater: {} };
 
-    const username = user.username || uVault.profile?.username || (user.email ? user.email.split('@')[0] : 'Member');
-    const avatarUrl = user.avatar_url || uVault.profile?.avatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(username);
-    const bio = user.bio || uVault.profile?.bio || 'Streaming anime on BlackLeg.';
+    let customProfile = {};
+    try {
+        const stored = localStorage.getItem('user_profile_data');
+        if (stored) customProfile = JSON.parse(stored);
+    } catch (e) {}
+
+    const username = customProfile.username || user.username || uVault.profile?.username || (user.email ? user.email.split('@')[0] : 'Member');
+    const avatarUrl = customProfile.avatar || user.avatar || user.avatarUrl || user.avatar_url || uVault.profile?.avatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(username);
+    const bio = customProfile.bio || user.bio || uVault.profile?.bio || 'Streaming anime on BlackLeg.';
     const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '2026';
 
     const watchedList = Object.values(uVault.watched || {}).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    const likedList = Object.values(uVault.liked || {}).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
-    const watchLaterList = Object.values(uVault.watchLater || {}).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    const likedList = Object.values(typeof getLikedAnimeList === 'function' ? getLikedAnimeList() : (uVault.liked || {})).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    const watchLaterList = Object.values(typeof getWatchLaterList === 'function' ? getWatchLaterList() : (uVault.watchLater || {})).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
 
     window.activeProfileTab = window.activeProfileTab || 'watched';
 
