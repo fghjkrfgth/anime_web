@@ -783,6 +783,7 @@ async function handleSpaRouting() {
     const isDetails = pathname.startsWith('/anime/');
     const isExplore = pathname.startsWith('/explore') || hash === '#trending-section' || hash === '#/trending-section';
     const isSchedule = pathname.startsWith('/schedule') || hash === '#airing-broadcast-section' || hash === '#/airing-broadcast-section';
+    const isContinueWatching = pathname.startsWith('/continue-watching') || hash === '#continue-watching-page' || hash === '#/continue-watching' || hash === '#continue-watching';
     const isContact = pathname.startsWith('/contact');
     const isDmca = pathname.startsWith('/dmca');
     const isTerms = pathname.startsWith('/terms');
@@ -793,6 +794,7 @@ async function handleSpaRouting() {
     const details = document.getElementById('anime-details-layout');
     const trendingExplore = document.getElementById('trending-explore-layout');
     const dedicatedSchedule = document.getElementById('dedicated-schedule-layout');
+    const dedicatedContinueWatching = document.getElementById('dedicated-continue-watching-layout');
     const contact = document.getElementById('contact-page-layout');
     const dmca = document.getElementById('dmca-page-layout');
     const terms = document.getElementById('terms-page-layout');
@@ -804,12 +806,13 @@ async function handleSpaRouting() {
     if (details) details.classList.toggle('hidden', !isDetails);
     if (trendingExplore) trendingExplore.classList.toggle('hidden', !isExplore);
     if (dedicatedSchedule) dedicatedSchedule.classList.toggle('hidden', !isSchedule);
+    if (dedicatedContinueWatching) dedicatedContinueWatching.classList.toggle('hidden', !isContinueWatching);
     if (contact) contact.classList.toggle('hidden', !isContact);
     if (dmca) dmca.classList.toggle('hidden', !isDmca);
     if (terms) terms.classList.toggle('hidden', !isTerms);
 
     // Stop background spotlight auto-rotator when leaving home view
-    const isHomeView = (!isLanding && !isWatch && !isDetails && !isExplore && !isSchedule && !isContact && !isDmca && !isTerms);
+    const isHomeView = (!isLanding && !isWatch && !isDetails && !isExplore && !isSchedule && !isContinueWatching && !isContact && !isDmca && !isTerms);
     if (!isHomeView && window.spotlightInterval) {
         clearInterval(window.spotlightInterval);
         window.spotlightInterval = null;
@@ -851,6 +854,12 @@ async function handleSpaRouting() {
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
         if (typeof window.renderDedicatedScheduleView === 'function') {
             await window.renderDedicatedScheduleView();
+        }
+    } else if (isContinueWatching) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        if (typeof window.renderDedicatedContinueWatchingView === 'function') {
+            await window.renderDedicatedContinueWatchingView();
         }
     } else if (isContact) {
         if (homepageWrapper) homepageWrapper.classList.add('hidden');
@@ -2542,6 +2551,43 @@ function isEpisodeWatched(showId, epNum) {
     return localStorage.getItem(`watched_${showId}_${epNum}`) === 'true';
 }
 window.isEpisodeWatched = isEpisodeWatched;
+
+window.getWatchVault = getWatchVault;
+window.saveWatchVault = saveWatchVault;
+
+window.clearContinueWatchingHistory = function() {
+    if (!confirm('Are you sure you want to clear your entire watch history?')) return;
+    localStorage.removeItem('anime_watch_vault');
+    localStorage.removeItem('continueWatching');
+    if (typeof pushVaultToCloud === 'function') pushVaultToCloud();
+    if (typeof window.renderDedicatedContinueWatchingView === 'function') {
+        window.renderDedicatedContinueWatchingView();
+    }
+    if (typeof renderContinueWatching === 'function') {
+        renderContinueWatching();
+    } else if (typeof window.renderContinueWatching === 'function') {
+        window.renderContinueWatching();
+    }
+};
+
+window.removeContinueWatchingItem = function(showId) {
+    let vault = getWatchVault();
+    delete vault[String(showId)];
+    saveWatchVault(vault);
+
+    let legacy = JSON.parse(localStorage.getItem('continueWatching') || '[]');
+    legacy = legacy.filter(i => i && i.show && String(i.show.id) !== String(showId));
+    localStorage.setItem('continueWatching', JSON.stringify(legacy));
+
+    if (typeof window.renderDedicatedContinueWatchingView === 'function') {
+        window.renderDedicatedContinueWatchingView();
+    }
+    if (typeof renderContinueWatching === 'function') {
+        renderContinueWatching();
+    } else if (typeof window.renderContinueWatching === 'function') {
+        window.renderContinueWatching();
+    }
+};
 
 // Event Listeners setup
 const searchToggleBtn = document.getElementById('search-toggle-btn');
