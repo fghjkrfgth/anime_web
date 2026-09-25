@@ -707,11 +707,19 @@ function initPlayerControls() {
 
     // --- AUTOMATION TOGGLES POPOVER & EVENT BINDINGS ---
     function syncAutoTogglesUI() {
-        if (typeof window.getUserPreferences !== 'function') return;
-        const prefs = window.getUserPreferences();
-        if (chkSkipIntro) chkSkipIntro.checked = !!prefs.autoSkipIntro;
-        if (chkSkipOutro) chkSkipOutro.checked = !!prefs.autoSkipOutro;
-        if (chkAutoNext) chkAutoNext.checked = (prefs.autoNext !== undefined ? !!prefs.autoNext : true);
+        const prefs = (typeof window.getUserPreferences === 'function')
+            ? window.getUserPreferences()
+            : { autoSkipIntro: false, autoSkipOutro: false, autoNext: true };
+
+        if (typeof window.syncAutomationCheckboxes === 'function') {
+            window.syncAutomationCheckboxes('autoSkipIntro', !!prefs.autoSkipIntro);
+            window.syncAutomationCheckboxes('autoSkipOutro', !!prefs.autoSkipOutro);
+            window.syncAutomationCheckboxes('autoNext', prefs.autoNext !== undefined ? !!prefs.autoNext : true);
+        } else {
+            if (chkSkipIntro) chkSkipIntro.checked = !!prefs.autoSkipIntro;
+            if (chkSkipOutro) chkSkipOutro.checked = !!prefs.autoSkipOutro;
+            if (chkAutoNext) chkAutoNext.checked = (prefs.autoNext !== undefined ? !!prefs.autoNext : true);
+        }
     }
 
     if (btnAuto) {
@@ -749,6 +757,9 @@ function initPlayerControls() {
             }
         };
     }
+
+    // Initial automation controls mirror sync on load
+    syncAutoTogglesUI();
 
     // Subtitles & Captions Menu Populate & Listeners
     function populateCaptionsMenu(subtitlesData) {
