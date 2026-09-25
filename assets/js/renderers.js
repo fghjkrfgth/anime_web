@@ -186,11 +186,18 @@ function scrollTrack(containerId, direction) {
     }
     const container = document.getElementById(containerId);
     if (!container) return;
-    const scrollAmount = 300;
-    if (direction === 'left') {
-        container.scrollLeft -= scrollAmount;
+    const scrollAmount = 350;
+    if (typeof container.scrollBy === 'function') {
+        container.scrollBy({
+            left: direction === 'left' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        });
     } else {
-        container.scrollLeft += scrollAmount;
+        if (direction === 'left') {
+            container.scrollLeft -= scrollAmount;
+        } else {
+            container.scrollLeft += scrollAmount;
+        }
     }
 }
 window.scrollTrack = scrollTrack;
@@ -1083,8 +1090,8 @@ function renderContinueWatching() {
         } catch (e) { }
     }
 
-    // Retain up to last 15 shows
-    items = items.slice(0, 15);
+    // Retain only the 10 most recently watched titles for the home section:
+    items = items.slice(0, 10);
 
     if (items.length === 0) {
         dock.classList.add('hidden');
@@ -1128,6 +1135,169 @@ function renderContinueWatching() {
         `;
     }).join('');
 }
+window.renderContinueWatching = renderContinueWatching;
+
+window.renderDedicatedContinueWatchingView = function () {
+    let layout = document.getElementById('dedicated-continue-watching-layout');
+    if (!layout) {
+        layout = document.createElement('div');
+        layout.id = 'dedicated-continue-watching-layout';
+        layout.className = 'w-full relative min-h-screen py-6 flex flex-col gap-6 select-none';
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+            mainContent.appendChild(layout);
+        }
+    }
+    layout.classList.remove('hidden');
+
+    let items = [];
+    let vault = {};
+    if (typeof getWatchVault === 'function') {
+        vault = getWatchVault();
+    } else if (typeof window.getWatchVault === 'function') {
+        vault = window.getWatchVault();
+    } else {
+        try {
+            vault = JSON.parse(localStorage.getItem('anime_watch_vault') || '{}');
+        } catch (e) {
+            vault = {};
+        }
+    }
+
+    try {
+        const vaultList = Object.values(vault).filter(v => v && v.id && v.lastEpNum);
+        vaultList.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        items = vaultList.map(v => ({
+            show: {
+                id: v.id,
+                title: typeof v.title === 'string' ? { romaji: v.title, english: v.title, userPreferred: v.title } : v.title,
+                coverImage: typeof v.coverImage === 'string' ? { large: v.coverImage, extraLarge: v.coverImage } : (v.coverImage || {}),
+                bannerImage: v.bannerImage,
+                format: v.format,
+                meanScore: v.rating
+            },
+            epNum: v.lastEpNum,
+            percentage: v.percentage || 0,
+            updatedAt: v.updatedAt || 0
+        }));
+    } catch (e) {
+        console.error('[Dedicated Continue Watching] Vault read error:', e);
+    }
+
+    // Fallback/merge legacy continueWatching items
+    try {
+        const legacy = JSON.parse(localStorage.getItem('continueWatching')) || [];
+        legacy.forEach(l => {
+            if (l && l.show && l.show.id && !items.some(it => String(it.show.id) === String(l.show.id))) {
+                items.push({
+                    show: l.show,
+                    epNum: l.epNum,
+                    percentage: l.percentage || 0,
+                    updatedAt: l.updatedAt || 0
+                });
+            }
+        });
+    } catch (e) { }
+
+    items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+    let contentHtml = '';
+
+    const headerHtml = `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
+            <div class="flex items-center gap-3">
+                <div class="w-2.5 h-8 bg-[#e50914] rounded-full shadow-[0_0_12px_rgba(229,9,20,0.6)]"></div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-white uppercase tracking-wider flex items-center gap-2.5">
+                        Continue Watching Library
+                        <span class="text-xs font-mono font-bold bg-[#e50914]/20 border border-[#e50914]/40 text-[#ff3b45] px-2.5 py-0.5 rounded-full">
+                            ${items.length} ${items.length === 1 ? 'Title' : 'Titles'}
+                        </span>
+                    </h1>
+                    <p class="text-xs text-zinc-400 mt-0.5">Resume your ongoing series and pick up right where you left off.</p>
+                </div>
+            </div>
+            ${items.length > 0 ? `
+            <div class="flex items-center gap-2">
+                <button onclick="clearContinueWatchingHistory()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-zinc-300 hover:text-red-400 border border-white/10 hover:border-red-500/30 text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer">
+                    <svg class="w-3.5 h-3.5 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    Clear History
+                </button>
+            </div>
+            ` : ''}
+        </div>
+    `;
+
+    if (items.length === 0) {
+        contentHtml = `
+            ${headerHtml}
+            <div class="w-full py-20 flex flex-col items-center justify-center text-center gap-4">
+                <div class="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400 text-2xl">
+                    📺
+                </div>
+                <div class="flex flex-col gap-1 max-w-sm">
+                    <h3 class="text-base font-bold text-white uppercase tracking-wider">No Watch History Yet</h3>
+                    <p class="text-xs text-zinc-400 leading-relaxed">Episodes you start watching will automatically appear here so you can resume anytime.</p>
+                </div>
+                <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="mt-2 px-6 py-2.5 rounded-full bg-[#e50914] hover:bg-[#ff1e27] text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-900/30 transition-all cursor-pointer">
+                    Browse Anime →
+                </button>
+            </div>
+        `;
+    } else {
+        const cardsHtml = items.map(item => {
+            const show = item.show;
+            const title = typeof getShowTitle === 'function' ? getShowTitle(show) : (show.title.english || show.title.romaji || show.title.userPreferred || 'Anime');
+            const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || '';
+            const bannerUrl = show.banner || show.bannerImage || coverUrl;
+            const epNum = item.epNum || 1;
+            const percent = Math.min(100, Math.max(0, item.percentage || 0));
+            const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
+
+            return `
+                <div class="continue-card-landscape aspect-video rounded-2xl overflow-hidden relative cursor-pointer group bg-[#12131a] border border-white/[0.06] shadow-xl hover:scale-[1.02] hover:border-[#e50914]/40 transition-all duration-300 select-none" onclick="watchShowProgress(${stringifiedShow}, ${epNum})" data-continue-show="${stringifiedShow}">
+                    <img src="${bannerUrl}" alt="${title}" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                    <div class="absolute inset-0 bg-gradient-to-t from-[#0a0b0f] via-[#0a0b0f]/60 to-transparent"></div>
+                    
+                    <!-- Top Right Individual Remove Button -->
+                    <button onclick="event.stopPropagation(); removeContinueWatchingItem('${show.id}');" class="absolute top-2.5 right-2.5 z-20 w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 hover:border-red-500/50 flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 shadow-md cursor-pointer" title="Remove from History">
+                        <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+
+                    <!-- Center Floating Circular Play Trigger -->
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div class="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white shadow-lg group-hover:bg-[#e50914] group-hover:scale-110 transition-all duration-300">
+                            <svg class="w-5 h-5 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Details -->
+                    <div class="absolute bottom-0 inset-x-0 p-3 sm:p-4 flex flex-col gap-0.5 z-10">
+                        <span class="text-sm font-bold truncate text-white group-hover:text-[#ff3b45] transition-colors" title="${title}">${title}</span>
+                        <div class="flex items-center justify-between text-[11px] text-zinc-400 font-medium">
+                            <span>Episode ${epNum}</span>
+                            <span class="font-mono text-[10px] text-zinc-500">${percent}% watched</span>
+                        </div>
+                    </div>
+
+                    <!-- Thin Crimson Progress Line at Bottom Edge -->
+                    <div class="absolute bottom-0 inset-x-0 h-1 bg-white/10 overflow-hidden">
+                        <div class="h-full bg-[#e50914] transition-all duration-300 shadow-[0_0_8px_#e50914]" style="width: ${percent}%"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        contentHtml = `
+            ${headerHtml}
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 w-full">
+                ${cardsHtml}
+            </div>
+        `;
+    }
+
+    layout.innerHTML = contentHtml;
+};
 
 function slugify(text) {
     if (!text) return 'show';
@@ -1143,8 +1313,14 @@ window.slugify = slugify;
 function watchShowProgress(show, epNum) {
     const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
     localStorage.setItem('activeShowData', JSON.stringify(show));
-    window.location.href = `/watch/anime/${slug}-${show.id}?ep=${epNum}`;
+    if (typeof handleSpaRouting === 'function') {
+        window.history.pushState(null, '', `/watch/anime/${slug}-${show.id}?ep=${epNum}`);
+        handleSpaRouting();
+    } else {
+        window.location.href = `/watch/anime/${slug}-${show.id}?ep=${epNum}`;
+    }
 }
+window.watchShowProgress = watchShowProgress;
 
 function watchShow(show) {
     const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
