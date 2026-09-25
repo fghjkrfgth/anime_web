@@ -1,6 +1,7 @@
-// -------------------------------------------------------------------------
-// APPLICATION INITIALIZATION & EVENT LISTENERS
-// -------------------------------------------------------------------------
+// Enforce English default language preference
+if (!localStorage.getItem('userLanguagePref')) {
+    localStorage.setItem('userLanguagePref', 'en');
+}
 
 let currentQueryText = '';
 
@@ -664,6 +665,62 @@ function setupMobileBottomNav() {
     }
 }
 
+function setupLanguageListeners() {
+    const langPrefBtn = document.getElementById('lang-pref-btn');
+    const langPrefDropdown = document.getElementById('lang-pref-dropdown');
+
+    if (langPrefBtn && langPrefDropdown) {
+        langPrefBtn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const isHidden = langPrefDropdown.classList.contains('hidden');
+            if (isHidden) {
+                langPrefDropdown.classList.remove('hidden');
+                langPrefDropdown.style.zIndex = '9999';
+            } else {
+                langPrefDropdown.classList.add('hidden');
+            }
+        };
+
+        document.addEventListener('click', (e) => {
+            if (!langPrefDropdown.contains(e.target) && !langPrefBtn.contains(e.target)) {
+                langPrefDropdown.classList.add('hidden');
+            }
+        });
+    }
+
+    document.querySelectorAll('.lang-option').forEach(btn => {
+        btn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const val = btn.getAttribute('data-value');
+            if (val) {
+                localStorage.setItem('userLanguagePref', val);
+                if (typeof window.updateLanguageSelectionUI === 'function') {
+                    window.updateLanguageSelectionUI();
+                } else if (typeof updateLanguageSelectionUI === 'function') {
+                    updateLanguageSelectionUI();
+                }
+                if (typeof window.updateAllRenderedTitles === 'function') {
+                    window.updateAllRenderedTitles();
+                } else if (typeof updateAllRenderedTitles === 'function') {
+                    updateAllRenderedTitles();
+                }
+            }
+            if (langPrefDropdown) {
+                langPrefDropdown.classList.add('hidden');
+            }
+        };
+    });
+
+    if (typeof window.updateLanguageSelectionUI === 'function') {
+        window.updateLanguageSelectionUI();
+    } else if (typeof updateLanguageSelectionUI === 'function') {
+        updateLanguageSelectionUI();
+    }
+}
+window.setupLanguageListeners = setupLanguageListeners;
+
 async function initApp() {
     console.log('[BlackLeg Init] Initializing SPA router...');
 
@@ -1191,13 +1248,11 @@ async function hydrateWatchUI() {
         bannerBackdrop.style.backgroundImage = `url('${bannerUrl}')`;
     }
 
-    const pref = localStorage.getItem('userLanguagePref') || 'romaji';
-    let title = showData.title.romaji || showData.title.english || showData.title.userPreferred;
-    if (pref === 'english') {
-        title = showData.title.english || showData.title.romaji || showData.title.userPreferred;
-    } else if (pref === 'native') {
-        title = showData.title.native || showData.title.romaji || showData.title.userPreferred;
-    }
+    const title = typeof getShowTitle === 'function' 
+        ? getShowTitle(showData) 
+        : (typeof window.getShowTitle === 'function' 
+            ? window.getShowTitle(showData) 
+            : (showData.title.english || showData.title.romaji || showData.title.userPreferred));
 
     const showTitleEl = document.getElementById('show-title');
     if (showTitleEl) showTitleEl.innerText = title;
@@ -1248,10 +1303,29 @@ function getUserPreferences() {
     };
 }
 
+function syncAutomationCheckboxes(key, value) {
+    // Map keys to DOM IDs for both external page toggles and in-player toggles
+    const idMap = {
+        autoSkipIntro: ['toggle-auto-skip-intro', 'chk-player-skip-intro'],
+        autoSkipOutro: ['toggle-auto-skip-outro', 'chk-player-skip-outro'],
+        autoNext: ['toggle-auto-next', 'chk-player-auto-next']
+    };
+
+    const targetIds = idMap[key] || [];
+    targetIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.checked !== value) {
+            el.checked = value;
+        }
+    });
+}
+window.syncAutomationCheckboxes = syncAutomationCheckboxes;
+
 function toggleUserPreference(key, value) {
     const prefs = getUserPreferences();
     prefs[key] = value;
     localStorage.setItem('anime_user_preferences', JSON.stringify(prefs));
+    syncAutomationCheckboxes(key, value);
 }
 window.getUserPreferences = getUserPreferences;
 window.toggleUserPreference = toggleUserPreference;
@@ -1267,12 +1341,9 @@ function setupWatchGlobalFunctions() {
     window.hlsInstance = null;
 
     const prefs = getUserPreferences();
-    const autoSkipIntroEl = document.getElementById('toggle-auto-skip-intro');
-    if (autoSkipIntroEl) autoSkipIntroEl.checked = !!prefs.autoSkipIntro;
-    const autoSkipOutroEl = document.getElementById('toggle-auto-skip-outro');
-    if (autoSkipOutroEl) autoSkipOutroEl.checked = !!prefs.autoSkipOutro;
-    const autoNextEl = document.getElementById('toggle-auto-next');
-    if (autoNextEl) autoNextEl.checked = !!prefs.autoNext;
+    syncAutomationCheckboxes('autoSkipIntro', !!prefs.autoSkipIntro);
+    syncAutomationCheckboxes('autoSkipOutro', !!prefs.autoSkipOutro);
+    syncAutomationCheckboxes('autoNext', prefs.autoNext !== undefined ? !!prefs.autoNext : true);
 
     if (video) {
         video.ontimeupdate = () => {
