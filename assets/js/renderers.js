@@ -210,6 +210,9 @@ function renderSpotlight(mediaList) {
     }
 
     const spotlightItems = mediaList.slice(0, 5);
+    spotlightItems.forEach(item => {
+        if (typeof registerAnimeEntity === 'function') registerAnimeEntity(item);
+    });
     window.spotlightState = { items: spotlightItems, centerIdx: 0 };
 
     rotateSpotlight(0);
@@ -459,6 +462,7 @@ function searchAndPlay(title, slug) {
 window.searchAndPlay = searchAndPlay;
 
 function createCardHTML(show, rank = null) {
+    if (typeof registerAnimeEntity === 'function') registerAnimeEntity(show);
     const title = getShowTitle(show);
     const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || '';
     const rating = show.meanScore ? `${(show.meanScore / 10).toFixed(1)}` : 'N/A';
@@ -570,6 +574,10 @@ function showHoverPreview(card, show) {
     if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768) return;
     dismissHoverPreview();
 
+    if (typeof registerAnimeEntity === 'function') {
+        registerAnimeEntity(show);
+    }
+
     const title = getShowTitle(show);
     const coverUrl = (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large)) || '';
     const bannerUrl = show.banner || show.bannerImage || coverUrl;
@@ -623,19 +631,23 @@ function showHoverPreview(card, show) {
                 View Details
             </button>
             <div class="flex items-center gap-2 mt-2">
-                <button data-action-like="${show.id}" onclick="toggleLikeAnime(${stringifiedShow}, event)" class="flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${isLiked ? 'text-[#e50914] border-[#e50914]/60 bg-red-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
-                    <svg class="w-4 h-4 ${isLiked ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                    <span>${isLiked ? 'Liked' : 'Like'}</span>
+                <button data-action-like="${show.id}" data-active="${isLiked ? 'true' : 'false'}" class="flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${isLiked ? 'text-[#e50914] border-[#e50914]/60 bg-red-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
+                    <svg class="w-4 h-4 pointer-events-none ${isLiked ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                    <span class="pointer-events-none">${isLiked ? 'Liked' : 'Like'}</span>
                 </button>
-                <button data-action-later="${show.id}" onclick="toggleWatchLaterAnime(${stringifiedShow}, event)" class="flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${isLater ? 'text-amber-400 border-amber-400/60 bg-amber-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
-                    <svg class="w-4 h-4 ${isLater ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
-                    <span>${isLater ? 'Saved' : 'Watch Later'}</span>
+                <button data-action-later="${show.id}" data-active="${isLater ? 'true' : 'false'}" class="flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${isLater ? 'text-[#f59e0b] border-[#f59e0b]/60 bg-amber-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
+                    <svg class="w-4 h-4 pointer-events-none ${isLater ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+                    <span class="pointer-events-none">${isLater ? 'Saved' : 'Watch Later'}</span>
                 </button>
             </div>
         </div>
     `;
 
     document.body.appendChild(activePreviewCard);
+
+    if (typeof updateInteractiveButtonStates === 'function') {
+        updateInteractiveButtonStates(show.id);
+    }
 
     // Pause all 3D coverflow carousels while preview modal is visible
     window.isAnyModalOrPreviewOpen = true;
@@ -767,6 +779,7 @@ class CoverflowCarousel {
 
     renderCards() {
         this.container.innerHTML = this.shows.map((show, idx) => {
+            if (typeof registerAnimeEntity === 'function') registerAnimeEntity(show);
             const title = getShowTitle(show);
             const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || show.bannerImage || '';
             const epCount = show.episodes ? `${show.episodes} Episodes` : (show.status === 'RELEASING' ? 'Ongoing' : 'Completed');
@@ -1333,6 +1346,18 @@ window.switchProfileTab = function(tabName) {
 function renderActiveTabContent(activeTab, data) {
     const { watchedList = [], likedList = [], watchLaterList = [] } = data;
 
+    // Register all entities into registry
+    watchedList.forEach(item => {
+        const s = item.show || item;
+        if (typeof registerAnimeEntity === 'function') registerAnimeEntity(s);
+    });
+    likedList.forEach(item => {
+        if (typeof registerAnimeEntity === 'function') registerAnimeEntity(item);
+    });
+    watchLaterList.forEach(item => {
+        if (typeof registerAnimeEntity === 'function') registerAnimeEntity(item);
+    });
+
     if (activeTab === 'watched') {
         if (watchedList.length === 0) {
             return `
@@ -1431,9 +1456,9 @@ function renderActiveTabContent(activeTab, data) {
                                     ★ ${rating}
                                 </div>
 
-                                <!-- Unlike Button -->
-                                <button onclick="event.stopPropagation(); toggleLikeAnime(${stringifiedItem}, event);" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-[#e50914] text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Liked">
-                                    <svg class="w-3.5 h-3.5 fill-white stroke-white" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                <!-- Unlike Button (✕) -->
+                                <button onclick="event.stopPropagation(); toggleLikeAnimeById('${item.id}');" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-[#e50914] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Liked">
+                                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
 
@@ -1487,8 +1512,8 @@ function renderActiveTabContent(activeTab, data) {
                                     ${format}
                                 </div>
 
-                                <!-- Remove from Queue Button -->
-                                <button onclick="event.stopPropagation(); toggleWatchLaterAnime(${stringifiedItem}, event);" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Watch Later">
+                                <!-- Remove from Queue Button (✕) -->
+                                <button onclick="event.stopPropagation(); toggleWatchLaterAnimeById('${item.id}');" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Watch Later">
                                     <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -1721,7 +1746,13 @@ function slugify(text) {
 window.slugify = slugify;
 
 function watchShowProgress(show, epNum) {
-    const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
+    if (!show) return;
+    if (typeof show === 'string' || typeof show === 'number') {
+        const idStr = String(show);
+        const registered = window.animeEntityRegistry && (window.animeEntityRegistry.get(idStr) || window.animeEntityRegistry.get(Number(idStr)));
+        if (registered) show = registered;
+    }
+    const slug = slugify(show.title?.english || show.title?.romaji || show.title?.userPreferred || 'anime');
     localStorage.setItem('activeShowData', JSON.stringify(show));
     if (typeof handleSpaRouting === 'function') {
         window.history.pushState(null, '', `/watch/anime/${slug}-${show.id}?ep=${epNum}`);
@@ -1733,7 +1764,18 @@ function watchShowProgress(show, epNum) {
 window.watchShowProgress = watchShowProgress;
 
 function watchShow(show) {
-    const slug = slugify(show.title.english || show.title.romaji || show.title.userPreferred);
+    if (!show) return;
+    if (typeof show === 'string' || typeof show === 'number') {
+        const idStr = String(show);
+        const registered = window.animeEntityRegistry && (window.animeEntityRegistry.get(idStr) || window.animeEntityRegistry.get(Number(idStr)));
+        if (registered) {
+            show = registered;
+        } else {
+            window.location.href = `/anime/show-${idStr}`;
+            return;
+        }
+    }
+    const slug = slugify(show.title?.english || show.title?.romaji || show.title?.userPreferred || 'anime');
     localStorage.setItem('activeShowData', JSON.stringify(show));
     window.location.href = `/anime/${slug}-${show.id}`;
 }
