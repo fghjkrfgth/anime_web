@@ -105,18 +105,20 @@ window.updateAllRenderedTitles = updateAllRenderedTitles;
 function updateLanguageSelectionUI() {
     const currentPref = localStorage.getItem('userLanguagePref') || 'en';
     const langCodeEl = document.getElementById('current-lang-code');
-    const langInfo = LANGUAGE_MAP[currentPref] || LANGUAGE_MAP['en'];
+    const langInfo = (typeof LANGUAGE_MAP !== 'undefined' && LANGUAGE_MAP[currentPref]) 
+        ? LANGUAGE_MAP[currentPref] 
+        : (typeof window.LANGUAGE_MAP !== 'undefined' && window.LANGUAGE_MAP[currentPref] ? window.LANGUAGE_MAP[currentPref] : null);
     if (langCodeEl) {
-        langCodeEl.innerText = langInfo ? langInfo.label : 'EN';
+        langCodeEl.innerText = langInfo ? langInfo.label : (currentPref === 'ja' ? '日' : (currentPref === 'zh-Hans' ? '简' : currentPref.toUpperCase().slice(0, 2)));
     }
 
     document.querySelectorAll('.lang-option').forEach(btn => {
         const val = btn.getAttribute('data-value');
         if (val === currentPref) {
-            btn.classList.add('bg-[#00f5ff]/20', 'text-[#00f5ff]');
+            btn.classList.add('bg-[#e50914]/20', 'text-[#ff3b45]', 'font-bold');
             btn.classList.remove('text-white');
         } else {
-            btn.classList.remove('bg-[#00f5ff]/20', 'text-[#00f5ff]');
+            btn.classList.remove('bg-[#e50914]/20', 'text-[#ff3b45]', 'font-bold');
             btn.classList.add('text-white');
         }
     });
@@ -131,7 +133,13 @@ function setupLanguageListeners() {
         langPrefBtn.onclick = function (e) {
             e.preventDefault();
             e.stopPropagation();
-            langPrefDropdown.classList.toggle('hidden');
+            const isHidden = langPrefDropdown.classList.contains('hidden');
+            if (isHidden) {
+                langPrefDropdown.classList.remove('hidden');
+                langPrefDropdown.style.zIndex = '9999';
+            } else {
+                langPrefDropdown.classList.add('hidden');
+            }
         };
 
         document.addEventListener('click', (e) => {
@@ -148,8 +156,8 @@ function setupLanguageListeners() {
             const val = btn.getAttribute('data-value');
             if (val) {
                 localStorage.setItem('userLanguagePref', val);
-                updateAllRenderedTitles();
                 updateLanguageSelectionUI();
+                updateAllRenderedTitles();
             }
             if (langPrefDropdown) {
                 langPrefDropdown.classList.add('hidden');
@@ -1345,7 +1353,7 @@ window.renderLandingView = function () {
 
     landingLayout.innerHTML = `
         <!-- HERO HEADER SECTION -->
-        <div class="glass-crystal relative w-full rounded-3xl p-6 sm:p-10 md:p-20 flex flex-col items-center text-center gap-8 md:gap-10 mt-2">
+        <div class="glass-crystal relative w-full rounded-3xl p-6 sm:p-10 md:p-20 flex flex-col items-center text-center gap-8 md:gap-10 mt-2 overflow-visible">
             <!-- Subtle ambient refraction -->
             <div class="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none rounded-3xl"></div>
 
@@ -1366,10 +1374,11 @@ window.renderLandingView = function () {
                 </p>
             </div>
 
-            <!-- Primary Crystal CTA Button -->
-            <div class="z-10 mt-2 w-full flex justify-center">
-                <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="btn-crystal w-full sm:w-auto min-h-[52px] px-9 py-4 rounded-2xl text-sm font-semibold tracking-[0.15em] uppercase flex items-center justify-center gap-3">
-                    Enter Experience <span class="text-lg">→</span>
+            <!-- Primary Vibrant CTA Button -->
+            <div class="z-30 mt-4 w-full flex justify-center overflow-visible relative">
+                <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="landing-cta-btn z-30 relative w-full sm:w-auto px-10 py-4 rounded-full font-extrabold text-[0.95rem] tracking-[0.12em] uppercase flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-transform duration-200 cursor-pointer text-white" style="background: linear-gradient(135deg, #e50914 0%, #ff1e27 100%) !important; color: #ffffff !important; font-weight: 800; font-size: 0.95rem; letter-spacing: 0.12em; box-shadow: 0 10px 30px rgba(229, 9, 20, 0.6) !important;">
+                    <span>START STREAMING NOW</span>
+                    <span class="text-sm font-black translate-x-0.5">▶</span>
                 </button>
             </div>
         </div>
