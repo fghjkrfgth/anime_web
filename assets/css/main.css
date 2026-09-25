@@ -924,3 +924,39 @@ section {
     transform: scale(1.02);
     box-shadow: 0 8px 22px rgba(245, 158, 11, 0.45);
 }
+
+/* =========================================================================
+   PROFILE ECOSYSTEM & LIST MANAGEMENT STYLES
+   ========================================================================= */
+#profile-page-layout {
+    animation: fadeInProfile 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInProfile {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.profile-avatar-glow {
+    box-shadow: 0 0 25px rgba(229, 9, 20, 0.35), 0 0 50px rgba(245, 158, 11, 0.15);
+}
+
+.quick-action-active-like {
+    background: #e50914 !important;
+    color: #ffffff !important;
+    border-color: #e50914 !important;
+    box-shadow: 0 0 16px rgba(229, 9, 20, 0.5) !important;
+}
+
+.quick-action-active-watchlater {
+    background: #f59e0b !important;
+    color: #08080c !important;
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.5) !important;
+}
