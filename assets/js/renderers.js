@@ -617,9 +617,17 @@ function showHoverPreview(card, show) {
             <h3 class="text-white text-base font-bold leading-snug line-clamp-1">${title}</h3>
             <div class="flex flex-wrap gap-1.5">${genreChips}</div>
             <p class="text-steelGray text-xs line-clamp-3 font-light leading-relaxed">${synopsis}</p>
-            <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="mt-2 w-full py-2.5 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-900/40 hover:scale-[1.02] active:scale-[0.98]">
-                View Details
-            </button>
+            <div class="flex items-center gap-2 mt-2">
+                <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="flex-1 py-2.5 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-900/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+                    View Details
+                </button>
+                <button id="preview-like-btn-${show.id}" onclick="event.stopPropagation(); window.toggleAnimeLiked(${stringifiedShow})" class="p-2.5 rounded-xl border transition-all cursor-pointer ${(typeof window.isAnimeLiked === 'function' && window.isAnimeLiked(show.id)) ? 'bg-[#e50914] text-white border-[#e50914] shadow-md shadow-red-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10'}" title="${(typeof window.isAnimeLiked === 'function' && window.isAnimeLiked(show.id)) ? 'Unlike' : 'Like'}">
+                    <svg class="w-4 h-4 ${(typeof window.isAnimeLiked === 'function' && window.isAnimeLiked(show.id)) ? 'fill-white stroke-white' : 'fill-none stroke-current'}" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                </button>
+                <button id="preview-watchlater-btn-${show.id}" onclick="event.stopPropagation(); window.toggleAnimeWatchLater(${stringifiedShow})" class="p-2.5 rounded-xl border transition-all cursor-pointer ${(typeof window.isAnimeInWatchLater === 'function' && window.isAnimeInWatchLater(show.id)) ? 'bg-[#f59e0b] text-[#08080c] border-[#f59e0b] shadow-md shadow-amber-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10'}" title="${(typeof window.isAnimeInWatchLater === 'function' && window.isAnimeInWatchLater(show.id)) ? 'Remove from Watch Later' : 'Watch Later'}">
+                    <svg class="w-4 h-4 ${(typeof window.isAnimeInWatchLater === 'function' && window.isAnimeInWatchLater(show.id)) ? 'fill-[#08080c] stroke-[#08080c]' : 'fill-none stroke-current'}" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                </button>
+            </div>
         </div>
     `;
 
@@ -1297,6 +1305,398 @@ window.renderDedicatedContinueWatchingView = function () {
     }
 
     layout.innerHTML = contentHtml;
+};
+
+// -------------------------------------------------------------------------
+// DEDICATED PROFILE ECOSYSTEM & TAB SWITCHING
+// -------------------------------------------------------------------------
+window.activeProfileTab = 'watched';
+
+window.toggleProfileEditDrawer = function() {
+    const drawer = document.getElementById('profile-edit-drawer');
+    if (drawer) {
+        drawer.classList.toggle('hidden');
+    }
+};
+
+window.switchProfileTab = function(tabName) {
+    window.activeProfileTab = tabName;
+    if (typeof window.renderDedicatedProfileView === 'function') {
+        window.renderDedicatedProfileView();
+    }
+};
+
+function renderActiveTabContent(activeTab, data) {
+    const { watchedList = [], likedList = [], watchLaterList = [] } = data;
+
+    if (activeTab === 'watched') {
+        if (watchedList.length === 0) {
+            return `
+                <div class="w-full py-16 flex flex-col items-center justify-center text-center gap-4">
+                    <div class="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400 text-2xl">📺</div>
+                    <div class="flex flex-col gap-1 max-w-sm">
+                        <h3 class="text-base font-bold text-white uppercase tracking-wider">No Watch History Yet</h3>
+                        <p class="text-xs text-zinc-400 leading-relaxed">Episodes you start streaming will automatically appear here with exact resume markers.</p>
+                    </div>
+                    <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="mt-2 px-6 py-2.5 rounded-full bg-[#e50914] hover:bg-[#ff1e27] text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-900/30 transition-all cursor-pointer">
+                        Browse Anime →
+                    </button>
+                </div>
+            `;
+        }
+        return `
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 w-full">
+                ${watchedList.map(item => {
+                    const show = item.show || item;
+                    const title = typeof getShowTitle === 'function' ? getShowTitle(show) : (show.title?.english || show.title?.romaji || show.title?.userPreferred || 'Anime');
+                    const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || '';
+                    const bannerUrl = show.banner || show.bannerImage || coverUrl;
+                    const epNum = item.lastEpNum || item.epNum || 1;
+                    const percent = Math.min(100, Math.max(0, item.percentage || 0));
+                    const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
+
+                    return `
+                        <div class="continue-card-landscape aspect-video rounded-2xl overflow-hidden relative cursor-pointer group bg-[#12131a] border border-white/[0.06] shadow-xl hover:scale-[1.02] hover:border-[#e50914]/40 transition-all duration-300 select-none" onclick="watchShowProgress(${stringifiedShow}, ${epNum})" data-continue-show="${stringifiedShow}">
+                            <img src="${bannerUrl}" alt="${title}" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                            <div class="absolute inset-0 bg-gradient-to-t from-[#0a0b0f] via-[#0a0b0f]/60 to-transparent"></div>
+                            
+                            <!-- Remove Button -->
+                            <button onclick="event.stopPropagation(); removeContinueWatchingItem('${show.id}');" class="absolute top-2.5 right-2.5 z-20 w-7 h-7 rounded-full bg-black/60 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 hover:border-red-500/50 flex items-center justify-center transition-all opacity-80 group-hover:opacity-100 shadow-md cursor-pointer" title="Remove from History">
+                                <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+
+                            <!-- Center Play Button -->
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div class="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white shadow-lg group-hover:bg-[#e50914] group-hover:scale-110 transition-all duration-300">
+                                    <svg class="w-5 h-5 fill-current ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                </div>
+                            </div>
+
+                            <!-- Bottom Details -->
+                            <div class="absolute bottom-0 inset-x-0 p-3 sm:p-4 flex flex-col gap-0.5 z-10">
+                                <span class="text-sm font-bold truncate text-white group-hover:text-[#ff3b45] transition-colors" title="${title}">${title}</span>
+                                <div class="flex items-center justify-between text-[11px] text-zinc-400 font-medium">
+                                    <span>Episode ${epNum}</span>
+                                    <span class="font-mono text-[10px] text-zinc-500">${percent}% watched</span>
+                                </div>
+                            </div>
+
+                            <!-- Progress Line -->
+                            <div class="absolute bottom-0 inset-x-0 h-1 bg-white/10 overflow-hidden">
+                                <div class="h-full bg-[#e50914] transition-all duration-300 shadow-[0_0_8px_#e50914]" style="width: ${percent}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    if (activeTab === 'liked') {
+        if (likedList.length === 0) {
+            return `
+                <div class="w-full py-16 flex flex-col items-center justify-center text-center gap-4">
+                    <div class="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400 text-2xl">♥</div>
+                    <div class="flex flex-col gap-1 max-w-sm">
+                        <h3 class="text-base font-bold text-white uppercase tracking-wider">No Liked Anime Yet</h3>
+                        <p class="text-xs text-zinc-400 leading-relaxed">Click the heart button on any anime card or details screen to pin your favorite series here.</p>
+                    </div>
+                    <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="mt-2 px-6 py-2.5 rounded-full bg-[#e50914] hover:bg-[#ff1e27] text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-900/30 transition-all cursor-pointer">
+                        Discover Favorites →
+                    </button>
+                </div>
+            `;
+        }
+        return `
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5 w-full">
+                ${likedList.map(item => {
+                    const title = typeof getShowTitle === 'function' ? getShowTitle(item) : (item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Anime');
+                    const coverUrl = (item.coverImage && (item.coverImage.large || item.coverImage.extraLarge)) || '';
+                    const format = item.format ? item.format.replace('_', ' ') : 'TV';
+                    const rating = item.rating || item.meanScore ? `${item.rating || item.meanScore}%` : 'N/A';
+                    const stringifiedItem = JSON.stringify(item).replace(/"/g, '&quot;');
+
+                    return `
+                        <div class="glass-panel group rounded-2xl overflow-hidden border border-white/[0.06] hover:border-[#e50914]/40 transition-all duration-300 flex flex-col relative shadow-xl hover:scale-[1.02]">
+                            <div class="relative aspect-[2/3] w-full overflow-hidden bg-black/60 cursor-pointer" onclick="watchShow(${stringifiedItem})">
+                                <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-t from-[#0a0b0f] via-transparent to-transparent"></div>
+                                
+                                <!-- Rating Badge -->
+                                <div class="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[10px] font-bold text-[#ffb703] border border-white/10 flex items-center gap-1 shadow">
+                                    ★ ${rating}
+                                </div>
+
+                                <!-- Unlike Button -->
+                                <button onclick="event.stopPropagation(); window.toggleAnimeLiked(${stringifiedItem});" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-[#e50914] text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Liked">
+                                    <svg class="w-3.5 h-3.5 fill-white stroke-white" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                                </button>
+                            </div>
+
+                            <div class="p-3 flex flex-col gap-1.5 flex-1 justify-between bg-[#12131a]">
+                                <div>
+                                    <span class="text-[9px] font-bold text-[#e50914] uppercase tracking-wider">${format}</span>
+                                    <h4 class="text-xs font-bold text-white line-clamp-1 group-hover:text-[#ff3b45] transition-colors" title="${title}">${title}</h4>
+                                </div>
+                                <button onclick="watchShow(${stringifiedItem})" class="w-full py-1.5 mt-1 bg-white/5 hover:bg-[#e50914] text-zinc-300 hover:text-white font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all text-center cursor-pointer">
+                                    Watch Now
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    if (activeTab === 'watchLater') {
+        if (watchLaterList.length === 0) {
+            return `
+                <div class="w-full py-16 flex flex-col items-center justify-center text-center gap-4">
+                    <div class="w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400 text-2xl">🔖</div>
+                    <div class="flex flex-col gap-1 max-w-sm">
+                        <h3 class="text-base font-bold text-white uppercase tracking-wider">Watch Later Queue Is Empty</h3>
+                        <p class="text-xs text-zinc-400 leading-relaxed">Save anime to your Watch Later queue using the bookmark button on any preview card.</p>
+                    </div>
+                    <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="mt-2 px-6 py-2.5 rounded-full bg-[#f59e0b] hover:bg-[#fbbf24] text-[#08080c] font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-900/30 transition-all cursor-pointer">
+                        Explore Catalog →
+                    </button>
+                </div>
+            `;
+        }
+        return `
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5 w-full">
+                ${watchLaterList.map(item => {
+                    const title = typeof getShowTitle === 'function' ? getShowTitle(item) : (item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Anime');
+                    const coverUrl = (item.coverImage && (item.coverImage.large || item.coverImage.extraLarge)) || '';
+                    const format = item.format ? item.format.replace('_', ' ') : 'TV';
+                    const stringifiedItem = JSON.stringify(item).replace(/"/g, '&quot;');
+
+                    return `
+                        <div class="glass-panel group rounded-2xl overflow-hidden border border-white/[0.06] hover:border-amber-500/40 transition-all duration-300 flex flex-col relative shadow-xl hover:scale-[1.02]">
+                            <div class="relative aspect-[2/3] w-full overflow-hidden bg-black/60 cursor-pointer" onclick="watchShow(${stringifiedItem})">
+                                <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                <div class="absolute inset-0 bg-gradient-to-t from-[#0a0b0f] via-transparent to-transparent"></div>
+                                
+                                <!-- Format Badge -->
+                                <div class="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-[#f59e0b]/90 text-[#08080c] text-[10px] font-black uppercase tracking-wider shadow">
+                                    ${format}
+                                </div>
+
+                                <!-- Remove from Queue Button -->
+                                <button onclick="event.stopPropagation(); window.toggleAnimeWatchLater(${stringifiedItem});" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Watch Later">
+                                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            <div class="p-3 flex flex-col gap-1.5 flex-1 justify-between bg-[#12131a]">
+                                <div>
+                                    <span class="text-[9px] font-bold text-amber-500 uppercase tracking-wider">Queue</span>
+                                    <h4 class="text-xs font-bold text-white line-clamp-1 group-hover:text-amber-400 transition-colors" title="${title}">${title}</h4>
+                                </div>
+                                <button onclick="watchShow(${stringifiedItem})" class="w-full py-1.5 mt-1 bg-[#f59e0b] hover:bg-[#fbbf24] text-[#08080c] font-black text-[10px] uppercase tracking-wider rounded-lg transition-all text-center cursor-pointer shadow-md">
+                                    Start Watching
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    return '';
+}
+
+window.renderDedicatedProfileView = async function () {
+    let layout = document.getElementById('profile-page-layout');
+    if (!layout) {
+        layout = document.createElement('div');
+        layout.id = 'profile-page-layout';
+        layout.className = 'w-full relative min-h-screen py-6 select-none';
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) mainContent.appendChild(layout);
+    }
+    layout.classList.remove('hidden');
+
+    const token = typeof getAuthToken === 'function' ? getAuthToken() : localStorage.getItem('auth_token');
+    const user = typeof getAuthUser === 'function' ? getAuthUser() : (localStorage.getItem('auth_user') ? JSON.parse(localStorage.getItem('auth_user')) : null);
+
+    // If not signed in: Glassmorphic prompt card
+    if (!token || !user) {
+        layout.innerHTML = `
+            <div class="w-full max-w-2xl mx-auto py-16 px-4 flex flex-col items-center text-center gap-6">
+                <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#e50914]/20 to-amber-500/10 border border-[#e50914]/30 flex items-center justify-center text-3xl shadow-[0_0_30px_rgba(229,9,20,0.25)]">
+                    👤
+                </div>
+                <div class="flex flex-col gap-2">
+                    <h1 class="text-2xl sm:text-3xl font-black text-white uppercase tracking-wider">
+                        Sign In to Access Profile
+                    </h1>
+                    <p class="text-sm text-zinc-400 max-w-md leading-relaxed">
+                        Access your synchronized watch history, keep track of your liked anime, and manage your custom Watch Later queue across all your devices.
+                    </p>
+                </div>
+                <div class="flex items-center gap-3 mt-2">
+                    <button onclick="openAuthModal('login')" class="px-8 py-3.5 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-widest rounded-2xl shadow-xl shadow-red-900/40 hover:scale-105 active:scale-95 transition-all cursor-pointer">
+                        Sign In / Create Account
+                    </button>
+                    <button onclick="window.history.pushState(null, '', '/home'); handleSpaRouting();" class="px-6 py-3.5 bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white font-bold text-xs uppercase tracking-wider rounded-2xl border border-white/10 transition-all cursor-pointer">
+                        Browse Catalog
+                    </button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    // Authenticated state
+    const uVault = typeof getUnifiedUserVault === 'function' ? getUnifiedUserVault() : { profile: {}, watched: {}, liked: {}, watchLater: {} };
+
+    const username = user.username || uVault.profile?.username || (user.email ? user.email.split('@')[0] : 'Member');
+    const avatarUrl = user.avatar_url || uVault.profile?.avatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(username);
+    const bio = user.bio || uVault.profile?.bio || 'Streaming anime on BlackLeg.';
+    const joinDate = user.created_at ? new Date(user.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '2026';
+
+    const watchedList = Object.values(uVault.watched || {}).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const likedList = Object.values(uVault.liked || {}).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    const watchLaterList = Object.values(uVault.watchLater || {}).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+
+    window.activeProfileTab = window.activeProfileTab || 'watched';
+
+    const PRESET_AVATARS = [
+        "https://api.dicebear.com/7.x/bottts/svg?seed=Luffy&backgroundColor=b6e3f4,c0aede,d1d4f9",
+        "https://api.dicebear.com/7.x/bottts/svg?seed=Zoro&backgroundColor=b6e3f4,c0aede,d1d4f9",
+        "https://api.dicebear.com/7.x/bottts/svg?seed=Sanji&backgroundColor=b6e3f4,c0aede,d1d4f9",
+        "https://api.dicebear.com/7.x/bottts/svg?seed=Gojo&backgroundColor=b6e3f4,c0aede,d1d4f9",
+        "https://api.dicebear.com/7.x/bottts/svg?seed=Sukuna&backgroundColor=b6e3f4,c0aede,d1d4f9"
+    ];
+
+    layout.innerHTML = `
+        <div class="w-full max-w-7xl mx-auto flex flex-col gap-8 pb-12">
+            <!-- Header Banner Card -->
+            <div class="relative w-full rounded-3xl overflow-hidden bg-gradient-to-r from-[#12131a] via-[#161824] to-[#12131a] border border-white/10 p-6 md:p-8 shadow-2xl">
+                <div class="absolute -right-10 -bottom-10 w-80 h-80 rounded-full bg-[#e50914]/10 blur-3xl pointer-events-none"></div>
+                <div class="relative z-10 flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
+                    <div class="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+                        <!-- Large Editable Avatar -->
+                        <div class="relative group cursor-pointer" onclick="toggleProfileEditDrawer()" title="Click to edit profile">
+                            <img id="profile-banner-avatar" src="${avatarUrl}" alt="${username}" class="w-24 h-24 md:w-28 md:h-28 rounded-2xl object-cover bg-black/60 border-2 border-[#e50914]/60 shadow-[0_0_20px_rgba(229,9,20,0.3)] transition-transform group-hover:scale-105">
+                            <div class="absolute inset-0 rounded-2xl bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-xs font-bold text-white transition-opacity backdrop-blur-xs">
+                                ✎ Edit
+                            </div>
+                        </div>
+                        <!-- Info -->
+                        <div class="flex flex-col gap-1.5">
+                            <div class="flex items-center gap-3 justify-center md:justify-start flex-wrap">
+                                <h1 class="text-2xl md:text-3xl font-black text-white uppercase tracking-wider">${username}</h1>
+                                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#e50914]/20 border border-[#e50914]/40 text-[#ff3b45]">
+                                    BlackLeg Member
+                                </span>
+                            </div>
+                            <div class="text-xs text-zinc-400 font-mono">${user.email}</div>
+                            <p class="text-xs text-zinc-300 italic max-w-lg mt-1 font-light">"${bio}"</p>
+                            <div class="text-[11px] text-zinc-500 mt-1">Member since ${joinDate}</div>
+                        </div>
+                    </div>
+
+                    <!-- Action Controls -->
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleProfileEditDrawer()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs uppercase tracking-wider border border-white/10 transition-all flex items-center gap-2 cursor-pointer">
+                            <span>✎ Edit Profile</span>
+                        </button>
+                        <button onclick="manualSyncVault()" class="px-4 py-2 rounded-xl bg-[#e50914]/10 hover:bg-[#e50914]/20 text-[#ff3b45] font-bold text-xs uppercase tracking-wider border border-[#e50914]/30 transition-all flex items-center gap-2 cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            <span>Sync Now</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Collapsible Profile Edit Drawer -->
+                <div id="profile-edit-drawer" class="hidden mt-8 pt-6 border-t border-white/10 flex flex-col gap-4">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">Edit Profile Information</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs text-zinc-400 font-semibold">Username</label>
+                            <input id="profile-edit-username" type="text" value="${username}" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#e50914]">
+                        </div>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs text-zinc-400 font-semibold">Avatar Image URL</label>
+                            <input id="profile-edit-avatar" type="text" value="${avatarUrl}" oninput="document.getElementById('profile-banner-avatar').src = this.value" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#e50914]">
+                        </div>
+                    </div>
+
+                    <!-- Preset Avatars -->
+                    <div class="flex flex-col gap-2">
+                        <span class="text-[11px] text-zinc-400 font-semibold">Choose Preset Avatar:</span>
+                        <div class="flex items-center gap-3 flex-wrap">
+                            ${PRESET_AVATARS.map((pUrl, idx) => `
+                                <img src="${pUrl}" alt="Preset ${idx+1}" onclick="document.getElementById('profile-edit-avatar').value = '${pUrl}'; document.getElementById('profile-banner-avatar').src = '${pUrl}';" class="w-10 h-10 rounded-xl bg-black/60 border border-white/10 hover:border-[#e50914] cursor-pointer hover:scale-110 transition-all object-cover">
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-1.5">
+                        <label class="text-xs text-zinc-400 font-semibold">Bio / Status</label>
+                        <textarea id="profile-edit-bio" rows="2" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#e50914]">${bio}</textarea>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2">
+                        <span id="profile-save-status" class="text-xs"></span>
+                        <div class="flex items-center gap-2">
+                            <button onclick="toggleProfileEditDrawer()" class="px-4 py-2 text-xs font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer">Cancel</button>
+                            <button onclick="saveUserProfileInfo()" class="px-6 py-2 rounded-xl bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-red-900/40 hover:scale-102 transition-all cursor-pointer">
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Summary Pills -->
+            <div class="grid grid-cols-3 gap-3 md:gap-5 w-full">
+                <div onclick="switchProfileTab('watched')" class="glass-panel p-4 md:p-5 rounded-2xl border transition-all cursor-pointer flex flex-col gap-1 ${window.activeProfileTab === 'watched' ? 'border-[#e50914] bg-[#e50914]/5' : 'border-white/5 hover:border-white/20'}">
+                    <div class="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <span>📺</span> Shows Watched
+                    </div>
+                    <div class="text-xl md:text-3xl font-black text-white">${watchedList.length}</div>
+                </div>
+                <div onclick="switchProfileTab('liked')" class="glass-panel p-4 md:p-5 rounded-2xl border transition-all cursor-pointer flex flex-col gap-1 ${window.activeProfileTab === 'liked' ? 'border-[#e50914] bg-[#e50914]/5' : 'border-white/5 hover:border-white/20'}">
+                    <div class="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <span>♥</span> Liked Anime
+                    </div>
+                    <div class="text-xl md:text-3xl font-black text-white">${likedList.length}</div>
+                </div>
+                <div onclick="switchProfileTab('watchLater')" class="glass-panel p-4 md:p-5 rounded-2xl border transition-all cursor-pointer flex flex-col gap-1 ${window.activeProfileTab === 'watchLater' ? 'border-[#f59e0b] bg-[#f59e0b]/5' : 'border-white/5 hover:border-white/20'}">
+                    <div class="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🔖</span> Watch Later
+                    </div>
+                    <div class="text-xl md:text-3xl font-black text-white">${watchLaterList.length}</div>
+                </div>
+            </div>
+
+            <!-- Segmented Content Tabs -->
+            <div class="flex items-center gap-2 border-b border-white/10 pb-4">
+                <button onclick="switchProfileTab('watched')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'watched' ? 'bg-[#e50914] text-white shadow-lg shadow-red-900/40' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
+                    <span>Watch History</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'watched' ? 'bg-black/30 text-white' : 'bg-white/10 text-zinc-300'}">${watchedList.length}</span>
+                </button>
+                <button onclick="switchProfileTab('liked')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'liked' ? 'bg-[#e50914] text-white shadow-lg shadow-red-900/40' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
+                    <span>Liked Anime</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'liked' ? 'bg-black/30 text-white' : 'bg-white/10 text-zinc-300'}">${likedList.length}</span>
+                </button>
+                <button onclick="switchProfileTab('watchLater')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'watchLater' ? 'bg-[#f59e0b] text-[#08080c] shadow-lg shadow-amber-900/40 font-black' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
+                    <span>Watch Later</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'watchLater' ? 'bg-black/20 text-[#08080c]' : 'bg-white/10 text-zinc-300'}">${watchLaterList.length}</span>
+                </button>
+            </div>
+
+            <!-- Tab Content Area -->
+            <div id="profile-tab-content" class="w-full">
+                ${renderActiveTabContent(window.activeProfileTab, { watchedList, likedList, watchLaterList })}
+            </div>
+        </div>
+    `;
 };
 
 function slugify(text) {
