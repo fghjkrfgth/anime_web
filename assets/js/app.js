@@ -784,6 +784,7 @@ async function handleSpaRouting() {
     const isExplore = pathname.startsWith('/explore') || hash === '#trending-section' || hash === '#/trending-section';
     const isSchedule = pathname.startsWith('/schedule') || hash === '#airing-broadcast-section' || hash === '#/airing-broadcast-section';
     const isContinueWatching = pathname.startsWith('/continue-watching') || hash === '#continue-watching-page' || hash === '#/continue-watching' || hash === '#continue-watching';
+    const isProfile = pathname.startsWith('/profile') || hash === '#profile' || hash === '#/profile';
     const isContact = pathname.startsWith('/contact');
     const isDmca = pathname.startsWith('/dmca');
     const isTerms = pathname.startsWith('/terms');
@@ -795,6 +796,7 @@ async function handleSpaRouting() {
     const trendingExplore = document.getElementById('trending-explore-layout');
     const dedicatedSchedule = document.getElementById('dedicated-schedule-layout');
     const dedicatedContinueWatching = document.getElementById('dedicated-continue-watching-layout');
+    const profileLayout = document.getElementById('profile-page-layout');
     const contact = document.getElementById('contact-page-layout');
     const dmca = document.getElementById('dmca-page-layout');
     const terms = document.getElementById('terms-page-layout');
@@ -807,12 +809,13 @@ async function handleSpaRouting() {
     if (trendingExplore) trendingExplore.classList.toggle('hidden', !isExplore);
     if (dedicatedSchedule) dedicatedSchedule.classList.toggle('hidden', !isSchedule);
     if (dedicatedContinueWatching) dedicatedContinueWatching.classList.toggle('hidden', !isContinueWatching);
+    if (profileLayout) profileLayout.classList.toggle('hidden', !isProfile);
     if (contact) contact.classList.toggle('hidden', !isContact);
     if (dmca) dmca.classList.toggle('hidden', !isDmca);
     if (terms) terms.classList.toggle('hidden', !isTerms);
 
     // Stop background spotlight auto-rotator when leaving home view
-    const isHomeView = (!isLanding && !isWatch && !isDetails && !isExplore && !isSchedule && !isContinueWatching && !isContact && !isDmca && !isTerms);
+    const isHomeView = (!isLanding && !isWatch && !isDetails && !isExplore && !isSchedule && !isContinueWatching && !isProfile && !isContact && !isDmca && !isTerms);
     if (!isHomeView && window.spotlightInterval) {
         clearInterval(window.spotlightInterval);
         window.spotlightInterval = null;
@@ -860,6 +863,12 @@ async function handleSpaRouting() {
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
         if (typeof window.renderDedicatedContinueWatchingView === 'function') {
             await window.renderDedicatedContinueWatchingView();
+        }
+    } else if (isProfile) {
+        if (homepageWrapper) homepageWrapper.classList.add('hidden');
+        if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        if (typeof window.renderDedicatedProfileView === 'function') {
+            await window.renderDedicatedProfileView();
         }
     } else if (isContact) {
         if (homepageWrapper) homepageWrapper.classList.add('hidden');
@@ -2440,28 +2449,264 @@ if (skipOutroBtn) {
 }
 
 // -------------------------------------------------------------------------
-// PERSISTENT WATCH VAULT & EPISODE TRACKING ENGINE
+// PERSISTENT MULTI-BUCKET USER VAULT & EPISODE TRACKING ENGINE
 // -------------------------------------------------------------------------
-function getWatchVault() {
+function getUnifiedUserVault() {
+    let vault = {
+        profile: { username: '', avatar: '', bio: '' },
+        watched: {},
+        liked: {},
+        watchLater: {}
+    };
+
     try {
-        const data = localStorage.getItem('anime_watch_vault');
-        if (data) return JSON.parse(data);
+        const raw = localStorage.getItem('blackleg_user_vault');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                if (parsed.profile) vault.profile = { ...vault.profile, ...parsed.profile };
+                if (parsed.watched && typeof parsed.watched === 'object') vault.watched = parsed.watched;
+                if (parsed.liked && typeof parsed.liked === 'object') vault.liked = parsed.liked;
+                if (parsed.watchLater && typeof parsed.watchLater === 'object') vault.watchLater = parsed.watchLater;
+            }
+        }
     } catch (e) {
-        console.error('[Watch Vault] Storage read error:', e);
+        console.error('[Unified Vault] Read error:', e);
     }
-    return {};
+
+    // Auto-migrate legacy anime_watch_vault into watched bucket if present
+    try {
+        const legacyWatch = localStorage.getItem('anime_watch_vault');
+        if (legacyWatch) {
+            const parsedLegacy = JSON.parse(legacyWatch);
+            if (parsedLegacy && typeof parsedLegacy === 'object') {
+                if (parsedLegacy.watched) {
+                    vault.watched = { ...parsedLegacy.watched, ...vault.watched };
+                    if (parsedLegacy.liked) vault.liked = { ...parsedLegacy.liked, ...vault.liked };
+                    if (parsedLegacy.watchLater) vault.watchLater = { ...parsedLegacy.watchLater, ...vault.watchLater };
+                    if (parsedLegacy.profile) vault.profile = { ...parsedLegacy.profile, ...vault.profile };
+                } else if (!Array.isArray(parsedLegacy)) {
+                    vault.watched = { ...parsedLegacy, ...vault.watched };
+                }
+            }
+        }
+    } catch (e) {}
+
+    return vault;
 }
 
-function saveWatchVault(vault) {
+function saveUnifiedUserVault(vault) {
     try {
-        localStorage.setItem('anime_watch_vault', JSON.stringify(vault));
+        if (!vault) return;
+        localStorage.setItem('blackleg_user_vault', JSON.stringify(vault));
+        // Keep anime_watch_vault in sync with watched map for full backwards compatibility
+        localStorage.setItem('anime_watch_vault', JSON.stringify(vault.watched || {}));
         if (typeof pushVaultToCloud === 'function') {
             pushVaultToCloud();
         }
     } catch (e) {
-        console.error('[Watch Vault] Storage write error:', e);
+        console.error('[Unified Vault] Save error:', e);
     }
 }
+
+function getWatchVault() {
+    return getUnifiedUserVault().watched || {};
+}
+
+function saveWatchVault(watched) {
+    const uVault = getUnifiedUserVault();
+    uVault.watched = watched || {};
+    saveUnifiedUserVault(uVault);
+}
+
+function normalizeVaultShow(show) {
+    if (!show) return null;
+    return {
+        id: show.id,
+        title: typeof show.title === 'string' ? { userPreferred: show.title, english: show.title, romaji: show.title } : (show.title || {}),
+        coverImage: show.coverImage || {},
+        bannerImage: show.banner || show.bannerImage || (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large)) || '',
+        format: show.format || 'TV',
+        rating: show.meanScore || show.averageScore || 0,
+        genres: show.genres || [],
+        episodes: show.episodes || 0,
+        description: show.description || ''
+    };
+}
+
+function updateLikeButtonUI(showId, isLiked) {
+    const detailsLikeBtn = document.getElementById('details-like-btn');
+    if (detailsLikeBtn && window.showData && String(window.showData.id) === String(showId)) {
+        detailsLikeBtn.className = `px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isLiked ? 'bg-[#e50914] text-white border-[#e50914] shadow-red-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border-white/10'}`;
+        const label = document.getElementById('details-like-label');
+        if (label) label.innerText = isLiked ? 'Liked' : 'Like';
+        const icon = detailsLikeBtn.querySelector('svg');
+        if (icon) {
+            icon.className = `w-4 h-4 ${isLiked ? 'fill-white stroke-white' : 'fill-none stroke-current'}`;
+        }
+    }
+    const previewLikeBtn = document.getElementById(`preview-like-btn-${showId}`);
+    if (previewLikeBtn) {
+        previewLikeBtn.className = `p-2.5 rounded-xl border transition-all cursor-pointer ${isLiked ? 'bg-[#e50914] text-white border-[#e50914] shadow-md shadow-red-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10'}`;
+        previewLikeBtn.title = isLiked ? 'Unlike' : 'Like';
+        const icon = previewLikeBtn.querySelector('svg');
+        if (icon) {
+            icon.className = `w-4 h-4 ${isLiked ? 'fill-white stroke-white' : 'fill-none stroke-current'}`;
+        }
+    }
+}
+
+function updateWatchLaterButtonUI(showId, isInWatchLater) {
+    const detailsWlBtn = document.getElementById('details-watchlater-btn');
+    if (detailsWlBtn && window.showData && String(window.showData.id) === String(showId)) {
+        detailsWlBtn.className = `px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isInWatchLater ? 'bg-[#f59e0b] text-[#08080c] border-[#f59e0b] shadow-amber-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border-white/10'}`;
+        const label = document.getElementById('details-watchlater-label');
+        if (label) label.innerText = isInWatchLater ? 'In Watch Later' : 'Watch Later';
+        const icon = detailsWlBtn.querySelector('svg');
+        if (icon) {
+            icon.className = `w-4 h-4 ${isInWatchLater ? 'fill-[#08080c] stroke-[#08080c]' : 'fill-none stroke-current'}`;
+        }
+    }
+    const previewWlBtn = document.getElementById(`preview-watchlater-btn-${showId}`);
+    if (previewWlBtn) {
+        previewWlBtn.className = `p-2.5 rounded-xl border transition-all cursor-pointer ${isInWatchLater ? 'bg-[#f59e0b] text-[#08080c] border-[#f59e0b] shadow-md shadow-amber-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10'}`;
+        previewWlBtn.title = isInWatchLater ? 'Remove from Watch Later' : 'Watch Later';
+        const icon = previewWlBtn.querySelector('svg');
+        if (icon) {
+            icon.className = `w-4 h-4 ${isInWatchLater ? 'fill-[#08080c] stroke-[#08080c]' : 'fill-none stroke-current'}`;
+        }
+    }
+}
+
+window.toggleAnimeLiked = function(show) {
+    if (!show || !show.id) return false;
+    const showId = String(show.id);
+    const uVault = getUnifiedUserVault();
+    let isLikedNow = false;
+
+    if (uVault.liked && uVault.liked[showId]) {
+        delete uVault.liked[showId];
+        isLikedNow = false;
+    } else {
+        if (!uVault.liked) uVault.liked = {};
+        uVault.liked[showId] = {
+            ...normalizeVaultShow(show),
+            addedAt: Date.now()
+        };
+        isLikedNow = true;
+    }
+
+    saveUnifiedUserVault(uVault);
+    updateLikeButtonUI(showId, isLikedNow);
+    if (window.renderDedicatedProfileView && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
+        window.renderDedicatedProfileView();
+    }
+    return isLikedNow;
+};
+
+window.toggleAnimeWatchLater = function(show) {
+    if (!show || !show.id) return false;
+    const showId = String(show.id);
+    const uVault = getUnifiedUserVault();
+    let isInWatchLaterNow = false;
+
+    if (uVault.watchLater && uVault.watchLater[showId]) {
+        delete uVault.watchLater[showId];
+        isInWatchLaterNow = false;
+    } else {
+        if (!uVault.watchLater) uVault.watchLater = {};
+        uVault.watchLater[showId] = {
+            ...normalizeVaultShow(show),
+            addedAt: Date.now()
+        };
+        isInWatchLaterNow = true;
+    }
+
+    saveUnifiedUserVault(uVault);
+    updateWatchLaterButtonUI(showId, isInWatchLaterNow);
+    if (window.renderDedicatedProfileView && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
+        window.renderDedicatedProfileView();
+    }
+    return isInWatchLaterNow;
+};
+
+window.isAnimeLiked = function(showId) {
+    if (!showId) return false;
+    const uVault = getUnifiedUserVault();
+    return Boolean(uVault.liked && uVault.liked[String(showId)]);
+};
+
+window.isAnimeInWatchLater = function(showId) {
+    if (!showId) return false;
+    const uVault = getUnifiedUserVault();
+    return Boolean(uVault.watchLater && uVault.watchLater[String(showId)]);
+};
+
+window.saveUserProfileInfo = async function() {
+    const usernameInput = document.getElementById('profile-edit-username');
+    const avatarInput = document.getElementById('profile-edit-avatar');
+    const bioInput = document.getElementById('profile-edit-bio');
+    const statusMsg = document.getElementById('profile-save-status');
+
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const avatar_url = avatarInput ? avatarInput.value.trim() : '';
+    const bio = bioInput ? bioInput.value.trim() : '';
+
+    const uVault = getUnifiedUserVault();
+    uVault.profile = {
+        username: username || uVault.profile.username || '',
+        avatar: avatar_url || uVault.profile.avatar || '',
+        bio: bio || uVault.profile.bio || ''
+    };
+    saveUnifiedUserVault(uVault);
+
+    const token = getAuthToken();
+    if (token) {
+        try {
+            if (statusMsg) {
+                statusMsg.innerText = 'Saving changes to cloud...';
+                statusMsg.className = 'text-xs font-semibold text-amber-400';
+            }
+            const url = getAuthWorkerApiUrl('/api/user/profile');
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ username, avatar_url, bio })
+            });
+            const json = await res.json();
+            if (json && json.success && json.profile) {
+                const curUser = getAuthUser() || {};
+                const updatedUser = { ...curUser, ...json.profile };
+                localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+                updateAuthUI();
+                if (statusMsg) {
+                    statusMsg.innerText = '✓ Profile updated successfully!';
+                    statusMsg.className = 'text-xs font-semibold text-emerald-400';
+                }
+            }
+        } catch (e) {
+            console.error('[Profile Save] Cloud save error:', e);
+            if (statusMsg) {
+                statusMsg.innerText = 'Saved locally (cloud sync retry pending)';
+                statusMsg.className = 'text-xs font-semibold text-zinc-400';
+            }
+        }
+    } else {
+        if (statusMsg) {
+            statusMsg.innerText = '✓ Saved locally!';
+            statusMsg.className = 'text-xs font-semibold text-emerald-400';
+        }
+    }
+
+    setTimeout(() => {
+        if (window.renderDedicatedProfileView) {
+            window.renderDedicatedProfileView();
+        }
+    }, 600);
+};
 
 function updateContinueWatchingHistory(percentage, currentTime = 0, duration = 0) {
     if (!window.showData || !window.showData.id) return;
@@ -2552,12 +2797,16 @@ function isEpisodeWatched(showId, epNum) {
 }
 window.isEpisodeWatched = isEpisodeWatched;
 
+window.getUnifiedUserVault = getUnifiedUserVault;
+window.saveUnifiedUserVault = saveUnifiedUserVault;
 window.getWatchVault = getWatchVault;
 window.saveWatchVault = saveWatchVault;
 
 window.clearContinueWatchingHistory = function() {
     if (!confirm('Are you sure you want to clear your entire watch history?')) return;
-    localStorage.removeItem('anime_watch_vault');
+    const uVault = getUnifiedUserVault();
+    uVault.watched = {};
+    saveUnifiedUserVault(uVault);
     localStorage.removeItem('continueWatching');
     if (typeof pushVaultToCloud === 'function') pushVaultToCloud();
     if (typeof window.renderDedicatedContinueWatchingView === 'function') {
@@ -2571,9 +2820,9 @@ window.clearContinueWatchingHistory = function() {
 };
 
 window.removeContinueWatchingItem = function(showId) {
-    let vault = getWatchVault();
-    delete vault[String(showId)];
-    saveWatchVault(vault);
+    let uVault = getUnifiedUserVault();
+    delete uVault.watched[String(showId)];
+    saveUnifiedUserVault(uVault);
 
     let legacy = JSON.parse(localStorage.getItem('continueWatching') || '[]');
     legacy = legacy.filter(i => i && i.show && String(i.show.id) !== String(showId));
@@ -2881,6 +3130,10 @@ async function renderAnimeDetailsView() {
         `;
     }
 
+    const isLiked = typeof window.isAnimeLiked === 'function' ? window.isAnimeLiked(showData.id) : false;
+    const isWatchLater = typeof window.isAnimeInWatchLater === 'function' ? window.isAnimeInWatchLater(showData.id) : false;
+    const stringifiedShowData = JSON.stringify(showData).replace(/"/g, '&quot;');
+
     detailsLayout.innerHTML = `
         <div class="absolute inset-x-0 top-0 h-[500px] bg-cover bg-center bg-no-repeat pointer-events-none z-0 opacity-40 transition-all duration-700" style="background-image: url('${bannerImg}'); mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%); -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);"></div>
         <div class="absolute inset-x-0 top-0 h-[500px] pointer-events-none z-0" style="background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(15,23,42,1) 100%);"></div>
@@ -2920,10 +3173,20 @@ async function renderAnimeDetailsView() {
                     </div>
                 </div>
 
-                <div class="flex gap-4">
-                    <button onclick="navigateWatchEpisode(${lastWatchedEp})" class="px-8 py-4 text-[#08080c] font-bold tracking-wider rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase flex items-center gap-2" style="background: var(--anime-accent-color, #f59e0b); box-shadow: 0 0 20px rgba(var(--anime-accent-rgb,245,158,11),0.4);">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <button onclick="navigateWatchEpisode(${lastWatchedEp})" class="px-8 py-4 text-[#08080c] font-bold tracking-wider rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 uppercase flex items-center gap-2 cursor-pointer" style="background: var(--anime-accent-color, #f59e0b); box-shadow: 0 0 20px rgba(var(--anime-accent-rgb,245,158,11),0.4);">
                         <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         ${ctaLabel}
+                    </button>
+
+                    <button id="details-like-btn" onclick="window.toggleAnimeLiked(${stringifiedShowData})" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isLiked ? 'bg-[#e50914] text-white border-[#e50914] shadow-red-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border-white/10'}">
+                        <svg class="w-4 h-4 ${isLiked ? 'fill-white stroke-white' : 'fill-none stroke-current'}" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                        <span id="details-like-label">${isLiked ? 'Liked' : 'Like'}</span>
+                    </button>
+
+                    <button id="details-watchlater-btn" onclick="window.toggleAnimeWatchLater(${stringifiedShowData})" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isWatchLater ? 'bg-[#f59e0b] text-[#08080c] border-[#f59e0b] shadow-amber-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border-white/10'}">
+                        <svg class="w-4 h-4 ${isWatchLater ? 'fill-[#08080c] stroke-[#08080c]' : 'fill-none stroke-current'}" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                        <span id="details-watchlater-label">${isWatchLater ? 'In Watch Later' : 'Watch Later'}</span>
                     </button>
                 </div>
 
@@ -3490,6 +3753,11 @@ async function registerUser(email, password) {
     localStorage.setItem('auth_user', JSON.stringify(json.user));
     updateAuthUI();
     await pushVaultToCloud();
+    if (window.location.pathname.startsWith('/profile') || window.location.hash === '#profile') {
+        if (typeof window.renderDedicatedProfileView === 'function') {
+            window.renderDedicatedProfileView();
+        }
+    }
 }
 
 async function loginUser(email, password) {
@@ -3516,6 +3784,11 @@ async function loginUser(email, password) {
     localStorage.setItem('auth_user', JSON.stringify(json.user));
     updateAuthUI();
     await pullVaultFromCloud();
+    if (window.location.pathname.startsWith('/profile') || window.location.hash === '#profile') {
+        if (typeof window.renderDedicatedProfileView === 'function') {
+            window.renderDedicatedProfileView();
+        }
+    }
 }
 
 function logoutUser() {
@@ -3524,6 +3797,11 @@ function logoutUser() {
     updateAuthUI();
     const dropdown = document.getElementById('auth-nav-dropdown');
     if (dropdown) dropdown.classList.add('hidden');
+    if (window.location.pathname.startsWith('/profile') || window.location.hash === '#profile') {
+        if (typeof window.renderDedicatedProfileView === 'function') {
+            window.renderDedicatedProfileView();
+        }
+    }
 }
 
 async function pushVaultToCloud() {
@@ -3534,12 +3812,7 @@ async function pushVaultToCloud() {
 
     cloudSyncDebounceTimer = setTimeout(async () => {
         try {
-            const vaultData = localStorage.getItem('anime_watch_vault');
-            let vaultObj = {};
-            if (vaultData) {
-                try { vaultObj = JSON.parse(vaultData); } catch (e) { }
-            }
-            const vaultArray = Object.values(vaultObj);
+            const uVault = getUnifiedUserVault();
             const url = getAuthWorkerApiUrl('/api/user/sync');
 
             const res = await fetch(url, {
@@ -3548,23 +3821,26 @@ async function pushVaultToCloud() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ vault: vaultArray })
+                body: JSON.stringify({
+                    vault: {
+                        watched: uVault.watched || {},
+                        liked: uVault.liked || {},
+                        watchLater: uVault.watchLater || {}
+                    }
+                })
             });
 
             const rawText = await res.text();
-            if (!rawText) {
-                console.warn(`[Cloud Sync] Empty response from auth server (HTTP ${res.status})`);
-                return;
-            }
+            if (!rawText) return;
             let json;
-            try {
-                json = JSON.parse(rawText);
-            } catch (err) {
-                console.warn(`[Cloud Sync] Invalid server response format (HTTP ${res.status})`);
-                return;
-            }
-            if (!res.ok || !json.success) {
-                console.warn('[Cloud Sync] Push failed:', json.error || `HTTP ${res.status}`);
+            try { json = JSON.parse(rawText); } catch (err) { return; }
+            if (json && json.success && json.vault) {
+                const local = getUnifiedUserVault();
+                local.watched = { ...local.watched, ...(json.vault.watched || {}) };
+                local.liked = { ...local.liked, ...(json.vault.liked || {}) };
+                local.watchLater = { ...local.watchLater, ...(json.vault.watchLater || {}) };
+                localStorage.setItem('blackleg_user_vault', JSON.stringify(local));
+                localStorage.setItem('anime_watch_vault', JSON.stringify(local.watched));
             }
         } catch (e) {
             console.error('[Cloud Sync] Push error:', e);
@@ -3582,37 +3858,72 @@ async function pullVaultFromCloud() {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const rawText = await res.text();
-        if (!rawText) {
-            console.warn(`[Cloud Sync] Empty response from auth server (HTTP ${res.status})`);
-            return;
-        }
+        if (!rawText) return;
         let json;
-        try {
-            json = JSON.parse(rawText);
-        } catch (err) {
-            console.warn(`[Cloud Sync] Invalid server response format (HTTP ${res.status})`);
-            return;
-        }
-        if (!res.ok || !json.success || !Array.isArray(json.vault)) return;
+        try { json = JSON.parse(rawText); } catch (err) { return; }
+        if (!res.ok || !json.success || !json.vault) return;
 
-        let localVault = {};
-        try {
-            const raw = localStorage.getItem('anime_watch_vault');
-            if (raw) localVault = JSON.parse(raw);
-        } catch (e) { }
+        const uVault = getUnifiedUserVault();
 
-        json.vault.forEach(item => {
-            if (!item || !item.id) return;
-            const showId = String(item.id);
-            const existing = localVault[showId];
-            if (!existing || (item.updatedAt || 0) > (existing.updatedAt || 0)) {
-                localVault[showId] = item;
+        // 1. Merge watched items
+        const incomingWatched = json.vault.watched || (Array.isArray(json.vault) ? json.vault : {});
+        const watchedEntries = Array.isArray(incomingWatched)
+            ? incomingWatched.map(it => [String(it.id || ''), it])
+            : Object.entries(incomingWatched);
+
+        watchedEntries.forEach(([id, item]) => {
+            if (!id || !item) return;
+            const existing = uVault.watched[id];
+            if (!existing || (item.updatedAt || 0) >= (existing.updatedAt || 0)) {
+                uVault.watched[id] = { ...existing, ...item };
             }
         });
 
-        localStorage.setItem('anime_watch_vault', JSON.stringify(localVault));
+        // 2. Merge liked items
+        const incomingLiked = json.vault.liked || {};
+        Object.entries(incomingLiked).forEach(([id, item]) => {
+            if (!id || !item) return;
+            const existing = uVault.liked[id];
+            if (!existing || (item.addedAt || item.updatedAt || 0) >= (existing.addedAt || existing.updatedAt || 0)) {
+                uVault.liked[id] = { ...existing, ...item };
+            }
+        });
+
+        // 3. Merge watch later items
+        const incomingWatchLater = json.vault.watchLater || {};
+        Object.entries(incomingWatchLater).forEach(([id, item]) => {
+            if (!id || !item) return;
+            const existing = uVault.watchLater[id];
+            if (!existing || (item.addedAt || item.updatedAt || 0) >= (existing.addedAt || existing.updatedAt || 0)) {
+                uVault.watchLater[id] = { ...existing, ...item };
+            }
+        });
+
+        // 4. Merge profile if present
+        if (json.profile) {
+            uVault.profile = {
+                username: json.profile.username || uVault.profile.username,
+                avatar: json.profile.avatar_url || uVault.profile.avatar,
+                bio: json.profile.bio || uVault.profile.bio
+            };
+            const curUser = getAuthUser();
+            if (curUser) {
+                localStorage.setItem('auth_user', JSON.stringify({ ...curUser, ...json.profile }));
+                updateAuthUI();
+            }
+        }
+
+        localStorage.setItem('blackleg_user_vault', JSON.stringify(uVault));
+        localStorage.setItem('anime_watch_vault', JSON.stringify(uVault.watched));
+
         if (typeof window.renderContinueWatching === 'function') {
             window.renderContinueWatching();
+        }
+        if (typeof window.renderDedicatedContinueWatchingView === 'function' && document.getElementById('dedicated-continue-watching-layout') && !document.getElementById('dedicated-continue-watching-layout').classList.contains('hidden')) {
+            window.renderDedicatedContinueWatchingView();
+        }
+        if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
+            window.renderDedicatedProfileView();
         }
     } catch (e) {
         console.error('[Cloud Sync] Pull error:', e);
