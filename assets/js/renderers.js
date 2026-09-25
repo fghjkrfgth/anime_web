@@ -1338,9 +1338,64 @@ window.toggleProfileEditDrawer = function() {
 
 window.switchProfileTab = function(tabName) {
     window.activeProfileTab = tabName;
-    if (typeof window.renderDedicatedProfileView === 'function') {
+    if (typeof window.refreshProfileTab === 'function') {
+        window.refreshProfileTab();
+    } else if (typeof window.renderDedicatedProfileView === 'function') {
         window.renderDedicatedProfileView();
     }
+};
+
+window.refreshProfileTab = function() {
+    const layout = document.getElementById('profile-page-layout');
+    if (!layout || layout.classList.contains('hidden')) return;
+
+    const contentContainer = document.getElementById('profile-tab-content');
+    if (!contentContainer) {
+        if (typeof window.renderDedicatedProfileView === 'function') {
+            window.renderDedicatedProfileView();
+        }
+        return;
+    }
+
+    const uVault = typeof getUnifiedUserVault === 'function' ? getUnifiedUserVault() : { profile: {}, watched: {}, liked: {}, watchLater: {} };
+    const watchedList = Object.values(uVault.watched || {}).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    const likedList = Object.values(typeof getLikedAnimeList === 'function' ? getLikedAnimeList() : (uVault.liked || {})).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    const watchLaterList = Object.values(typeof getWatchLaterList === 'function' ? getWatchLaterList() : (uVault.watchLater || {})).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+
+    // Update Counts on Pills
+    const pillWatched = document.getElementById('profile-pill-count-watched');
+    if (pillWatched) pillWatched.innerText = watchedList.length;
+    const pillLiked = document.getElementById('profile-pill-count-liked');
+    if (pillLiked) pillLiked.innerText = likedList.length;
+    const pillWl = document.getElementById('profile-pill-count-watchlater');
+    if (pillWl) pillWl.innerText = watchLaterList.length;
+
+    // Update Counts on Tab Badges
+    const badgeWatched = document.getElementById('profile-tab-badge-watched');
+    if (badgeWatched) badgeWatched.innerText = watchedList.length;
+    const badgeLiked = document.getElementById('profile-tab-badge-liked');
+    if (badgeLiked) badgeLiked.innerText = likedList.length;
+    const badgeWl = document.getElementById('profile-tab-badge-watchlater');
+    if (badgeWl) badgeWl.innerText = watchLaterList.length;
+
+    // Update Tab Button active classes
+    const activeTab = window.activeProfileTab || 'watched';
+    const btnWatched = document.getElementById('profile-tab-btn-watched');
+    const btnLiked = document.getElementById('profile-tab-btn-liked');
+    const btnWl = document.getElementById('profile-tab-btn-watchlater');
+
+    if (btnWatched) {
+        btnWatched.className = `px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${activeTab === 'watched' ? 'bg-[#e50914] text-white shadow-lg shadow-red-900/40' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`;
+    }
+    if (btnLiked) {
+        btnLiked.className = `px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${activeTab === 'liked' ? 'bg-[#e50914] text-white shadow-lg shadow-red-900/40' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`;
+    }
+    if (btnWl) {
+        btnWl.className = `px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${activeTab === 'watchLater' ? 'bg-[#f59e0b] text-[#08080c] shadow-lg shadow-amber-900/40 font-black' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}`;
+    }
+
+    // Re-render active tab content area
+    contentContainer.innerHTML = renderActiveTabContent(activeTab, { watchedList, likedList, watchLaterList });
 };
 
 function renderActiveTabContent(activeTab, data) {
@@ -1457,8 +1512,8 @@ function renderActiveTabContent(activeTab, data) {
                                 </div>
 
                                 <!-- Unlike Button (✕) -->
-                                <button onclick="event.stopPropagation(); toggleLikeAnimeById('${item.id}');" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-[#e50914] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Liked">
-                                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <button data-action-like="${item.id}" class="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/70 hover:bg-[#e50914] text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Liked">
+                                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2 pointer-events-none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
 
@@ -1513,8 +1568,8 @@ function renderActiveTabContent(activeTab, data) {
                                 </div>
 
                                 <!-- Remove from Queue Button (✕) -->
-                                <button onclick="event.stopPropagation(); toggleWatchLaterAnimeById('${item.id}');" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Watch Later">
-                                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <button data-action-later="${item.id}" class="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 text-zinc-300 hover:text-white border border-white/10 flex items-center justify-center transition-all shadow-md cursor-pointer" title="Remove from Watch Later">
+                                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2 pointer-events-none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
 
@@ -1694,35 +1749,35 @@ window.renderDedicatedProfileView = async function () {
                     <div class="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
                         <span>📺</span> Shows Watched
                     </div>
-                    <div class="text-xl md:text-3xl font-black text-white">${watchedList.length}</div>
+                    <div id="profile-pill-count-watched" class="text-xl md:text-3xl font-black text-white">${watchedList.length}</div>
                 </div>
                 <div onclick="switchProfileTab('liked')" class="glass-panel p-4 md:p-5 rounded-2xl border transition-all cursor-pointer flex flex-col gap-1 ${window.activeProfileTab === 'liked' ? 'border-[#e50914] bg-[#e50914]/5' : 'border-white/5 hover:border-white/20'}">
                     <div class="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
                         <span>♥</span> Liked Anime
                     </div>
-                    <div class="text-xl md:text-3xl font-black text-white">${likedList.length}</div>
+                    <div id="profile-pill-count-liked" class="text-xl md:text-3xl font-black text-white">${likedList.length}</div>
                 </div>
                 <div onclick="switchProfileTab('watchLater')" class="glass-panel p-4 md:p-5 rounded-2xl border transition-all cursor-pointer flex flex-col gap-1 ${window.activeProfileTab === 'watchLater' ? 'border-[#f59e0b] bg-[#f59e0b]/5' : 'border-white/5 hover:border-white/20'}">
                     <div class="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
                         <span>🔖</span> Watch Later
                     </div>
-                    <div class="text-xl md:text-3xl font-black text-white">${watchLaterList.length}</div>
+                    <div id="profile-pill-count-watchlater" class="text-xl md:text-3xl font-black text-white">${watchLaterList.length}</div>
                 </div>
             </div>
 
             <!-- Segmented Content Tabs -->
             <div class="flex items-center gap-2 border-b border-white/10 pb-4">
-                <button onclick="switchProfileTab('watched')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'watched' ? 'bg-[#e50914] text-white shadow-lg shadow-red-900/40' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
+                <button id="profile-tab-btn-watched" onclick="switchProfileTab('watched')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'watched' ? 'bg-[#e50914] text-white shadow-lg shadow-red-900/40' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
                     <span>Watch History</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'watched' ? 'bg-black/30 text-white' : 'bg-white/10 text-zinc-300'}">${watchedList.length}</span>
+                    <span id="profile-tab-badge-watched" class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'watched' ? 'bg-black/30 text-white' : 'bg-white/10 text-zinc-300'}">${watchedList.length}</span>
                 </button>
-                <button onclick="switchProfileTab('liked')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'liked' ? 'bg-[#e50914] text-white shadow-lg shadow-red-900/40' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
+                <button id="profile-tab-btn-liked" onclick="switchProfileTab('liked')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'liked' ? 'bg-[#e50914] text-white shadow-lg shadow-red-900/40' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
                     <span>Liked Anime</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'liked' ? 'bg-black/30 text-white' : 'bg-white/10 text-zinc-300'}">${likedList.length}</span>
+                    <span id="profile-tab-badge-liked" class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'liked' ? 'bg-black/30 text-white' : 'bg-white/10 text-zinc-300'}">${likedList.length}</span>
                 </button>
-                <button onclick="switchProfileTab('watchLater')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'watchLater' ? 'bg-[#f59e0b] text-[#08080c] shadow-lg shadow-amber-900/40 font-black' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
+                <button id="profile-tab-btn-watchlater" onclick="switchProfileTab('watchLater')" class="px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${window.activeProfileTab === 'watchLater' ? 'bg-[#f59e0b] text-[#08080c] shadow-lg shadow-amber-900/40 font-black' : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'}">
                     <span>Watch Later</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'watchLater' ? 'bg-black/20 text-[#08080c]' : 'bg-white/10 text-zinc-300'}">${watchLaterList.length}</span>
+                    <span id="profile-tab-badge-watchlater" class="text-[10px] px-1.5 py-0.5 rounded-full ${window.activeProfileTab === 'watchLater' ? 'bg-black/20 text-[#08080c]' : 'bg-white/10 text-zinc-300'}">${watchLaterList.length}</span>
                 </button>
             </div>
 
