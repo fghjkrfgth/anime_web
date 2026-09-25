@@ -2534,131 +2534,174 @@ function normalizeVaultShow(show) {
     };
 }
 
-function updateLikeButtonUI(showId, isLiked) {
-    const detailsLikeBtn = document.getElementById('details-like-btn');
-    if (detailsLikeBtn && window.showData && String(window.showData.id) === String(showId)) {
-        detailsLikeBtn.className = `px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isLiked ? 'bg-[#e50914] text-white border-[#e50914] shadow-red-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border-white/10'}`;
-        const label = document.getElementById('details-like-label');
-        if (label) label.innerText = isLiked ? 'Liked' : 'Like';
-        const icon = detailsLikeBtn.querySelector('svg');
-        if (icon) {
-            icon.className = `w-4 h-4 ${isLiked ? 'fill-white stroke-white' : 'fill-none stroke-current'}`;
-        }
-    }
-    const previewLikeBtn = document.getElementById(`preview-like-btn-${showId}`);
-    if (previewLikeBtn) {
-        previewLikeBtn.className = `p-2.5 rounded-xl border transition-all cursor-pointer ${isLiked ? 'bg-[#e50914] text-white border-[#e50914] shadow-md shadow-red-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10'}`;
-        previewLikeBtn.title = isLiked ? 'Unlike' : 'Like';
-        const icon = previewLikeBtn.querySelector('svg');
-        if (icon) {
-            icon.className = `w-4 h-4 ${isLiked ? 'fill-white stroke-white' : 'fill-none stroke-current'}`;
-        }
+function getLikedAnimeList() {
+    try {
+        return JSON.parse(localStorage.getItem('anime_liked_list')) || {};
+    } catch (e) {
+        return {};
     }
 }
 
-function updateWatchLaterButtonUI(showId, isInWatchLater) {
-    const detailsWlBtn = document.getElementById('details-watchlater-btn');
-    if (detailsWlBtn && window.showData && String(window.showData.id) === String(showId)) {
-        detailsWlBtn.className = `px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isInWatchLater ? 'bg-[#f59e0b] text-[#08080c] border-[#f59e0b] shadow-amber-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border-white/10'}`;
-        const label = document.getElementById('details-watchlater-label');
-        if (label) label.innerText = isInWatchLater ? 'In Watch Later' : 'Watch Later';
-        const icon = detailsWlBtn.querySelector('svg');
-        if (icon) {
-            icon.className = `w-4 h-4 ${isInWatchLater ? 'fill-[#08080c] stroke-[#08080c]' : 'fill-none stroke-current'}`;
-        }
-    }
-    const previewWlBtn = document.getElementById(`preview-watchlater-btn-${showId}`);
-    if (previewWlBtn) {
-        previewWlBtn.className = `p-2.5 rounded-xl border transition-all cursor-pointer ${isInWatchLater ? 'bg-[#f59e0b] text-[#08080c] border-[#f59e0b] shadow-md shadow-amber-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 border-white/10'}`;
-        previewWlBtn.title = isInWatchLater ? 'Remove from Watch Later' : 'Watch Later';
-        const icon = previewWlBtn.querySelector('svg');
-        if (icon) {
-            icon.className = `w-4 h-4 ${isInWatchLater ? 'fill-[#08080c] stroke-[#08080c]' : 'fill-none stroke-current'}`;
-        }
+function getWatchLaterList() {
+    try {
+        return JSON.parse(localStorage.getItem('anime_watch_later_list')) || {};
+    } catch (e) {
+        return {};
     }
 }
 
-window.toggleAnimeLiked = function(show) {
-    if (!show || !show.id) return false;
+function toggleLikeAnime(show, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!show || !show.id) return;
     const showId = String(show.id);
-    const uVault = getUnifiedUserVault();
-    let isLikedNow = false;
+    const list = getLikedAnimeList();
 
-    if (uVault.liked && uVault.liked[showId]) {
-        delete uVault.liked[showId];
-        isLikedNow = false;
+    if (list[showId]) {
+        delete list[showId];
     } else {
-        if (!uVault.liked) uVault.liked = {};
-        uVault.liked[showId] = {
-            ...normalizeVaultShow(show),
+        list[showId] = {
+            id: show.id,
+            title: show.title,
+            coverImage: show.coverImage,
+            bannerImage: show.bannerImage || show.banner,
+            meanScore: show.meanScore,
+            format: show.format,
             addedAt: Date.now()
         };
-        isLikedNow = true;
     }
 
-    saveUnifiedUserVault(uVault);
-    updateLikeButtonUI(showId, isLikedNow);
-    if (window.renderDedicatedProfileView && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
+    localStorage.setItem('anime_liked_list', JSON.stringify(list));
+    try {
+        const uVault = getUnifiedUserVault();
+        uVault.liked = list;
+        localStorage.setItem('blackleg_user_vault', JSON.stringify(uVault));
+    } catch (e) {}
+
+    if (typeof pushVaultToCloud === 'function') pushVaultToCloud();
+    updateInteractiveButtonStates(showId);
+    if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
         window.renderDedicatedProfileView();
     }
-    return isLikedNow;
-};
+}
 
-window.toggleAnimeWatchLater = function(show) {
-    if (!show || !show.id) return false;
+function toggleWatchLaterAnime(show, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!show || !show.id) return;
     const showId = String(show.id);
-    const uVault = getUnifiedUserVault();
-    let isInWatchLaterNow = false;
+    const list = getWatchLaterList();
 
-    if (uVault.watchLater && uVault.watchLater[showId]) {
-        delete uVault.watchLater[showId];
-        isInWatchLaterNow = false;
+    if (list[showId]) {
+        delete list[showId];
     } else {
-        if (!uVault.watchLater) uVault.watchLater = {};
-        uVault.watchLater[showId] = {
-            ...normalizeVaultShow(show),
+        list[showId] = {
+            id: show.id,
+            title: show.title,
+            coverImage: show.coverImage,
+            bannerImage: show.bannerImage || show.banner,
+            meanScore: show.meanScore,
+            format: show.format,
             addedAt: Date.now()
         };
-        isInWatchLaterNow = true;
     }
 
-    saveUnifiedUserVault(uVault);
-    updateWatchLaterButtonUI(showId, isInWatchLaterNow);
-    if (window.renderDedicatedProfileView && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
+    localStorage.setItem('anime_watch_later_list', JSON.stringify(list));
+    try {
+        const uVault = getUnifiedUserVault();
+        uVault.watchLater = list;
+        localStorage.setItem('blackleg_user_vault', JSON.stringify(uVault));
+    } catch (e) {}
+
+    if (typeof pushVaultToCloud === 'function') pushVaultToCloud();
+    updateInteractiveButtonStates(showId);
+    if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
         window.renderDedicatedProfileView();
     }
-    return isInWatchLaterNow;
-};
+}
 
-window.isAnimeLiked = function(showId) {
-    if (!showId) return false;
-    const uVault = getUnifiedUserVault();
-    return Boolean(uVault.liked && uVault.liked[String(showId)]);
-};
+function updateInteractiveButtonStates(showId) {
+    const isLiked = !!getLikedAnimeList()[String(showId)];
+    const isWatchLater = !!getWatchLaterList()[String(showId)];
 
-window.isAnimeInWatchLater = function(showId) {
-    if (!showId) return false;
-    const uVault = getUnifiedUserVault();
-    return Boolean(uVault.watchLater && uVault.watchLater[String(showId)]);
-};
+    document.querySelectorAll(`[data-action-like="${showId}"]`).forEach(btn => {
+        btn.setAttribute('data-active', isLiked ? 'true' : 'false');
+        if (isLiked) {
+            btn.classList.add('text-[#e50914]', 'border-[#e50914]/60', 'bg-red-500/10');
+            btn.classList.remove('text-white', 'border-white/10', 'bg-white/5');
+            btn.innerHTML = `<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> <span>Liked</span>`;
+        } else {
+            btn.classList.remove('text-[#e50914]', 'border-[#e50914]/60', 'bg-red-500/10');
+            btn.classList.add('text-white', 'border-white/10', 'bg-white/5');
+            btn.innerHTML = `<svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg> <span>Like</span>`;
+        }
+    });
 
-window.saveUserProfileInfo = async function() {
+    document.querySelectorAll(`[data-action-later="${showId}"]`).forEach(btn => {
+        btn.setAttribute('data-active', isWatchLater ? 'true' : 'false');
+        if (isWatchLater) {
+            btn.classList.add('text-amber-400', 'border-amber-400/60', 'bg-amber-500/10');
+            btn.classList.remove('text-white', 'border-white/10', 'bg-white/5');
+            btn.innerHTML = `<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> <span>Saved</span>`;
+        } else {
+            btn.classList.remove('text-amber-400', 'border-amber-400/60', 'bg-amber-500/10');
+            btn.classList.add('text-white', 'border-white/10', 'bg-white/5');
+            btn.innerHTML = `<svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg> <span>Watch Later</span>`;
+        }
+    });
+}
+
+window.getLikedAnimeList = getLikedAnimeList;
+window.getWatchLaterList = getWatchLaterList;
+window.toggleLikeAnime = toggleLikeAnime;
+window.toggleWatchLaterAnime = toggleWatchLaterAnime;
+window.updateInteractiveButtonStates = updateInteractiveButtonStates;
+
+window.toggleAnimeLiked = (show, event) => toggleLikeAnime(show, event);
+window.toggleAnimeWatchLater = (show, event) => toggleWatchLaterAnime(show, event);
+window.isAnimeLiked = (showId) => !!getLikedAnimeList()[String(showId)];
+window.isAnimeInWatchLater = (showId) => !!getWatchLaterList()[String(showId)];
+
+async function saveUserProfileInfo(newUsername, newAvatar, newBio) {
     const usernameInput = document.getElementById('profile-edit-username');
     const avatarInput = document.getElementById('profile-edit-avatar');
     const bioInput = document.getElementById('profile-edit-bio');
     const statusMsg = document.getElementById('profile-save-status');
 
-    const username = usernameInput ? usernameInput.value.trim() : '';
-    const avatar_url = avatarInput ? avatarInput.value.trim() : '';
-    const bio = bioInput ? bioInput.value.trim() : '';
+    const username = (typeof newUsername === 'string' && newUsername.trim()) ? newUsername.trim() : (usernameInput ? usernameInput.value.trim() : '');
+    const avatar = (typeof newAvatar === 'string' && newAvatar.trim()) ? newAvatar.trim() : (avatarInput ? avatarInput.value.trim() : '');
+    const bio = (typeof newBio === 'string') ? newBio.trim() : (bioInput ? bioInput.value.trim() : '');
 
-    const uVault = getUnifiedUserVault();
-    uVault.profile = {
-        username: username || uVault.profile.username || '',
-        avatar: avatar_url || uVault.profile.avatar || '',
-        bio: bio || uVault.profile.bio || ''
+    // 1. Save into localStorage user_profile_data
+    localStorage.setItem('user_profile_data', JSON.stringify({ username, avatar, bio }));
+
+    // 2. Also update stored auth_user in localStorage
+    const curUser = getAuthUser() || {};
+    const updatedUser = {
+        ...curUser,
+        username: username || curUser.username,
+        avatar: avatar || curUser.avatar,
+        avatar_url: avatar || curUser.avatar_url,
+        bio: bio || curUser.bio
     };
+    localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+
+    // Update unified user vault
+    const uVault = getUnifiedUserVault();
+    uVault.profile = { username, avatar, bio };
     saveUnifiedUserVault(uVault);
+
+    // 3. Immediately call updateAuthUI() so top nav & headers refresh without reload
+    updateAuthUI();
+
+    // 4. Dispatch cloud synchronization via pushVaultToCloud()
+    if (typeof pushVaultToCloud === 'function') {
+        pushVaultToCloud();
+    }
 
     const token = getAuthToken();
     if (token) {
@@ -2674,13 +2717,12 @@ window.saveUserProfileInfo = async function() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ username, avatar_url, bio })
+                body: JSON.stringify({ username, avatar_url: avatar, bio })
             });
             const json = await res.json();
             if (json && json.success && json.profile) {
-                const curUser = getAuthUser() || {};
-                const updatedUser = { ...curUser, ...json.profile };
-                localStorage.setItem('auth_user', JSON.stringify(updatedUser));
+                const refreshedUser = { ...getAuthUser(), ...json.profile };
+                localStorage.setItem('auth_user', JSON.stringify(refreshedUser));
                 updateAuthUI();
                 if (statusMsg) {
                     statusMsg.innerText = '✓ Profile updated successfully!';
@@ -2702,11 +2744,12 @@ window.saveUserProfileInfo = async function() {
     }
 
     setTimeout(() => {
-        if (window.renderDedicatedProfileView) {
+        if (window.renderDedicatedProfileView && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
             window.renderDedicatedProfileView();
         }
-    }, 600);
-};
+    }, 400);
+}
+window.saveUserProfileInfo = saveUserProfileInfo;
 
 function updateContinueWatchingHistory(percentage, currentTime = 0, duration = 0) {
     if (!window.showData || !window.showData.id) return;
@@ -3130,8 +3173,8 @@ async function renderAnimeDetailsView() {
         `;
     }
 
-    const isLiked = typeof window.isAnimeLiked === 'function' ? window.isAnimeLiked(showData.id) : false;
-    const isWatchLater = typeof window.isAnimeInWatchLater === 'function' ? window.isAnimeInWatchLater(showData.id) : false;
+    const isLiked = !!getLikedAnimeList()[String(showData.id)];
+    const isWatchLater = !!getWatchLaterList()[String(showData.id)];
     const stringifiedShowData = JSON.stringify(showData).replace(/"/g, '&quot;');
 
     detailsLayout.innerHTML = `
@@ -3179,14 +3222,14 @@ async function renderAnimeDetailsView() {
                         ${ctaLabel}
                     </button>
 
-                    <button id="details-like-btn" onclick="window.toggleAnimeLiked(${stringifiedShowData})" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isLiked ? 'bg-[#e50914] text-white border-[#e50914] shadow-red-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border-white/10'}">
-                        <svg class="w-4 h-4 ${isLiked ? 'fill-white stroke-white' : 'fill-none stroke-current'}" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-                        <span id="details-like-label">${isLiked ? 'Liked' : 'Like'}</span>
+                    <button data-action-like="${showData.id}" data-active="${isLiked ? 'true' : 'false'}" onclick="toggleLikeAnime(${stringifiedShowData}, event)" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isLiked ? 'text-[#e50914] border-[#e50914]/60 bg-red-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
+                        <svg class="w-4 h-4 ${isLiked ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                        <span>${isLiked ? 'Liked' : 'Like'}</span>
                     </button>
 
-                    <button id="details-watchlater-btn" onclick="window.toggleAnimeWatchLater(${stringifiedShowData})" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isWatchLater ? 'bg-[#f59e0b] text-[#08080c] border-[#f59e0b] shadow-amber-900/40' : 'bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border-white/10'}">
-                        <svg class="w-4 h-4 ${isWatchLater ? 'fill-[#08080c] stroke-[#08080c]' : 'fill-none stroke-current'}" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
-                        <span id="details-watchlater-label">${isWatchLater ? 'In Watch Later' : 'Watch Later'}</span>
+                    <button data-action-later="${showData.id}" data-active="${isWatchLater ? 'true' : 'false'}" onclick="toggleWatchLaterAnime(${stringifiedShowData}, event)" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isWatchLater ? 'text-amber-400 border-amber-400/60 bg-amber-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
+                        <svg class="w-4 h-4 ${isWatchLater ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+                        <span>${isWatchLater ? 'Saved' : 'Watch Later'}</span>
                     </button>
                 </div>
 
@@ -3604,22 +3647,45 @@ function updateAuthUI() {
     const navLabel = document.getElementById('auth-nav-label');
     const userInfo = document.getElementById('auth-user-info');
     const authBtn = document.getElementById('auth-nav-btn');
+    const pfpImg = document.getElementById('nav-user-pfp');
+    const defaultIcon = document.getElementById('nav-default-user-icon');
+
+    let customProfile = {};
+    try {
+        const stored = localStorage.getItem('user_profile_data');
+        if (stored) customProfile = JSON.parse(stored);
+    } catch (e) {}
 
     if (user && token) {
-        const displayName = user.email ? user.email.split('@')[0] : 'User';
+        const displayName = customProfile.username || user.username || (user.email ? user.email.split('@')[0] : 'User');
+        const avatarUrl = customProfile.avatar || user.avatar || user.avatarUrl || user.avatar_url || '';
+
         if (navLabel) navLabel.innerText = displayName;
-        if (userInfo) userInfo.innerText = user.email;
+        if (userInfo) userInfo.innerText = user.email || displayName;
+
+        if (avatarUrl && pfpImg && defaultIcon) {
+            pfpImg.src = avatarUrl;
+            pfpImg.classList.remove('hidden');
+            defaultIcon.classList.add('hidden');
+        } else if (pfpImg && defaultIcon) {
+            pfpImg.classList.add('hidden');
+            defaultIcon.classList.remove('hidden');
+        }
+
         if (authBtn) {
             authBtn.onclick = toggleAuthNavDropdown;
         }
     } else {
         if (navLabel) navLabel.innerText = 'Sign In';
         if (userInfo) userInfo.innerText = 'Not Signed In';
+        if (pfpImg) pfpImg.classList.add('hidden');
+        if (defaultIcon) defaultIcon.classList.remove('hidden');
         if (authBtn) {
             authBtn.onclick = () => openAuthModal('login');
         }
     }
 }
+window.updateAuthUI = updateAuthUI;
 
 function toggleAuthNavDropdown() {
     const dropdown = document.getElementById('auth-nav-dropdown');
@@ -3813,6 +3879,8 @@ async function pushVaultToCloud() {
     cloudSyncDebounceTimer = setTimeout(async () => {
         try {
             const uVault = getUnifiedUserVault();
+            const likedMap = getLikedAnimeList();
+            const wlMap = getWatchLaterList();
             const url = getAuthWorkerApiUrl('/api/user/sync');
 
             const res = await fetch(url, {
@@ -3824,8 +3892,8 @@ async function pushVaultToCloud() {
                 body: JSON.stringify({
                     vault: {
                         watched: uVault.watched || {},
-                        liked: uVault.liked || {},
-                        watchLater: uVault.watchLater || {}
+                        liked: { ...(uVault.liked || {}), ...likedMap },
+                        watchLater: { ...(uVault.watchLater || {}), ...wlMap }
                     }
                 })
             });
@@ -3841,6 +3909,8 @@ async function pushVaultToCloud() {
                 local.watchLater = { ...local.watchLater, ...(json.vault.watchLater || {}) };
                 localStorage.setItem('blackleg_user_vault', JSON.stringify(local));
                 localStorage.setItem('anime_watch_vault', JSON.stringify(local.watched));
+                localStorage.setItem('anime_liked_list', JSON.stringify(local.liked));
+                localStorage.setItem('anime_watch_later_list', JSON.stringify(local.watchLater));
             }
         } catch (e) {
             console.error('[Cloud Sync] Push error:', e);
@@ -3881,23 +3951,29 @@ async function pullVaultFromCloud() {
 
         // 2. Merge liked items
         const incomingLiked = json.vault.liked || {};
+        const localLiked = getLikedAnimeList();
         Object.entries(incomingLiked).forEach(([id, item]) => {
             if (!id || !item) return;
-            const existing = uVault.liked[id];
+            const existing = localLiked[id] || uVault.liked[id];
             if (!existing || (item.addedAt || item.updatedAt || 0) >= (existing.addedAt || existing.updatedAt || 0)) {
                 uVault.liked[id] = { ...existing, ...item };
+                localLiked[id] = { ...existing, ...item };
             }
         });
+        localStorage.setItem('anime_liked_list', JSON.stringify(localLiked));
 
         // 3. Merge watch later items
         const incomingWatchLater = json.vault.watchLater || {};
+        const localWatchLater = getWatchLaterList();
         Object.entries(incomingWatchLater).forEach(([id, item]) => {
             if (!id || !item) return;
-            const existing = uVault.watchLater[id];
+            const existing = localWatchLater[id] || uVault.watchLater[id];
             if (!existing || (item.addedAt || item.updatedAt || 0) >= (existing.addedAt || existing.updatedAt || 0)) {
                 uVault.watchLater[id] = { ...existing, ...item };
+                localWatchLater[id] = { ...existing, ...item };
             }
         });
+        localStorage.setItem('anime_watch_later_list', JSON.stringify(localWatchLater));
 
         // 4. Merge profile if present
         if (json.profile) {
@@ -3906,9 +3982,18 @@ async function pullVaultFromCloud() {
                 avatar: json.profile.avatar_url || uVault.profile.avatar,
                 bio: json.profile.bio || uVault.profile.bio
             };
+            localStorage.setItem('user_profile_data', JSON.stringify({
+                username: uVault.profile.username,
+                avatar: uVault.profile.avatar,
+                bio: uVault.profile.bio
+            }));
             const curUser = getAuthUser();
             if (curUser) {
-                localStorage.setItem('auth_user', JSON.stringify({ ...curUser, ...json.profile }));
+                localStorage.setItem('auth_user', JSON.stringify({
+                    ...curUser,
+                    ...json.profile,
+                    avatar: json.profile.avatar_url || curUser.avatar
+                }));
                 updateAuthUI();
             }
         }
