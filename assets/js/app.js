@@ -2534,6 +2534,14 @@ function normalizeVaultShow(show) {
     };
 }
 
+// Entity Registry to eliminate inline JSON escaping bugs
+window.animeEntityRegistry = window.animeEntityRegistry || new Map();
+function registerAnimeEntity(show) {
+    if (!show || !show.id) return;
+    window.animeEntityRegistry.set(String(show.id), show);
+}
+window.registerAnimeEntity = registerAnimeEntity;
+
 function getLikedAnimeList() {
     try {
         return JSON.parse(localStorage.getItem('anime_liked_list')) || {};
@@ -2550,27 +2558,51 @@ function getWatchLaterList() {
     }
 }
 
-function toggleLikeAnime(show, event) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-    if (!show || !show.id) return;
-    const showId = String(show.id);
+function toggleLikeAnimeById(showId) {
+    if (!showId) return;
+    const idStr = String(showId);
     const list = getLikedAnimeList();
 
-    if (list[showId]) {
-        delete list[showId];
+    if (list[idStr]) {
+        delete list[idStr];
     } else {
-        list[showId] = {
-            id: show.id,
-            title: show.title,
-            coverImage: show.coverImage,
-            bannerImage: show.bannerImage || show.banner,
-            meanScore: show.meanScore,
-            format: show.format,
-            addedAt: Date.now()
-        };
+        let show = window.animeEntityRegistry ? window.animeEntityRegistry.get(idStr) : null;
+        if (!show && window.showData && String(window.showData.id) === idStr) {
+            show = window.showData;
+        }
+        if (!show) {
+            const wl = getWatchLaterList();
+            if (wl[idStr]) show = wl[idStr];
+        }
+        if (!show) {
+            try {
+                const active = JSON.parse(localStorage.getItem('activeShowData'));
+                if (active && String(active.id) === idStr) show = active;
+            } catch (e) {}
+        }
+        if (!show) {
+            try {
+                const vault = getUnifiedUserVault();
+                if (vault.watched && vault.watched[idStr]) show = vault.watched[idStr].show || vault.watched[idStr];
+            } catch (e) {}
+        }
+
+        if (show) {
+            list[idStr] = {
+                id: show.id,
+                title: show.title,
+                coverImage: show.coverImage,
+                bannerImage: show.bannerImage || show.banner || (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large)),
+                meanScore: show.meanScore || show.averageScore || show.rating || 0,
+                format: show.format || 'TV',
+                addedAt: Date.now()
+            };
+        } else {
+            list[idStr] = {
+                id: showId,
+                addedAt: Date.now()
+            };
+        }
     }
 
     localStorage.setItem('anime_liked_list', JSON.stringify(list));
@@ -2581,33 +2613,58 @@ function toggleLikeAnime(show, event) {
     } catch (e) {}
 
     if (typeof pushVaultToCloud === 'function') pushVaultToCloud();
-    updateInteractiveButtonStates(showId);
+    updateInteractiveButtonStates(idStr);
+
     if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
         window.renderDedicatedProfileView();
     }
 }
 
-function toggleWatchLaterAnime(show, event) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-    if (!show || !show.id) return;
-    const showId = String(show.id);
+function toggleWatchLaterAnimeById(showId) {
+    if (!showId) return;
+    const idStr = String(showId);
     const list = getWatchLaterList();
 
-    if (list[showId]) {
-        delete list[showId];
+    if (list[idStr]) {
+        delete list[idStr];
     } else {
-        list[showId] = {
-            id: show.id,
-            title: show.title,
-            coverImage: show.coverImage,
-            bannerImage: show.bannerImage || show.banner,
-            meanScore: show.meanScore,
-            format: show.format,
-            addedAt: Date.now()
-        };
+        let show = window.animeEntityRegistry ? window.animeEntityRegistry.get(idStr) : null;
+        if (!show && window.showData && String(window.showData.id) === idStr) {
+            show = window.showData;
+        }
+        if (!show) {
+            const liked = getLikedAnimeList();
+            if (liked[idStr]) show = liked[idStr];
+        }
+        if (!show) {
+            try {
+                const active = JSON.parse(localStorage.getItem('activeShowData'));
+                if (active && String(active.id) === idStr) show = active;
+            } catch (e) {}
+        }
+        if (!show) {
+            try {
+                const vault = getUnifiedUserVault();
+                if (vault.watched && vault.watched[idStr]) show = vault.watched[idStr].show || vault.watched[idStr];
+            } catch (e) {}
+        }
+
+        if (show) {
+            list[idStr] = {
+                id: show.id,
+                title: show.title,
+                coverImage: show.coverImage,
+                bannerImage: show.bannerImage || show.banner || (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large)),
+                meanScore: show.meanScore || show.averageScore || show.rating || 0,
+                format: show.format || 'TV',
+                addedAt: Date.now()
+            };
+        } else {
+            list[idStr] = {
+                id: showId,
+                addedAt: Date.now()
+            };
+        }
     }
 
     localStorage.setItem('anime_watch_later_list', JSON.stringify(list));
@@ -2618,43 +2675,90 @@ function toggleWatchLaterAnime(show, event) {
     } catch (e) {}
 
     if (typeof pushVaultToCloud === 'function') pushVaultToCloud();
-    updateInteractiveButtonStates(showId);
+    updateInteractiveButtonStates(idStr);
+
     if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
         window.renderDedicatedProfileView();
     }
 }
 
-function updateInteractiveButtonStates(showId) {
-    const isLiked = !!getLikedAnimeList()[String(showId)];
-    const isWatchLater = !!getWatchLaterList()[String(showId)];
+function toggleLikeAnime(show, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!show || !show.id) return;
+    registerAnimeEntity(show);
+    toggleLikeAnimeById(show.id);
+}
 
-    document.querySelectorAll(`[data-action-like="${showId}"]`).forEach(btn => {
+function toggleWatchLaterAnime(show, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!show || !show.id) return;
+    registerAnimeEntity(show);
+    toggleWatchLaterAnimeById(show.id);
+}
+
+// Global delegated click listener for action buttons with capture to prevent inline escaping bugs
+document.addEventListener('click', (event) => {
+    const likeBtn = event.target.closest('[data-action-like]');
+    if (likeBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const showId = likeBtn.getAttribute('data-action-like');
+        if (showId) toggleLikeAnimeById(showId);
+        return;
+    }
+
+    const laterBtn = event.target.closest('[data-action-later]');
+    if (laterBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const showId = laterBtn.getAttribute('data-action-later');
+        if (showId) toggleWatchLaterAnimeById(showId);
+        return;
+    }
+}, true);
+
+function updateInteractiveButtonStates(showId) {
+    if (!showId) return;
+    const idStr = String(showId);
+    const isLiked = !!getLikedAnimeList()[idStr];
+    const isWatchLater = !!getWatchLaterList()[idStr];
+
+    document.querySelectorAll(`[data-action-like="${idStr}"]`).forEach(btn => {
         btn.setAttribute('data-active', isLiked ? 'true' : 'false');
         if (isLiked) {
             btn.classList.add('text-[#e50914]', 'border-[#e50914]/60', 'bg-red-500/10');
-            btn.classList.remove('text-white', 'border-white/10', 'bg-white/5');
-            btn.innerHTML = `<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> <span>Liked</span>`;
+            btn.classList.remove('text-white', 'border-white/10', 'bg-white/5', 'hover:bg-white/10');
+            btn.innerHTML = `<svg class="w-4 h-4 fill-current pointer-events-none" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg> <span class="pointer-events-none">Liked</span>`;
         } else {
             btn.classList.remove('text-[#e50914]', 'border-[#e50914]/60', 'bg-red-500/10');
-            btn.classList.add('text-white', 'border-white/10', 'bg-white/5');
-            btn.innerHTML = `<svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg> <span>Like</span>`;
+            btn.classList.add('text-white', 'border-white/10', 'bg-white/5', 'hover:bg-white/10');
+            btn.innerHTML = `<svg class="w-4 h-4 fill-none stroke-current pointer-events-none" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg> <span class="pointer-events-none">Like</span>`;
         }
     });
 
-    document.querySelectorAll(`[data-action-later="${showId}"]`).forEach(btn => {
+    document.querySelectorAll(`[data-action-later="${idStr}"]`).forEach(btn => {
         btn.setAttribute('data-active', isWatchLater ? 'true' : 'false');
         if (isWatchLater) {
-            btn.classList.add('text-amber-400', 'border-amber-400/60', 'bg-amber-500/10');
-            btn.classList.remove('text-white', 'border-white/10', 'bg-white/5');
-            btn.innerHTML = `<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> <span>Saved</span>`;
+            btn.classList.add('text-[#f59e0b]', 'border-[#f59e0b]/60', 'bg-amber-500/10');
+            btn.classList.remove('text-white', 'border-white/10', 'bg-white/5', 'hover:bg-white/10');
+            btn.innerHTML = `<svg class="w-4 h-4 fill-current pointer-events-none" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> <span class="pointer-events-none">Saved</span>`;
         } else {
-            btn.classList.remove('text-amber-400', 'border-amber-400/60', 'bg-amber-500/10');
-            btn.classList.add('text-white', 'border-white/10', 'bg-white/5');
-            btn.innerHTML = `<svg class="w-4 h-4 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg> <span>Watch Later</span>`;
+            btn.classList.remove('text-[#f59e0b]', 'border-[#f59e0b]/60', 'bg-amber-500/10');
+            btn.classList.add('text-white', 'border-white/10', 'bg-white/5', 'hover:bg-white/10');
+            btn.innerHTML = `<svg class="w-4 h-4 fill-none stroke-current pointer-events-none" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> <span class="pointer-events-none">Watch Later</span>`;
         }
     });
 }
 
+window.registerAnimeEntity = registerAnimeEntity;
+window.toggleLikeAnimeById = toggleLikeAnimeById;
+window.toggleWatchLaterAnimeById = toggleWatchLaterAnimeById;
 window.getLikedAnimeList = getLikedAnimeList;
 window.getWatchLaterList = getWatchLaterList;
 window.toggleLikeAnime = toggleLikeAnime;
@@ -2879,6 +2983,9 @@ window.removeContinueWatchingItem = function(showId) {
     } else if (typeof window.renderContinueWatching === 'function') {
         window.renderContinueWatching();
     }
+    if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
+        window.renderDedicatedProfileView();
+    }
 };
 
 // Event Listeners setup
@@ -3017,6 +3124,7 @@ async function renderAnimeDetailsView() {
     }
 
     window.showData = showData;
+    if (typeof registerAnimeEntity === 'function') registerAnimeEntity(showData);
 
     const accentColor = showData.coverImage?.color || showData.color || '#f59e0b';
     applyAnimeThemeColor(accentColor);
@@ -3222,14 +3330,14 @@ async function renderAnimeDetailsView() {
                         ${ctaLabel}
                     </button>
 
-                    <button data-action-like="${showData.id}" data-active="${isLiked ? 'true' : 'false'}" onclick="toggleLikeAnime(${stringifiedShowData}, event)" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isLiked ? 'text-[#e50914] border-[#e50914]/60 bg-red-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
-                        <svg class="w-4 h-4 ${isLiked ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                        <span>${isLiked ? 'Liked' : 'Like'}</span>
+                    <button data-action-like="${showData.id}" data-active="${isLiked ? 'true' : 'false'}" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isLiked ? 'text-[#e50914] border-[#e50914]/60 bg-red-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
+                        <svg class="w-4 h-4 pointer-events-none ${isLiked ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                        <span class="pointer-events-none">${isLiked ? 'Liked' : 'Like'}</span>
                     </button>
 
-                    <button data-action-later="${showData.id}" data-active="${isWatchLater ? 'true' : 'false'}" onclick="toggleWatchLaterAnime(${stringifiedShowData}, event)" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isWatchLater ? 'text-amber-400 border-amber-400/60 bg-amber-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
-                        <svg class="w-4 h-4 ${isWatchLater ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
-                        <span>${isWatchLater ? 'Saved' : 'Watch Later'}</span>
+                    <button data-action-later="${showData.id}" data-active="${isWatchLater ? 'true' : 'false'}" class="px-5 py-4 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer ${isWatchLater ? 'text-[#f59e0b] border-[#f59e0b]/60 bg-amber-500/10' : 'text-white border-white/10 bg-white/5 hover:bg-white/10'}">
+                        <svg class="w-4 h-4 pointer-events-none ${isWatchLater ? 'fill-current' : 'fill-none stroke-current'}" stroke-width="2" viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+                        <span class="pointer-events-none">${isWatchLater ? 'Saved' : 'Watch Later'}</span>
                     </button>
                 </div>
 
@@ -3369,6 +3477,8 @@ async function renderAnimeDetailsView() {
     }
 
     window.renderDetailsEpisodePicker(totalEpisodes);
+    if (typeof registerAnimeEntity === 'function') registerAnimeEntity(showData);
+    if (typeof updateInteractiveButtonStates === 'function') updateInteractiveButtonStates(showData.id);
 
     window.toggleDetailsSynopsis = function () {
         const wrapper = document.getElementById('details-synopsis-wrapper');
