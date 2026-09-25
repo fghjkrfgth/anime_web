@@ -2542,9 +2542,32 @@ function registerAnimeEntity(show) {
 }
 window.registerAnimeEntity = registerAnimeEntity;
 
+function setStoredBucket(key, data) {
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+        const uVault = getUnifiedUserVault();
+        if (key === 'anime_liked_list') {
+            uVault.liked = data;
+        } else if (key === 'anime_watch_later_list') {
+            uVault.watchLater = data;
+        } else if (key === 'anime_watch_vault') {
+            uVault.watched = data;
+        }
+        localStorage.setItem('blackleg_user_vault', JSON.stringify(uVault));
+    } catch (e) {
+        console.error(`[Storage] Failed to set ${key}:`, e);
+    }
+}
+window.setStoredBucket = setStoredBucket;
+
 function getLikedAnimeList() {
     try {
-        return JSON.parse(localStorage.getItem('anime_liked_list')) || {};
+        const raw = JSON.parse(localStorage.getItem('anime_liked_list')) || {};
+        const out = {};
+        for (const [k, v] of Object.entries(raw)) {
+            if (k && v) out[String(k).trim()] = v;
+        }
+        return out;
     } catch (e) {
         return {};
     }
@@ -2552,7 +2575,12 @@ function getLikedAnimeList() {
 
 function getWatchLaterList() {
     try {
-        return JSON.parse(localStorage.getItem('anime_watch_later_list')) || {};
+        const raw = JSON.parse(localStorage.getItem('anime_watch_later_list')) || {};
+        const out = {};
+        for (const [k, v] of Object.entries(raw)) {
+            if (k && v) out[String(k).trim()] = v;
+        }
+        return out;
     } catch (e) {
         return {};
     }
@@ -2560,36 +2588,40 @@ function getWatchLaterList() {
 
 function toggleLikeAnimeById(showId) {
     if (!showId) return;
-    const idStr = String(showId);
-    const list = getLikedAnimeList();
+    const targetId = String(showId).trim();
+    window.__lastLocalListMutationTime = Date.now();
+    let list = getLikedAnimeList();
 
-    if (list[idStr]) {
-        delete list[idStr];
+    if (list[targetId] || list[Number(targetId)]) {
+        delete list[targetId];
+        delete list[Number(targetId)];
+        setStoredBucket('anime_liked_list', list);
+        if (typeof pushVaultToCloud === 'function') pushVaultToCloud(true);
     } else {
-        let show = window.animeEntityRegistry ? window.animeEntityRegistry.get(idStr) : null;
-        if (!show && window.showData && String(window.showData.id) === idStr) {
+        let show = window.animeEntityRegistry ? (window.animeEntityRegistry.get(targetId) || window.animeEntityRegistry.get(Number(targetId))) : null;
+        if (!show && window.showData && String(window.showData.id).trim() === targetId) {
             show = window.showData;
         }
         if (!show) {
             const wl = getWatchLaterList();
-            if (wl[idStr]) show = wl[idStr];
+            if (wl[targetId]) show = wl[targetId];
         }
         if (!show) {
             try {
                 const active = JSON.parse(localStorage.getItem('activeShowData'));
-                if (active && String(active.id) === idStr) show = active;
+                if (active && String(active.id).trim() === targetId) show = active;
             } catch (e) {}
         }
         if (!show) {
             try {
                 const vault = getUnifiedUserVault();
-                if (vault.watched && vault.watched[idStr]) show = vault.watched[idStr].show || vault.watched[idStr];
+                if (vault.watched && vault.watched[targetId]) show = vault.watched[targetId].show || vault.watched[targetId];
             } catch (e) {}
         }
 
         if (show) {
-            list[idStr] = {
-                id: show.id,
+            list[targetId] = {
+                id: targetId,
                 title: show.title,
                 coverImage: show.coverImage,
                 bannerImage: show.bannerImage || show.banner || (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large)),
@@ -2598,60 +2630,66 @@ function toggleLikeAnimeById(showId) {
                 addedAt: Date.now()
             };
         } else {
-            list[idStr] = {
-                id: showId,
+            list[targetId] = {
+                id: targetId,
                 addedAt: Date.now()
             };
         }
+        setStoredBucket('anime_liked_list', list);
+        if (typeof pushVaultToCloud === 'function') pushVaultToCloud(true);
     }
 
-    localStorage.setItem('anime_liked_list', JSON.stringify(list));
-    try {
-        const uVault = getUnifiedUserVault();
-        uVault.liked = list;
-        localStorage.setItem('blackleg_user_vault', JSON.stringify(uVault));
-    } catch (e) {}
+    updateInteractiveButtonStates(targetId);
 
-    if (typeof pushVaultToCloud === 'function') pushVaultToCloud();
-    updateInteractiveButtonStates(idStr);
+    const onProfile = window.location.pathname.startsWith('/profile') ||
+                      window.location.hash === '#profile' ||
+                      (document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden'));
 
-    if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
-        window.renderDedicatedProfileView();
+    if (onProfile) {
+        if (typeof window.refreshProfileTab === 'function') {
+            window.refreshProfileTab();
+        } else if (typeof window.renderDedicatedProfileView === 'function') {
+            window.renderDedicatedProfileView();
+        }
     }
 }
 
 function toggleWatchLaterAnimeById(showId) {
     if (!showId) return;
-    const idStr = String(showId);
-    const list = getWatchLaterList();
+    const targetId = String(showId).trim();
+    window.__lastLocalListMutationTime = Date.now();
+    let list = getWatchLaterList();
 
-    if (list[idStr]) {
-        delete list[idStr];
+    if (list[targetId] || list[Number(targetId)]) {
+        delete list[targetId];
+        delete list[Number(targetId)];
+        setStoredBucket('anime_watch_later_list', list);
+        if (typeof pushVaultToCloud === 'function') pushVaultToCloud(true);
     } else {
-        let show = window.animeEntityRegistry ? window.animeEntityRegistry.get(idStr) : null;
-        if (!show && window.showData && String(window.showData.id) === idStr) {
+        let show = window.animeEntityRegistry ? (window.animeEntityRegistry.get(targetId) || window.animeEntityRegistry.get(Number(targetId))) : null;
+        if (!show && window.showData && String(window.showData.id).trim() === targetId) {
             show = window.showData;
         }
         if (!show) {
             const liked = getLikedAnimeList();
-            if (liked[idStr]) show = liked[idStr];
+            if (liked[targetId]) show = liked[targetId];
         }
         if (!show) {
             try {
                 const active = JSON.parse(localStorage.getItem('activeShowData'));
-                if (active && String(active.id) === idStr) show = active;
+                if (active && String(active.id).trim() === targetId) show = active;
             } catch (e) {}
         }
         if (!show) {
             try {
                 const vault = getUnifiedUserVault();
-                if (vault.watched && vault.watched[idStr]) show = vault.watched[idStr].show || vault.watched[idStr];
+                if (vault.watched && vault.watched[targetId]) show = vault.watched[targetId].show || vault.watched[targetId];
             } catch (e) {}
         }
 
         if (show) {
-            list[idStr] = {
-                id: show.id,
+            list[targetId] = {
+                id: targetId,
                 title: show.title,
                 coverImage: show.coverImage,
                 bannerImage: show.bannerImage || show.banner || (show.coverImage && (show.coverImage.extraLarge || show.coverImage.large)),
@@ -2660,25 +2698,27 @@ function toggleWatchLaterAnimeById(showId) {
                 addedAt: Date.now()
             };
         } else {
-            list[idStr] = {
-                id: showId,
+            list[targetId] = {
+                id: targetId,
                 addedAt: Date.now()
             };
         }
+        setStoredBucket('anime_watch_later_list', list);
+        if (typeof pushVaultToCloud === 'function') pushVaultToCloud(true);
     }
 
-    localStorage.setItem('anime_watch_later_list', JSON.stringify(list));
-    try {
-        const uVault = getUnifiedUserVault();
-        uVault.watchLater = list;
-        localStorage.setItem('blackleg_user_vault', JSON.stringify(uVault));
-    } catch (e) {}
+    updateInteractiveButtonStates(targetId);
 
-    if (typeof pushVaultToCloud === 'function') pushVaultToCloud();
-    updateInteractiveButtonStates(idStr);
+    const onProfile = window.location.pathname.startsWith('/profile') ||
+                      window.location.hash === '#profile' ||
+                      (document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden'));
 
-    if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
-        window.renderDedicatedProfileView();
+    if (onProfile) {
+        if (typeof window.refreshProfileTab === 'function') {
+            window.refreshProfileTab();
+        } else if (typeof window.renderDedicatedProfileView === 'function') {
+            window.renderDedicatedProfileView();
+        }
     }
 }
 
@@ -2686,6 +2726,7 @@ function toggleLikeAnime(show, event) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
     }
     if (!show || !show.id) return;
     registerAnimeEntity(show);
@@ -2696,6 +2737,7 @@ function toggleWatchLaterAnime(show, event) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
     }
     if (!show || !show.id) return;
     registerAnimeEntity(show);
@@ -2708,6 +2750,7 @@ document.addEventListener('click', (event) => {
     if (likeBtn) {
         event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
         const showId = likeBtn.getAttribute('data-action-like');
         if (showId) toggleLikeAnimeById(showId);
         return;
@@ -2717,6 +2760,7 @@ document.addEventListener('click', (event) => {
     if (laterBtn) {
         event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
         const showId = laterBtn.getAttribute('data-action-later');
         if (showId) toggleWatchLaterAnimeById(showId);
         return;
@@ -3980,13 +4024,16 @@ function logoutUser() {
     }
 }
 
-async function pushVaultToCloud() {
+async function pushVaultToCloud(immediate = false) {
     const token = getAuthToken();
     if (!token) return;
 
-    if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
+    if (cloudSyncDebounceTimer) {
+        clearTimeout(cloudSyncDebounceTimer);
+        cloudSyncDebounceTimer = null;
+    }
 
-    cloudSyncDebounceTimer = setTimeout(async () => {
+    const performPush = async () => {
         try {
             const uVault = getUnifiedUserVault();
             const likedMap = getLikedAnimeList();
@@ -4002,8 +4049,8 @@ async function pushVaultToCloud() {
                 body: JSON.stringify({
                     vault: {
                         watched: uVault.watched || {},
-                        liked: { ...(uVault.liked || {}), ...likedMap },
-                        watchLater: { ...(uVault.watchLater || {}), ...wlMap }
+                        liked: Object.values(likedMap),
+                        watchLater: Object.values(wlMap)
                     }
                 })
             });
@@ -4015,8 +4062,8 @@ async function pushVaultToCloud() {
             if (json && json.success && json.vault) {
                 const local = getUnifiedUserVault();
                 local.watched = { ...local.watched, ...(json.vault.watched || {}) };
-                local.liked = { ...local.liked, ...(json.vault.liked || {}) };
-                local.watchLater = { ...local.watchLater, ...(json.vault.watchLater || {}) };
+                local.liked = likedMap;
+                local.watchLater = wlMap;
                 localStorage.setItem('blackleg_user_vault', JSON.stringify(local));
                 localStorage.setItem('anime_watch_vault', JSON.stringify(local.watched));
                 localStorage.setItem('anime_liked_list', JSON.stringify(local.liked));
@@ -4025,7 +4072,13 @@ async function pushVaultToCloud() {
         } catch (e) {
             console.error('[Cloud Sync] Push error:', e);
         }
-    }, 1000);
+    };
+
+    if (immediate) {
+        await performPush();
+    } else {
+        cloudSyncDebounceTimer = setTimeout(performPush, 1000);
+    }
 }
 
 async function pullVaultFromCloud() {
@@ -4059,31 +4112,56 @@ async function pullVaultFromCloud() {
             }
         });
 
-        // 2. Merge liked items
-        const incomingLiked = json.vault.liked || {};
-        const localLiked = getLikedAnimeList();
-        Object.entries(incomingLiked).forEach(([id, item]) => {
-            if (!id || !item) return;
-            const existing = localLiked[id] || uVault.liked[id];
-            if (!existing || (item.addedAt || item.updatedAt || 0) >= (existing.addedAt || existing.updatedAt || 0)) {
-                uVault.liked[id] = { ...existing, ...item };
-                localLiked[id] = { ...existing, ...item };
+        // 2. Synchronize liked items without additive merge resurrection
+        const recentlyMutated = (Date.now() - (window.__lastLocalListMutationTime || 0)) < 5000;
+        if (!recentlyMutated) {
+            const incomingLiked = json.vault.liked || {};
+            const likedEntries = Array.isArray(incomingLiked)
+                ? incomingLiked.map(it => [String(it?.id || '').trim(), it])
+                : Object.entries(incomingLiked);
+            const serverLiked = {};
+            for (const [k, it] of likedEntries) {
+                const cleanKey = String(k || it?.id || '').trim();
+                if (cleanKey && it) {
+                    serverLiked[cleanKey] = {
+                        id: cleanKey,
+                        title: it.title,
+                        coverImage: it.coverImage,
+                        bannerImage: it.bannerImage || it.banner || '',
+                        meanScore: it.meanScore || it.averageScore || it.rating || 0,
+                        format: it.format || 'TV',
+                        addedAt: it.addedAt || Date.now()
+                    };
+                }
             }
-        });
-        localStorage.setItem('anime_liked_list', JSON.stringify(localLiked));
+            uVault.liked = serverLiked;
+            setStoredBucket('anime_liked_list', serverLiked);
+        }
 
-        // 3. Merge watch later items
-        const incomingWatchLater = json.vault.watchLater || {};
-        const localWatchLater = getWatchLaterList();
-        Object.entries(incomingWatchLater).forEach(([id, item]) => {
-            if (!id || !item) return;
-            const existing = localWatchLater[id] || uVault.watchLater[id];
-            if (!existing || (item.addedAt || item.updatedAt || 0) >= (existing.addedAt || existing.updatedAt || 0)) {
-                uVault.watchLater[id] = { ...existing, ...item };
-                localWatchLater[id] = { ...existing, ...item };
+        // 3. Synchronize watch later items without additive merge resurrection
+        if (!recentlyMutated) {
+            const incomingWatchLater = json.vault.watchLater || {};
+            const wlEntries = Array.isArray(incomingWatchLater)
+                ? incomingWatchLater.map(it => [String(it?.id || '').trim(), it])
+                : Object.entries(incomingWatchLater);
+            const serverWatchLater = {};
+            for (const [k, it] of wlEntries) {
+                const cleanKey = String(k || it?.id || '').trim();
+                if (cleanKey && it) {
+                    serverWatchLater[cleanKey] = {
+                        id: cleanKey,
+                        title: it.title,
+                        coverImage: it.coverImage,
+                        bannerImage: it.bannerImage || it.banner || '',
+                        meanScore: it.meanScore || it.averageScore || it.rating || 0,
+                        format: it.format || 'TV',
+                        addedAt: it.addedAt || Date.now()
+                    };
+                }
             }
-        });
-        localStorage.setItem('anime_watch_later_list', JSON.stringify(localWatchLater));
+            uVault.watchLater = serverWatchLater;
+            setStoredBucket('anime_watch_later_list', serverWatchLater);
+        }
 
         // 4. Merge profile if present
         if (json.profile) {
@@ -4117,7 +4195,9 @@ async function pullVaultFromCloud() {
         if (typeof window.renderDedicatedContinueWatchingView === 'function' && document.getElementById('dedicated-continue-watching-layout') && !document.getElementById('dedicated-continue-watching-layout').classList.contains('hidden')) {
             window.renderDedicatedContinueWatchingView();
         }
-        if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
+        if (typeof window.refreshProfileTab === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
+            window.refreshProfileTab();
+        } else if (typeof window.renderDedicatedProfileView === 'function' && document.getElementById('profile-page-layout') && !document.getElementById('profile-page-layout').classList.contains('hidden')) {
             window.renderDedicatedProfileView();
         }
     } catch (e) {
