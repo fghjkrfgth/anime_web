@@ -1037,7 +1037,6 @@ async function renderWatchView() {
                                 🎙️ DUB
                             </button>
                         </div>
-                        <div id="player-server-buttons" class="flex items-center gap-1.5 flex-wrap"></div>
                     </div>
                     <div class="flex items-center gap-4 flex-wrap">
                         <label class="flex items-center gap-2 text-xs font-semibold text-white cursor-pointer select-none">
@@ -1052,6 +1051,20 @@ async function renderWatchView() {
                             <input type="checkbox" id="toggle-auto-next" onchange="toggleUserPreference('autoNext', this.checked)" class="w-4 h-4 rounded border-white/10 bg-white/5 text-[var(--anime-accent-color,#f59e0b)] focus:ring-0">
                             <span class="text-steelGray">Auto Next</span>
                         </label>
+                    </div>
+                </div>
+
+                <!-- Dedicated Stream Server Section -->
+                <div id="watch-servers-section" class="glass-panel p-4 rounded-xl border border-white/5 flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono text-[var(--anime-accent-color,#f59e0b)] uppercase tracking-wider font-bold">STREAM SERVERS</span>
+                            <span class="text-[10px] text-steelGray">If current server is buffering or failing, switch below:</span>
+                        </div>
+                        <span id="active-server-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 border border-white/10 text-white font-semibold uppercase"></span>
+                    </div>
+                    <div id="dedicated-server-buttons-container" class="flex items-center gap-2 flex-wrap">
+                        <!-- Populated dynamically with server chips -->
                     </div>
                 </div>
             </div>
@@ -1445,15 +1458,24 @@ function setupWatchGlobalFunctions() {
     };
 
     window.renderServerButtonsUI = function () {
-        const container = document.getElementById('player-server-buttons');
+        const container = document.getElementById('dedicated-server-buttons-container') || document.getElementById('player-server-buttons');
+        const badge = document.getElementById('active-server-badge');
         if (!container) return;
 
         const currentLang = (window.currentLang || 'sub').toLowerCase();
         const serversForLang = (window.episodeServers || []).filter(s => (s.dataType || s.type || 'sub').toLowerCase() === currentLang);
 
         if (serversForLang.length === 0) {
-            container.innerHTML = '';
+            container.innerHTML = `<span class="text-xs text-steelGray/70 italic py-1">No ${currentLang.toUpperCase()} stream servers found for this episode.</span>`;
+            if (badge) {
+                badge.textContent = 'NO SERVERS';
+            }
             return;
+        }
+
+        const activeName = (window.activeServer ? (window.activeServer.serverName || window.activeServer.name) : (serversForLang[0]?.serverName || serversForLang[0]?.name || 'HD-1')) || 'HD-1';
+        if (badge) {
+            badge.innerHTML = `<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5 align-middle"></span>ACTIVE: ${activeName.toUpperCase()}`;
         }
 
         let html = '';
@@ -1465,11 +1487,12 @@ function setupWatchGlobalFunctions() {
                 ((window.activeServer.dataType || window.currentLang || '').toLowerCase() === (server.dataType || currentLang).toLowerCase())
             );
 
-            const activeClass = "px-3 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_10px_var(--anime-accent-color,#f59e0b)]";
-            const inactiveClass = "px-3 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 text-steelGray hover:text-white bg-white/5 hover:bg-white/10 border border-white/10";
+            const activeClass = "server-btn-active px-3.5 py-1.5 text-xs font-extrabold rounded-lg uppercase tracking-wider transition-all duration-300 bg-[var(--anime-accent-color,#f59e0b)] text-[#08080c] shadow-[0_0_12px_rgba(245,158,11,0.35)] flex items-center gap-1.5";
+            const inactiveClass = "server-btn-inactive px-3.5 py-1.5 text-xs font-bold rounded-lg uppercase tracking-wider transition-all duration-300 text-steelGray hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 flex items-center gap-1.5";
 
             html += `<button class="server-btn ${isActive ? activeClass : inactiveClass}" data-link="${encodeURIComponent(sLink)}" data-name="${sName}" data-type="${server.dataType || currentLang}">
-                ${sName}
+                <span class="inline-block w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#08080c]' : 'bg-steelGray/60'}"></span>
+                <span>${sName}</span>
             </button>`;
         });
 
