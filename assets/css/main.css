@@ -992,3 +992,74 @@ section {
     color: #f59e0b !important;
     box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
 }
+
+/* =========================================================================
+   WATCH VIEW DEDICATED STREAM SERVERS PANEL & ACTIVE BADGE
+   ========================================================================= */
+#watch-servers-section {
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: linear-gradient(135deg, rgba(18, 19, 26, 0.75) 0%, rgba(10, 11, 16, 0.85) 100%) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#watch-servers-section:hover {
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+#watch-servers-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(var(--anime-accent-rgb, 245, 158, 11), 0.45), transparent);
+    pointer-events: none;
+}
+
+#active-server-badge {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    letter-spacing: 0.06em;
+    display: inline-flex;
+    align-items: center;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+#dedicated-server-buttons-container {
+    min-height: 40px;
+    align-items: center;
+}
+
+.server-btn {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    outline: none;
+    font-family: inherit;
+    font-weight: 700;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.server-btn:hover:not(.server-btn-active) {
+    transform: translateY(-1.5px);
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+}
+
+.server-btn:active {
+    transform: translateY(0) scale(0.96) !important;
+}
+
+.server-btn.server-btn-active {
+    transform: translateY(-1px);
+    box-shadow: 0 0 16px rgba(var(--anime-accent-rgb, 245, 158, 11), 0.45) !important;
+    border-color: transparent !important;
+}
