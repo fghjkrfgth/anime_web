@@ -99,11 +99,31 @@ class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultCon
             }).then(async (response) => {
                 if (timeoutTimer) clearTimeout(timeoutTimer);
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+                    if (callbacks && typeof callbacks.onError === 'function') {
+                        callbacks.onError(
+                            { code: response.status, text: `HTTP ${response.status} ${response.statusText}` },
+                            context,
+                            response
+                        );
+                    }
+                    return;
                 }
                 tfirst = performance.now();
                 const buffer = await response.arrayBuffer();
                 const now = performance.now();
+
+                // If bundle fails or returns an empty buffer, trigger callbacks.onError
+                if (!buffer || buffer.byteLength === 0) {
+                    console.warn('[BatchFragmentLoader] Empty bundle response received (0 bytes)');
+                    if (callbacks && typeof callbacks.onError === 'function') {
+                        callbacks.onError(
+                            { code: response.status, text: "Empty bundle response" },
+                            context,
+                            response
+                        );
+                    }
+                    return;
+                }
 
                 const stats = context.stats || {
                     trequest: startTime,
