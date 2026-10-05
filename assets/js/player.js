@@ -27,6 +27,7 @@ class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultCon
 
     load(context, config, callbacks) {
         if (context && context.url && context.url.includes('/api/stream/bundle')) {
+            context.responseType = 'arraybuffer';
             const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
 
             // 1. Check if this load was triggered immediately following a seek action
