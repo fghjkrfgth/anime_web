@@ -224,11 +224,11 @@ window.fetchEpisodeServers = fetchEpisodeServers;
 // 4. FILLER EPISODE DATA FETCHING & CACHING (TARGETED BATCH FETCHING)
 const fillerCache = new Map();
 
-async function fetchFillerEpisodes(anilistId, malId, targetBatchIdx = 0) {
+async function fetchFillerEpisodes(anilistId, malId = null, targetBatchIdx = 0) {
     if (!anilistId) return new Set();
 
     const batchIdx = Math.max(0, parseInt(targetBatchIdx || 0, 10) || 0);
-    const sessionKey = 'fillers_' + anilistId + '_batch_' + batchIdx;
+    const sessionKey = `fillers_${anilistId}_batch_${batchIdx}`;
 
     // 1. Check in-memory cache first
     if (fillerCache.has(sessionKey)) {
@@ -251,7 +251,17 @@ async function fetchFillerEpisodes(anilistId, malId, targetBatchIdx = 0) {
     const page = batchIdx + 1;
 
     try {
-        const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes?page=${page}`);
+        const timeoutSignal = (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function')
+            ? AbortSignal.timeout(3000)
+            : (() => {
+                const controller = new AbortController();
+                setTimeout(() => controller.abort(), 3000);
+                return controller.signal;
+            })();
+
+        const res = await fetch(`https://api.jikan.moe/v4/anime/${targetMalId}/episodes?page=${page}`, {
+            signal: timeoutSignal
+        });
         if (!res.ok) {
             console.warn(`[Jikan Filler API] Non-200 response (${res.status}) for batch ${batchIdx}`);
             return fillerSet;
@@ -275,7 +285,7 @@ async function fetchFillerEpisodes(anilistId, malId, targetBatchIdx = 0) {
         fillerCache.set(sessionKey, fillerSet);
         return fillerSet;
     } catch (err) {
-        console.warn(`[Jikan Filler API] Failed to fetch batch ${batchIdx}:`, err);
+        console.warn(`[Jikan Filler API] Non-blocking timeout/error for batch ${batchIdx}:`, err?.message || err);
         return fillerSet;
     }
 }
