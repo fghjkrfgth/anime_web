@@ -3,6 +3,178 @@
 // -------------------------------------------------------------------------
 
 window.overlayHideTimeout = window.overlayHideTimeout || null;
+window.lastUserSeekTime = window.lastUserSeekTime || null;
+window.lastUserSeekTimestamp = window.lastUserSeekTimestamp || null;
+
+// Global capture-phase listener to track any video seek as early as possible
+if (typeof document !== 'undefined') {
+    document.addEventListener('seeking', (e) => {
+        if (e.target && e.target.tagName === 'VIDEO') {
+            window.lastUserSeekTime = e.target.currentTime;
+            window.lastUserSeekTimestamp = Date.now();
+        }
+    }, true);
+}
+
+// -------------------------------------------------------------------------
+// CUSTOM FRAGMENT LOADER FOR HLS.JS (10-SEGMENT PACKET BUNDLE & SEEK SLICER)
+// -------------------------------------------------------------------------
+class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultConfig && Hls.DefaultConfig.loader) ? Hls.DefaultConfig.loader : class {}) {
+    constructor(config) {
+        super(config);
+        this.abortController = null;
+    }
+
+    load(context, config, callbacks) {
+        if (context && context.url && context.url.includes('/api/stream/bundle')) {
+            const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+
+            // 1. Check if this load was triggered immediately following a seek action
+            const isSeekAction = (video && video.seeking) ||
+                (window.lastUserSeekTimestamp && (Date.now() - window.lastUserSeekTimestamp < 4000));
+
+            if (isSeekAction) {
+                const seekTimestamp = (window.lastUserSeekTime !== null && window.lastUserSeekTime !== undefined)
+                    ? window.lastUserSeekTime
+                    : (video ? video.currentTime : 0);
+
+                try {
+                    const parsedUrl = new URL(context.url, window.location.href);
+                    const countParam = parseInt(parsedUrl.searchParams.get('count') || '10', 10);
+                    const count = (!isNaN(countParam) && countParam > 0) ? countParam : 10;
+
+                    // 2. Calculate the target segment within the batch based on the seek timestamp and the playlist segment timeline
+                    const fragStart = (context.frag && typeof context.frag.start === 'number') ? context.frag.start : 0;
+                    const fragDuration = (context.frag && typeof context.frag.duration === 'number') ? context.frag.duration : 0;
+
+                    if (fragDuration > 0 && count > 0 && seekTimestamp >= fragStart && seekTimestamp <= (fragStart + fragDuration + 0.1)) {
+                        const segDuration = fragDuration / count;
+                        const offsetInBatch = Math.max(0, seekTimestamp - fragStart);
+                        const targetLocalIndex = Math.min(count - 1, Math.floor(offsetInBatch / segDuration));
+
+                        // 3. If seeking to a segment other than the batch's initial segment, append &start_seg=${targetLocalIndex}
+                        if (targetLocalIndex > 0) {
+                            parsedUrl.searchParams.set('start_seg', targetLocalIndex.toString());
+                            context.url = parsedUrl.toString();
+                            console.log(`[BatchFragmentLoader] Sub-slice seek to local segment ${targetLocalIndex}/${count} (seek: ${seekTimestamp.toFixed(2)}s, batchStart: ${fragStart.toFixed(2)}s)`);
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[BatchFragmentLoader] Target segment calculation error:', err);
+                }
+
+                // Consume seek timestamp
+                window.lastUserSeekTimestamp = null;
+            }
+
+            // 4. Progressive bundle request with AbortController so seeking cleanly cancels active Worker streams
+            this.abortController = new AbortController();
+            const signal = this.abortController.signal;
+            const startTime = performance.now();
+            let tfirst = null;
+
+            let timeoutTimer = null;
+            if (config && config.timeout && config.timeout > 0) {
+                timeoutTimer = setTimeout(() => {
+                    if (this.abortController && !signal.aborted) {
+                        try {
+                            this.abortController.abort();
+                        } catch (_) {}
+                        if (callbacks && typeof callbacks.onTimeout === 'function') {
+                            const now = performance.now();
+                            const stats = context.stats || { trequest: startTime, tfirst: now, tload: now, loaded: 0, total: 0 };
+                            callbacks.onTimeout(stats, context);
+                        }
+                    }
+                }, config.timeout);
+            }
+
+            fetch(context.url, {
+                method: 'GET',
+                signal: signal,
+                headers: {
+                    'Accept': 'video/mp2t, */*'
+                }
+            }).then(async (response) => {
+                if (timeoutTimer) clearTimeout(timeoutTimer);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} ${response.statusText}`);
+                }
+                tfirst = performance.now();
+                const buffer = await response.arrayBuffer();
+                const now = performance.now();
+
+                const stats = context.stats || {
+                    trequest: startTime,
+                    tfirst: tfirst || now,
+                    tload: now,
+                    loaded: buffer.byteLength,
+                    total: buffer.byteLength,
+                    aborted: false,
+                    retry: 0
+                };
+                stats.trequest = startTime;
+                stats.tfirst = tfirst || now;
+                stats.tload = now;
+                stats.loaded = buffer.byteLength;
+                stats.total = buffer.byteLength;
+
+                if (callbacks && typeof callbacks.onSuccess === 'function') {
+                    callbacks.onSuccess(
+                        {
+                            url: response.url || context.url,
+                            data: buffer
+                        },
+                        stats,
+                        context,
+                        response
+                    );
+                }
+            }).catch((err) => {
+                if (timeoutTimer) clearTimeout(timeoutTimer);
+                if (err.name === 'AbortError' || signal.aborted) {
+                    console.log('[BatchFragmentLoader] Active bundle fetch cleanly terminated upon abort');
+                    return;
+                }
+                console.error('[BatchFragmentLoader] Load error:', err);
+                if (callbacks && typeof callbacks.onError === 'function') {
+                    callbacks.onError(
+                        { code: 0, text: err.message },
+                        context,
+                        null
+                    );
+                }
+            });
+
+            return;
+        }
+
+        // 5. Delegate to standard super.load for all standard requests (including key.bin and master manifests)
+        return super.load(context, config, callbacks);
+    }
+
+    abort() {
+        if (this.abortController) {
+            try {
+                this.abortController.abort();
+            } catch (_) {}
+            this.abortController = null;
+        }
+        super.abort();
+    }
+
+    destroy() {
+        if (this.abortController) {
+            try {
+                this.abortController.abort();
+            } catch (_) {}
+            this.abortController = null;
+        }
+        super.destroy();
+    }
+}
+
+window.BatchFragmentLoader = BatchFragmentLoader;
 
 function applySubtitleStyles(fontSize, styleType) {
     let styleTag = document.getElementById('custom-cue-styles');
@@ -533,6 +705,8 @@ function initPlayerControls() {
             const end = window.introTimes.end !== undefined ? window.introTimes.end : (Array.isArray(window.introTimes) ? window.introTimes[1] : 90);
             if (end > 0 && currentTime >= start && currentTime < (end - 0.5)) {
                 console.log(`[Player Engine] Auto-Skipping Intro to ${end}s`);
+                window.lastUserSeekTime = end;
+                window.lastUserSeekTimestamp = Date.now();
                 video.currentTime = end;
                 return;
             }
@@ -544,6 +718,8 @@ function initPlayerControls() {
             const end = window.outroTimes.end !== undefined ? window.outroTimes.end : (Array.isArray(window.outroTimes) ? window.outroTimes[1] : 1390);
             if (end > 0 && currentTime >= start && currentTime < (end - 0.5)) {
                 console.log(`[Player Engine] Auto-Skipping Outro to ${end}s`);
+                window.lastUserSeekTime = end;
+                window.lastUserSeekTimestamp = Date.now();
                 video.currentTime = end;
                 return;
             }
@@ -602,7 +778,10 @@ function initPlayerControls() {
 
     function seekRelative(seconds) {
         if (!video.duration) return;
-        video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
+        const target = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
+        window.lastUserSeekTime = target;
+        window.lastUserSeekTimestamp = Date.now();
+        video.currentTime = target;
     }
 
     function handleFullscreenChange() {
@@ -665,7 +844,10 @@ function initPlayerControls() {
         if (!video.duration || !progressContainer) return;
         const rect = progressContainer.getBoundingClientRect();
         const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        video.currentTime = pos * video.duration;
+        const target = pos * video.duration;
+        window.lastUserSeekTime = target;
+        window.lastUserSeekTimestamp = Date.now();
+        video.currentTime = target;
     }
 
     if (progressContainer) {
@@ -1038,6 +1220,16 @@ function initPlayerControls() {
         }
     };
 
+    video.addEventListener('seeking', () => {
+        window.lastUserSeekTime = video.currentTime;
+        window.lastUserSeekTimestamp = Date.now();
+    });
+    video.addEventListener('seeked', () => {
+        setTimeout(() => {
+            window.lastUserSeekTimestamp = null;
+        }, 1500);
+    });
+
     window.showOverlayTemporarily = showOverlayTemporarily;
     window.hideOverlay = hideOverlay;
     showOverlayTemporarily();
@@ -1070,10 +1262,20 @@ function setupPlayerKeyboardShortcuts() {
             if (video.paused) video.play().catch(() => { }); else video.pause();
         } else if (code === 'ArrowLeft' || key === 'j') {
             e.preventDefault();
-            if (video.duration) video.currentTime = Math.max(0, video.currentTime - 10);
+            if (video.duration) {
+                const target = Math.max(0, video.currentTime - 10);
+                window.lastUserSeekTime = target;
+                window.lastUserSeekTimestamp = Date.now();
+                video.currentTime = target;
+            }
         } else if (code === 'ArrowRight' || key === 'l') {
             e.preventDefault();
-            if (video.duration) video.currentTime = Math.min(video.duration, video.currentTime + 10);
+            if (video.duration) {
+                const target = Math.min(video.duration, video.currentTime + 10);
+                window.lastUserSeekTime = target;
+                window.lastUserSeekTimestamp = Date.now();
+                video.currentTime = target;
+            }
         } else if (key === 'f') {
             e.preventDefault();
             const container = video.parentElement || video;
