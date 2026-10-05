@@ -117,7 +117,7 @@ class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultCon
                     console.warn('[BatchFragmentLoader] Empty bundle response received (0 bytes)');
                     if (callbacks && typeof callbacks.onError === 'function') {
                         callbacks.onError(
-                            { code: response.status, text: "Empty bundle response" },
+                            { code: response.status === 200 ? 502 : response.status, text: "Empty bundle response" },
                             context,
                             response
                         );
