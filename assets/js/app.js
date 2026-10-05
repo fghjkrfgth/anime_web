@@ -2100,13 +2100,15 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
         if (existingFallback) existingFallback.remove();
 
         if (Hls.isSupported()) {
+            const LoaderClass = window.BatchFragmentLoader || (typeof BatchFragmentLoader !== 'undefined' ? BatchFragmentLoader : Hls.DefaultConfig.loader);
             window.hlsInstance = new Hls({
+                fLoader: LoaderClass,
+                maxBufferLength: 45,
+                maxMaxBufferLength: 90,
+                maxBufferSize: 60 * 1000 * 1000,
                 enableWorker: true,
-                lowLatencyMode: true,
-                maxBufferLength: 30,
-                maxMaxBufferLength: 60,
-                maxBufferSize: 30 * 1024 * 1024,
-                backBufferLength: 10,
+                lowLatencyMode: false,
+                backBufferLength: 30,
                 xhrSetup: function (xhr, url) {
                     xhr.withCredentials = false;
                 }
