@@ -2109,12 +2109,22 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
                 enableWorker: true,
                 lowLatencyMode: false,
                 backBufferLength: 30,
+                fragLoadingMaxRetry: 3,
+                fragLoadingRetryDelay: 1000,
+                fragLoadingMaxRetryTimeout: 15000,
                 xhrSetup: function (xhr, url) {
                     xhr.withCredentials = false;
                 }
             });
             window.hlsInstance.loadSource(manifestBlobUrl);
             if (video) window.hlsInstance.attachMedia(video);
+
+            window.hlsInstance.on(Hls.Events.FRAG_LOADED, (event, data) => {
+                window.streamRetryCount = 0;
+                if (spinner) spinner.classList.add('hidden');
+                const pOverlay = document.getElementById('player-poster-overlay');
+                if (pOverlay) pOverlay.classList.add('hidden');
+            });
 
             window.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
                 console.log('[HLS Engine] Manifest parsed successfully. Segment streaming ready.');
