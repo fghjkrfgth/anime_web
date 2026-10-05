@@ -2109,8 +2109,9 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
                 enableWorker: true,
                 lowLatencyMode: false,
                 backBufferLength: 30,
-                fragLoadingMaxRetry: 3,
-                fragLoadingRetryDelay: 1000,
+                bufferNudgeOnStall: true,
+                fragLoadingMaxRetry: 2,
+                fragLoadingRetryDelay: 500,
                 fragLoadingMaxRetryTimeout: 15000,
                 xhrSetup: function (xhr, url) {
                     xhr.withCredentials = false;
@@ -2177,6 +2178,17 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
             });
 
             window.hlsInstance.on(Hls.Events.ERROR, (event, errData) => {
+                // Buffer stall recovery: nudge playback to prevent infinite stall or restarts
+                if (errData && (errData.details === 'bufferStalledError' || (Hls.ErrorDetails && errData.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR))) {
+                    console.warn('[HLS Engine] Buffer stall detected, nudging playback forward...');
+                    if (video && !video.paused && video.readyState >= 2) {
+                        try {
+                            video.currentTime += 0.1;
+                        } catch (_) {}
+                    }
+                    return;
+                }
+
                 if (errData.fatal) {
                     console.warn('[HLS Engine] Fatal playback error caught:', errData.type, errData.details);
                     switch (errData.type) {
