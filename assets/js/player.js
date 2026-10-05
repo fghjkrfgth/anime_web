@@ -594,7 +594,7 @@ function initPlayerControls() {
                         <button id="btn-captions-toggle" title="Subtitles / Captions (C)" class="min-w-[44px] min-h-[44px] px-2.5 py-1.5 text-xs font-bold font-mono text-white/80 hover:text-white hover:bg-white/10 rounded border border-white/10 transition-all flex items-center justify-center">
                             CC
                         </button>
-                        <div id="player-captions-popover" class="absolute right-0 bottom-12 w-56 p-3 rounded-xl bg-slate-950/95 border border-white/15 backdrop-blur-xl shadow-2xl hidden z-50 flex flex-col gap-3 text-xs text-white">
+                        <div id="player-captions-popover" class="absolute right-0 bottom-22 w-56 p-3 rounded-xl bg-slate-950/95 border border-white/15 backdrop-blur-xl shadow-2xl hidden z-50 flex flex-col gap-3 text-xs text-white">
                             <div class="font-bold border-b border-white/10 pb-1.5 text-slate-300 flex justify-between items-center">
                                 <span>Subtitles / Captions</span>
                                 <span id="captions-active-track-label" class="text-[10px] text-themeCyan">Off</span>
@@ -604,16 +604,16 @@ function initPlayerControls() {
                             </div>
                             <div class="border-t border-white/10 pt-2 flex flex-col gap-2">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-[11px] text-slate-400">Size</span>
+                                    <span class="text-[13px] text-slate-400">Size</span>
                                     <select id="caption-size-select" class="bg-slate-900 border border-white/10 text-xs text-white rounded px-1.5 py-0.5 outline-none cursor-pointer">
-                                        <option value="12px">Small</option>
-                                        <option value="15px" selected>Medium</option>
-                                        <option value="18px">Large</option>
-                                        <option value="22px">X-Large</option>
+                                        <option value="16px">Small</option>
+                                        <option value="19px" selected>Medium</option>
+                                        <option value="23px">Large</option>
+                                        <option value="26px">X-Large</option>
                                     </select>
                                 </div>
                                 <div class="flex items-center justify-between">
-                                    <span class="text-[11px] text-slate-400">Style</span>
+                                    <span class="text-[13px] text-slate-400">Style</span>
                                     <select id="caption-style-select" class="bg-slate-900 border border-white/10 text-xs text-white rounded px-1.5 py-0.5 outline-none cursor-pointer">
                                         <option value="black-box" selected>Black Box</option>
                                         <option value="transparent">Transparent</option>
