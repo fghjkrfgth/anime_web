@@ -204,21 +204,57 @@ function applySubtitleStyles(fontSize, styleType) {
         styleTag.id = 'custom-cue-styles';
         document.head.appendChild(styleTag);
     }
-    let bg = 'rgba(8, 8, 12, 0.75)';
-    if (styleType === 'transparent') bg = 'transparent';
-    else if (styleType === 'semi-trans') bg = 'rgba(0, 0, 0, 0.45)';
+
+    const currentStyle = styleType || localStorage.getItem('preferredCaptionStyle') || 'transparent';
+    const currentSize = fontSize || localStorage.getItem('preferredCaptionSize') || '20px';
+
+    let bg = 'transparent';
+    let textShadow = '0 1px 3px rgba(0, 0, 0, 0.95), 0 0 8px rgba(0, 0, 0, 0.9), -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 4px #000';
+
+    if (currentStyle === 'black-box') {
+        bg = 'rgba(8, 8, 12, 0.85)';
+        textShadow = '0 0 4px rgba(0, 0, 0, 0.9)';
+    } else if (currentStyle === 'semi-trans') {
+        bg = 'rgba(0, 0, 0, 0.45)';
+        textShadow = '0 1px 2px rgba(0, 0, 0, 0.9), -1px -1px 0 #000, 1px 1px 0 #000';
+    }
 
     styleTag.textContent = `
         video::cue, ::cue {
-            font-size: ${fontSize || '15px'} !important;
+            font-size: ${currentSize} !important;
             background: ${bg} !important;
             color: #ffffff !important;
-            text-shadow: 0 0 4px rgba(0,0,0,0.9) !important;
-            font-family: 'Outfit', sans-serif !important;
+            text-shadow: ${textShadow} !important;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
             line-height: 1.4 !important;
-            margin-bottom: 15% !important;
+            margin-bottom: 24% !important;
+            bottom: 24% !important;
+            padding: 0.25em 0.5em !important;
+        }
+        video::-webkit-media-text-track-container {
+            bottom: 60px !important;
+            padding-bottom: 35px !important;
+        }
+        video::-webkit-media-text-track-display {
+            padding-bottom: 35px !important;
+        }
+        @media (max-width: 768px) {
+            video::cue, ::cue {
+                font-size: calc(${currentSize} * 0.9) !important;
+                margin-bottom: 22% !important;
+                bottom: 22% !important;
+            }
+            video::-webkit-media-text-track-container {
+                bottom: 45px !important;
+                padding-bottom: 25px !important;
+            }
         }
     `;
+}
+
+window.applySubtitleStyles = applySubtitleStyles;
+if (typeof document !== 'undefined') {
+    applySubtitleStyles();
 }
 
 window.streamRetryCount = window.streamRetryCount || 0;
@@ -503,7 +539,21 @@ function initPlayerControls() {
 
     const overlay = document.createElement('div');
     overlay.id = 'custom-player-controls-overlay';
-    overlay.className = 'absolute inset-0 z-20 flex flex-col justify-between p-4 bg-gradient-to-t from-black/85 via-transparent to-black/40 opacity-100 pointer-events-auto transition-opacity duration-300 select-none';
+    overlay.className = 'absolute inset-0 z-20 flex flex-col justify-between p-4 bg-transparent opacity-100 pointer-events-auto transition-opacity duration-300 select-none';
+
+    // Inject rule ensuring controls are completely disabled when hidden
+    if (!document.getElementById('custom-player-overlay-styles')) {
+        const s = document.createElement('style');
+        s.id = 'custom-player-overlay-styles';
+        s.textContent = `
+            #custom-player-controls-overlay.opacity-0,
+            #custom-player-controls-overlay.opacity-0 * {
+                pointer-events: none !important;
+                cursor: default !important;
+            }
+        `;
+        document.head.appendChild(s);
+    }
 
     const showTitle = window.showData?.title?.english || window.showData?.title?.romaji || window.showData?.title?.userPreferred || 'Anime';
     const epNum = window.currentEp || 1;
@@ -520,7 +570,7 @@ function initPlayerControls() {
         </div>
 
         <!-- Center Bar: 10s Rewind, Center Play/Pause, 10s Fast-Forward -->
-        <div class="flex items-center justify-center gap-6 md:gap-8 my-auto pointer-events-auto">
+        <div class="flex items-center justify-center gap-6 md:gap-8 my-auto">
             <button id="btn-rewind-10" title="Rewind 10s (Left Arrow / J)" class="w-12 h-12 rounded-full bg-black/40 hover:bg-black/70 border border-white/15 text-white flex items-center justify-center transition-all duration-200 transform hover:scale-110 active:scale-95 shadow-md">
                 <span class="text-xs font-extrabold tracking-tighter">⏮ 10s</span>
             </button>
@@ -533,8 +583,8 @@ function initPlayerControls() {
             </button>
         </div>
 
-        <!-- Bottom Controls & Progress Bar Wrapper (Transparent Gradient Overlay) -->
-        <div class="flex flex-col gap-2 pointer-events-auto bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 border-none shadow-none relative rounded-b-xl">
+        <!-- Bottom Controls & Progress Bar Wrapper (Fully Transparent, No Background) -->
+        <div id="player-bottom-controls-wrapper" class="flex flex-col gap-2 p-4 border-none shadow-none relative bg-transparent">
             
             <!-- Segmented Custom Progress Bar -->
             <div id="player-progress-container" class="relative w-full h-3 flex items-center cursor-pointer group py-1">
@@ -591,10 +641,10 @@ function initPlayerControls() {
 
                     <!-- Subtitles/Captions Button & Popover -->
                     <div class="relative">
-                        <button id="btn-captions-toggle" title="Subtitles / Captions (C)" class="min-w-[54px] min-h-[54px] px-2.5 py-1.5 text-xs font-bold font-mono text-white/80 hover:text-white hover:bg-white/10 rounded border border-white/10 transition-all flex items-center justify-center">
+                        <button id="btn-captions-toggle" title="Subtitles / Captions (C)" class="min-w-[44px] min-h-[44px] px-2.5 py-1.5 text-xs font-bold font-mono text-white/80 hover:text-white hover:bg-white/10 rounded border border-white/10 transition-all flex items-center justify-center">
                             CC
                         </button>
-                        <div id="player-captions-popover" class="absolute right-0 bottom-5 w-56 p-3 rounded-xl bg-slate-950/95 border border-white/15 backdrop-blur-xl shadow-2xl hidden z-50 flex flex-col gap-3 text-xs text-white">
+                        <div id="player-captions-popover" class="absolute right-0 bottom-12 w-56 p-3 rounded-xl bg-slate-950/95 border border-white/15 backdrop-blur-xl shadow-2xl hidden z-50 flex flex-col gap-3 text-xs text-white">
                             <div class="font-bold border-b border-white/10 pb-1.5 text-slate-300 flex justify-between items-center">
                                 <span>Subtitles / Captions</span>
                                 <span id="captions-active-track-label" class="text-[10px] text-themeCyan">Off</span>
@@ -604,20 +654,20 @@ function initPlayerControls() {
                             </div>
                             <div class="border-t border-white/10 pt-2 flex flex-col gap-2">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-[13px] text-slate-400">Size</span>
+                                    <span class="text-[11px] text-slate-400">Size</span>
                                     <select id="caption-size-select" class="bg-slate-900 border border-white/10 text-xs text-white rounded px-1.5 py-0.5 outline-none cursor-pointer">
                                         <option value="16px">Small</option>
-                                        <option value="19px" selected>Medium</option>
-                                        <option value="23px">Large</option>
-                                        <option value="26px">X-Large</option>
+                                        <option value="20px" selected>Medium</option>
+                                        <option value="24px">Large</option>
+                                        <option value="28px">X-Large</option>
                                     </select>
                                 </div>
                                 <div class="flex items-center justify-between">
-                                    <span class="text-[13px] text-slate-400">Style</span>
+                                    <span class="text-[11px] text-slate-400">Style</span>
                                     <select id="caption-style-select" class="bg-slate-900 border border-white/10 text-xs text-white rounded px-1.5 py-0.5 outline-none cursor-pointer">
-                                        <option value="black-box" selected>Black Box</option>
-                                        <option value="transparent">Transparent</option>
+                                        <option value="transparent" selected>Transparent</option>
                                         <option value="semi-trans">Semi-Trans</option>
+                                        <option value="black-box">Black Box</option>
                                     </select>
                                 </div>
                             </div>
@@ -1065,7 +1115,14 @@ function initPlayerControls() {
     const captionSizeSelect = document.getElementById('caption-size-select');
     const captionStyleSelect = document.getElementById('caption-style-select');
     if (captionSizeSelect && captionStyleSelect) {
+        const savedSize = localStorage.getItem('preferredCaptionSize') || '20px';
+        const savedStyle = localStorage.getItem('preferredCaptionStyle') || 'transparent';
+        captionSizeSelect.value = savedSize;
+        captionStyleSelect.value = savedStyle;
+
         const updateStyles = () => {
+            localStorage.setItem('preferredCaptionSize', captionSizeSelect.value);
+            localStorage.setItem('preferredCaptionStyle', captionStyleSelect.value);
             applySubtitleStyles(captionSizeSelect.value, captionStyleSelect.value);
         };
         captionSizeSelect.onchange = updateStyles;
@@ -1176,9 +1233,13 @@ function initPlayerControls() {
     }
 
     function hideOverlay() {
+        if (!overlay) return;
         overlay.classList.remove('opacity-100', 'pointer-events-auto');
         overlay.classList.add('opacity-0', 'pointer-events-none');
-        if (window.overlayHideTimeout) clearTimeout(window.overlayHideTimeout);
+        if (window.overlayHideTimeout) {
+            clearTimeout(window.overlayHideTimeout);
+            window.overlayHideTimeout = null;
+        }
         document.getElementById('player-captions-popover')?.classList.add('hidden');
         document.getElementById('player-speed-popover')?.classList.add('hidden');
         document.getElementById('player-auto-popover')?.classList.add('hidden');
@@ -1188,7 +1249,10 @@ function initPlayerControls() {
         if (!overlay) return;
         overlay.classList.remove('opacity-0', 'pointer-events-none', 'hidden');
         overlay.classList.add('opacity-100', 'pointer-events-auto');
-        if (window.overlayHideTimeout) clearTimeout(window.overlayHideTimeout);
+        if (window.overlayHideTimeout) {
+            clearTimeout(window.overlayHideTimeout);
+            window.overlayHideTimeout = null;
+        }
 
         // Lock controls visible while any popover menu is active
         if (isAnyPopoverOpen()) {
@@ -1204,37 +1268,74 @@ function initPlayerControls() {
         }
     }
 
+    let suppressMouseWakeupUntil = 0;
+    function blockMouseMoveWakeupTemporarily() {
+        suppressMouseWakeupUntil = Date.now() + 450;
+    }
+
     function toggleOverlayVisibility(e) {
-        if (e.target.closest('.pointer-events-auto, button, input, select, option, label, #player-captions-popover, #player-speed-popover, #player-auto-popover, #player-progress-container')) {
+        if (!overlay) return;
+
+        // Check if the click target is an interactive player control
+        const isControl = !!e.target.closest('button, input, select, option, label, #player-progress-container, #player-captions-popover, #player-speed-popover, #player-auto-popover, a');
+
+        const isVisible = overlay.classList.contains('opacity-100') && !overlay.classList.contains('opacity-0');
+
+        // Case 1: Controls are currently hidden.
+        // Clicking anywhere on the player wakes up and reveals the controls.
+        if (!isVisible) {
+            showOverlayTemporarily();
             return;
         }
 
-        if (!overlay) return;
+        // Case 2: Controls are currently visible, and user clicked an actual control.
+        // Let the control execute, and refresh the auto-hide timer.
+        if (isControl) {
+            showOverlayTemporarily();
+            return;
+        }
 
+        // Case 3: Controls are visible, and user clicked on an empty area (no control).
+        // Immediately stop hide timer, and hide controls immediately.
         if (isAnyPopoverOpen()) {
             document.getElementById('player-captions-popover')?.classList.add('hidden');
             document.getElementById('player-speed-popover')?.classList.add('hidden');
             document.getElementById('player-auto-popover')?.classList.add('hidden');
-            showOverlayTemporarily();
-            return;
         }
 
-        const isVisible = overlay.classList.contains('opacity-100');
-
-        if (isVisible && !video.paused) {
-            hideOverlay();
-        } else {
-            showOverlayTemporarily();
+        if (window.overlayHideTimeout) {
+            clearTimeout(window.overlayHideTimeout);
+            window.overlayHideTimeout = null;
         }
+
+        hideOverlay();
+        blockMouseMoveWakeupTemporarily();
     }
 
     const playerContainer = document.getElementById('player-container') || video.parentElement;
     playerContainer.onclick = toggleOverlayVisibility;
 
-    playerContainer.onmousemove = () => {
+    let lastMouseX = -1;
+    let lastMouseY = -1;
+
+    playerContainer.onmousemove = (e) => {
+        if (Date.now() < suppressMouseWakeupUntil) return;
+        if (lastMouseX !== -1 && lastMouseY !== -1) {
+            const dx = Math.abs(e.clientX - lastMouseX);
+            const dy = Math.abs(e.clientY - lastMouseY);
+            if (dx < 3 && dy < 3) return;
+        }
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+
         showOverlayTemporarily();
     };
-    playerContainer.onmouseenter = showOverlayTemporarily;
+
+    playerContainer.onmouseenter = () => {
+        if (Date.now() < suppressMouseWakeupUntil) return;
+        showOverlayTemporarily();
+    };
+
     playerContainer.onmouseleave = () => {
         if (!video.paused && !isAnyPopoverOpen()) {
             hideOverlay();
@@ -1356,6 +1457,10 @@ function setupPlayerKeyboardShortcuts() {
             if (video.volume === 0) video.muted = true;
             const slider = document.getElementById('player-volume-slider');
             if (slider) slider.value = video.volume;
+        }
+
+        if (typeof window.showOverlayTemporarily === 'function') {
+            window.showOverlayTemporarily();
         }
     });
 }
