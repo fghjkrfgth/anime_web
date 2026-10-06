@@ -591,7 +591,7 @@ function initPlayerControls() {
 
                     <!-- Subtitles/Captions Button & Popover -->
                     <div class="relative">
-                        <button id="btn-captions-toggle" title="Subtitles / Captions (C)" class="min-w-[44px] min-h-[44px] px-2.5 py-1.5 text-xs font-bold font-mono text-white/80 hover:text-white hover:bg-white/10 rounded border border-white/10 transition-all flex items-center justify-center">
+                        <button id="btn-captions-toggle" title="Subtitles / Captions (C)" class="min-w-[54px] min-h-[54px] px-2.5 py-2.5 text-xs font-bold font-mono text-white/80 hover:text-white hover:bg-white/10 rounded border border-white/10 transition-all flex items-center justify-center">
                             CC
                         </button>
                         <div id="player-captions-popover" class="absolute right-0 bottom-5 w-56 p-3 rounded-xl bg-slate-950/95 border border-white/15 backdrop-blur-xl shadow-2xl hidden z-50 flex flex-col gap-3 text-xs text-white">
