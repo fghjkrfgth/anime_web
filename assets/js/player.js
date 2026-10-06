@@ -26,9 +26,11 @@ class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultCon
     }
 
     load(context, config, callbacks) {
-        // Strictly prevent subtitle, manifest, or key interception - delegate directly to super.load
+        // Strictly prevent subtitle, manifest, font, or key interception - delegate directly to super.load
         if (!context || !context.url || !context.url.includes('/api/stream/bundle') ||
-            context.url.includes('.vtt') || context.url.includes('.ass') || context.url.includes('proxy_caption')) {
+            context.url.includes('.m3u8') || context.url.includes('.vtt') || context.url.includes('.ass') ||
+            context.url.includes('.woff') || context.url.includes('.ttf') || context.url.includes('proxy_caption') ||
+            context.type === 'manifest' || context.type === 'level' || context.type === 'subtitle' || context.type === 'audioTrack') {
             return super.load(context, config, callbacks);
         }
 
@@ -112,9 +114,69 @@ class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultCon
                 }
                 return;
             }
+
             tfirst = performance.now();
-            const buffer = await response.arrayBuffer();
+            const stats = context.stats || {
+                trequest: startTime,
+                tfirst: tfirst,
+                tload: tfirst,
+                loaded: 0,
+                total: 0,
+                aborted: false,
+                retry: 0
+            };
+            stats.trequest = startTime;
+            stats.tfirst = tfirst;
+
+            let buffer = null;
+
+            // Stream reader if supported for progressive processing & immediate progress notification
+            if (response.body && typeof response.body.getReader === 'function') {
+                const reader = response.body.getReader();
+                const chunks = [];
+                let totalBytes = 0;
+
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        if (value && value.byteLength > 0) {
+                            chunks.push(value);
+                            totalBytes += value.byteLength;
+                            stats.loaded = totalBytes;
+                            stats.total = totalBytes;
+
+                            // Emit progress event immediately so Hls.js tracks live arrival
+                            if (callbacks && typeof callbacks.onProgress === 'function') {
+                                callbacks.onProgress(stats, context, value.buffer || value, response);
+                            }
+                        }
+                    }
+
+                    if (totalBytes > 0) {
+                        const merged = new Uint8Array(totalBytes);
+                        let offset = 0;
+                        for (let k = 0; k < chunks.length; k++) {
+                            merged.set(chunks[k], offset);
+                            offset += chunks[k].byteLength;
+                        }
+                        buffer = merged.buffer;
+                    }
+                } catch (readErr) {
+                    if (readErr.name === 'AbortError' || signal.aborted) {
+                        console.log('[BatchFragmentLoader] Active bundle fetch cleanly terminated upon abort');
+                        return;
+                    }
+                    throw readErr;
+                }
+            } else {
+                buffer = await response.arrayBuffer();
+            }
+
             const now = performance.now();
+            stats.tload = now;
+            stats.loaded = buffer ? buffer.byteLength : 0;
+            stats.total = buffer ? buffer.byteLength : 0;
 
             // If bundle fails or returns an empty buffer, trigger callbacks.onError
             if (!buffer || buffer.byteLength === 0) {
@@ -128,21 +190,6 @@ class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultCon
                 }
                 return;
             }
-
-            const stats = context.stats || {
-                trequest: startTime,
-                tfirst: tfirst || now,
-                tload: now,
-                loaded: buffer.byteLength,
-                total: buffer.byteLength,
-                aborted: false,
-                retry: 0
-            };
-            stats.trequest = startTime;
-            stats.tfirst = tfirst || now;
-            stats.tload = now;
-            stats.loaded = buffer.byteLength;
-            stats.total = buffer.byteLength;
 
             if (callbacks && typeof callbacks.onSuccess === 'function') {
                 callbacks.onSuccess(
@@ -225,26 +272,26 @@ function applySubtitleStyles(fontSize, styleType) {
             text-shadow: ${textShadow} !important;
             font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
             line-height: 1.4 !important;
-            margin-bottom: 24% !important;
-            bottom: 24% !important;
+            margin-bottom: 2.5rem !important;
+            bottom: auto !important;
             padding: 0.25em 0.5em !important;
         }
         video::-webkit-media-text-track-container {
-            bottom: 60px !important;
-            padding-bottom: 35px !important;
+            bottom: 1.5rem !important;
+            padding-bottom: 0 !important;
         }
         video::-webkit-media-text-track-display {
-            padding-bottom: 35px !important;
+            padding-bottom: 0 !important;
         }
         @media (max-width: 768px) {
             video::cue, ::cue {
                 font-size: calc(${currentSize} * 0.9) !important;
-                margin-bottom: 22% !important;
-                bottom: 22% !important;
+                margin-bottom: 2.5rem !important;
+                bottom: auto !important;
             }
             video::-webkit-media-text-track-container {
-                bottom: 45px !important;
-                padding-bottom: 25px !important;
+                bottom: 1.25rem !important;
+                padding-bottom: 0 !important;
             }
         }
     `;
