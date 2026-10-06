@@ -2244,7 +2244,12 @@ async function loadSubtitles(trackList, targetVideo) {
     if (!videoEl) return;
 
     const existingTracks = videoEl.querySelectorAll('track');
-    existingTracks.forEach(t => t.remove());
+    existingTracks.forEach(t => {
+        if (t.src && t.src.startsWith('blob:')) {
+            try { URL.revokeObjectURL(t.src); } catch (_) {}
+        }
+        t.remove();
+    });
 
     window.currentSubtitles = trackList || [];
 
@@ -2278,14 +2283,16 @@ async function loadSubtitles(trackList, targetVideo) {
                 vttText = await response.text();
             }
 
-            const base64Vtt = btoa(unescape(encodeURIComponent(vttText)));
-            const dataUrl = 'data:text/vtt;base64,' + base64Vtt;
+            // Standard same-origin Blob Object URL rather than base64 Data URI
+            // Prevents Chrome/WebKit MSE isolation blocking cues on attached media
+            const blob = new Blob([vttText], { type: 'text/vtt' });
+            const blobUrl = URL.createObjectURL(blob);
 
             const trackEl = document.createElement('track');
             trackEl.kind = subKind;
             trackEl.label = subLabel;
             trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
-            trackEl.src = dataUrl;
+            trackEl.src = blobUrl;
 
             if (isDefault) {
                 trackEl.default = true;
@@ -2324,6 +2331,8 @@ async function loadSubtitles(trackList, targetVideo) {
 window.loadSubtitles = loadSubtitles;
 
 function enableDefaultTextTrack(videoEl) {
+    if (!videoEl) return;
+
     const applyMode = () => {
         if (!videoEl) return;
         const textTracks = videoEl.textTracks;
@@ -2388,8 +2397,21 @@ function enableDefaultTextTrack(videoEl) {
         }
     };
 
+    // Attach listeners on videoEl so browser or Hls.js MSE resets do not disable tracks
+    if (!videoEl._subtitlesListenerAttached) {
+        videoEl._subtitlesListenerAttached = true;
+        const reapplyOnEvent = () => {
+            applyMode();
+        };
+        videoEl.addEventListener('loadedmetadata', reapplyOnEvent);
+        videoEl.addEventListener('loadeddata', reapplyOnEvent);
+        videoEl.addEventListener('play', reapplyOnEvent);
+        videoEl.addEventListener('playing', reapplyOnEvent);
+    }
+
     applyMode();
     setTimeout(applyMode, 100);
+    setTimeout(applyMode, 500);
 }
 window.enableDefaultTextTrack = enableDefaultTextTrack;
 
