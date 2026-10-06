@@ -2290,6 +2290,11 @@ async function loadSubtitles(trackList, targetVideo) {
             if (isDefault) {
                 trackEl.default = true;
             }
+            trackEl.addEventListener('load', () => {
+                if (isDefault) {
+                    try { trackEl.track.mode = 'showing'; } catch (_) {}
+                }
+            });
 
             videoEl.appendChild(trackEl);
         } catch (err) {
@@ -2301,7 +2306,14 @@ async function loadSubtitles(trackList, targetVideo) {
                 trackEl.label = subLabel;
                 trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
                 trackEl.src = proxyUrl;
-                if (isDefault) trackEl.default = true;
+                if (isDefault) {
+                    trackEl.default = true;
+                }
+                trackEl.addEventListener('load', () => {
+                    if (isDefault) {
+                        try { trackEl.track.mode = 'showing'; } catch (_) {}
+                    }
+                });
                 videoEl.appendChild(trackEl);
             }
         }
@@ -2312,7 +2324,7 @@ async function loadSubtitles(trackList, targetVideo) {
 window.loadSubtitles = loadSubtitles;
 
 function enableDefaultTextTrack(videoEl) {
-    setTimeout(() => {
+    const applyMode = () => {
         if (!videoEl) return;
         const textTracks = videoEl.textTracks;
         if (!textTracks || textTracks.length === 0) return;
@@ -2320,7 +2332,7 @@ function enableDefaultTextTrack(videoEl) {
         const preferredCaption = localStorage.getItem('preferredCaption');
         if (preferredCaption === 'Off') {
             for (let i = 0; i < textTracks.length; i++) {
-                textTracks[i].mode = 'disabled';
+                try { textTracks[i].mode = 'disabled'; } catch (_) {}
             }
             const activeLabel = document.getElementById('captions-active-track-label');
             if (activeLabel) activeLabel.innerText = "Off";
@@ -2357,11 +2369,13 @@ function enableDefaultTextTrack(videoEl) {
         }
 
         for (let i = 0; i < textTracks.length; i++) {
-            if (i === defaultIndex) {
-                textTracks[i].mode = 'showing';
-            } else {
-                textTracks[i].mode = 'disabled';
-            }
+            try {
+                if (i === defaultIndex) {
+                    textTracks[i].mode = 'showing';
+                } else {
+                    textTracks[i].mode = 'disabled';
+                }
+            } catch (_) {}
         }
 
         const activeLabel = document.getElementById('captions-active-track-label');
@@ -2372,7 +2386,10 @@ function enableDefaultTextTrack(videoEl) {
         if (typeof window.populateCaptionsMenu === 'function') {
             window.populateCaptionsMenu();
         }
-    }, 100);
+    };
+
+    applyMode();
+    setTimeout(applyMode, 100);
 }
 window.enableDefaultTextTrack = enableDefaultTextTrack;
 
