@@ -26,152 +26,150 @@ class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultCon
     }
 
     load(context, config, callbacks) {
-        if (context && context.url && context.url.includes('/api/stream/bundle')) {
-            context.responseType = 'arraybuffer';
-            const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+        // Strictly prevent subtitle, manifest, or key interception - delegate directly to super.load
+        if (!context || !context.url || !context.url.includes('/api/stream/bundle') ||
+            context.url.includes('.vtt') || context.url.includes('.ass') || context.url.includes('proxy_caption')) {
+            return super.load(context, config, callbacks);
+        }
 
-            // 1. Check if this load was triggered immediately following a seek action
-            const isSeekAction = (video && video.seeking) ||
-                (window.lastUserSeekTimestamp && (Date.now() - window.lastUserSeekTimestamp < 4000));
+        context.responseType = 'arraybuffer';
+        const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
 
-            if (isSeekAction) {
-                const seekTimestamp = (window.lastUserSeekTime !== null && window.lastUserSeekTime !== undefined)
-                    ? window.lastUserSeekTime
-                    : (video ? video.currentTime : 0);
+        // 1. Check if this load was triggered immediately following a seek action
+        const isSeekAction = (video && video.seeking) ||
+            (window.lastUserSeekTimestamp && (Date.now() - window.lastUserSeekTimestamp < 4000));
 
-                try {
-                    const parsedUrl = new URL(context.url, window.location.href);
-                    const countParam = parseInt(parsedUrl.searchParams.get('count') || '10', 10);
-                    const count = (!isNaN(countParam) && countParam > 0) ? countParam : 10;
+        if (isSeekAction) {
+            const seekTimestamp = (window.lastUserSeekTime !== null && window.lastUserSeekTime !== undefined)
+                ? window.lastUserSeekTime
+                : (video ? video.currentTime : 0);
 
-                    // 2. Calculate the target segment within the batch based on the seek timestamp and the playlist segment timeline
-                    const fragStart = (context.frag && typeof context.frag.start === 'number') ? context.frag.start : 0;
-                    const fragDuration = (context.frag && typeof context.frag.duration === 'number') ? context.frag.duration : 0;
+            try {
+                const parsedUrl = new URL(context.url, window.location.href);
+                const countParam = parseInt(parsedUrl.searchParams.get('count') || '10', 10);
+                const count = (!isNaN(countParam) && countParam > 0) ? countParam : 10;
 
-                    if (fragDuration > 0 && count > 0 && seekTimestamp >= fragStart && seekTimestamp <= (fragStart + fragDuration + 0.1)) {
-                        const segDuration = fragDuration / count;
-                        const offsetInBatch = Math.max(0, seekTimestamp - fragStart);
-                        const targetLocalIndex = Math.min(count - 1, Math.floor(offsetInBatch / segDuration));
+                // 2. Calculate the target segment within the batch based on the seek timestamp and the playlist segment timeline
+                const fragStart = (context.frag && typeof context.frag.start === 'number') ? context.frag.start : 0;
+                const fragDuration = (context.frag && typeof context.frag.duration === 'number') ? context.frag.duration : 0;
 
-                        // 3. If seeking to a segment other than the batch's initial segment, append &start_seg=${targetLocalIndex}
-                        if (targetLocalIndex > 0) {
-                            parsedUrl.searchParams.set('start_seg', targetLocalIndex.toString());
-                            context.url = parsedUrl.toString();
-                            console.log(`[BatchFragmentLoader] Sub-slice seek to local segment ${targetLocalIndex}/${count} (seek: ${seekTimestamp.toFixed(2)}s, batchStart: ${fragStart.toFixed(2)}s)`);
-                        }
+                if (fragDuration > 0 && count > 0 && seekTimestamp >= fragStart && seekTimestamp <= (fragStart + fragDuration + 0.1)) {
+                    const offsetInBatch = Math.max(0, seekTimestamp - fragStart);
+                    const targetLocalIndex = Math.min(count - 1, Math.floor(offsetInBatch / (fragDuration / count)));
+
+                    // 3. If seeking to a segment other than the batch's initial segment, append &start_seg=${targetLocalIndex}
+                    if (targetLocalIndex > 0) {
+                        parsedUrl.searchParams.set('start_seg', targetLocalIndex.toString());
+                        context.url = parsedUrl.toString();
+                        console.log(`[BatchFragmentLoader] Sub-slice seek to local segment ${targetLocalIndex}/${count} (seek: ${seekTimestamp.toFixed(2)}s, batchStart: ${fragStart.toFixed(2)}s)`);
                     }
-                } catch (err) {
-                    console.warn('[BatchFragmentLoader] Target segment calculation error:', err);
                 }
-
-                // Consume seek timestamp
-                window.lastUserSeekTimestamp = null;
+            } catch (err) {
+                console.warn('[BatchFragmentLoader] Target segment calculation error:', err);
             }
 
-            // 4. Progressive bundle request with AbortController so seeking cleanly cancels active Worker streams
-            this.abortController = new AbortController();
-            const signal = this.abortController.signal;
-            const startTime = performance.now();
-            let tfirst = null;
+            // Consume seek timestamp
+            window.lastUserSeekTimestamp = null;
+        }
 
-            let timeoutTimer = null;
-            if (config && config.timeout && config.timeout > 0) {
-                timeoutTimer = setTimeout(() => {
-                    if (this.abortController && !signal.aborted) {
-                        try {
-                            this.abortController.abort();
-                        } catch (_) {}
-                        if (callbacks && typeof callbacks.onTimeout === 'function') {
-                            const now = performance.now();
-                            const stats = context.stats || { trequest: startTime, tfirst: now, tload: now, loaded: 0, total: 0 };
-                            callbacks.onTimeout(stats, context);
-                        }
+        // 4. Progressive bundle request with AbortController so seeking cleanly cancels active Worker streams
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
+        const startTime = performance.now();
+        let tfirst = null;
+
+        let timeoutTimer = null;
+        if (config && config.timeout && config.timeout > 0) {
+            timeoutTimer = setTimeout(() => {
+                if (this.abortController && !signal.aborted) {
+                    try {
+                        this.abortController.abort();
+                    } catch (_) {}
+                    if (callbacks && typeof callbacks.onTimeout === 'function') {
+                        const now = performance.now();
+                        const stats = context.stats || { trequest: startTime, tfirst: now, tload: now, loaded: 0, total: 0 };
+                        callbacks.onTimeout(stats, context);
                     }
-                }, config.timeout);
+                }
+            }, config.timeout);
+        }
+
+        fetch(context.url, {
+            method: 'GET',
+            signal: signal,
+            headers: {
+                'Accept': 'video/mp2t, audio/mp2t, */*'
             }
-
-            fetch(context.url, {
-                method: 'GET',
-                signal: signal,
-                headers: {
-                    'Accept': 'video/mp2t, */*'
-                }
-            }).then(async (response) => {
-                if (timeoutTimer) clearTimeout(timeoutTimer);
-                if (!response.ok) {
-                    if (callbacks && typeof callbacks.onError === 'function') {
-                        callbacks.onError(
-                            { code: response.status, text: `HTTP ${response.status} ${response.statusText}` },
-                            context,
-                            response
-                        );
-                    }
-                    return;
-                }
-                tfirst = performance.now();
-                const buffer = await response.arrayBuffer();
-                const now = performance.now();
-
-                // If bundle fails or returns an empty buffer, trigger callbacks.onError
-                if (!buffer || buffer.byteLength === 0) {
-                    console.warn('[BatchFragmentLoader] Empty bundle response received (0 bytes)');
-                    if (callbacks && typeof callbacks.onError === 'function') {
-                        callbacks.onError(
-                            { code: response.status === 200 ? 502 : response.status, text: "Empty bundle response" },
-                            context,
-                            response
-                        );
-                    }
-                    return;
-                }
-
-                const stats = context.stats || {
-                    trequest: startTime,
-                    tfirst: tfirst || now,
-                    tload: now,
-                    loaded: buffer.byteLength,
-                    total: buffer.byteLength,
-                    aborted: false,
-                    retry: 0
-                };
-                stats.trequest = startTime;
-                stats.tfirst = tfirst || now;
-                stats.tload = now;
-                stats.loaded = buffer.byteLength;
-                stats.total = buffer.byteLength;
-
-                if (callbacks && typeof callbacks.onSuccess === 'function') {
-                    callbacks.onSuccess(
-                        {
-                            url: response.url || context.url,
-                            data: buffer
-                        },
-                        stats,
+        }).then(async (response) => {
+            if (timeoutTimer) clearTimeout(timeoutTimer);
+            if (!response.ok) {
+                if (callbacks && typeof callbacks.onError === 'function') {
+                    callbacks.onError(
+                        { code: response.status, text: `HTTP ${response.status} ${response.statusText}` },
                         context,
                         response
                     );
                 }
-            }).catch((err) => {
-                if (timeoutTimer) clearTimeout(timeoutTimer);
-                if (err.name === 'AbortError' || signal.aborted) {
-                    console.log('[BatchFragmentLoader] Active bundle fetch cleanly terminated upon abort');
-                    return;
-                }
-                console.error('[BatchFragmentLoader] Load error:', err);
+                return;
+            }
+            tfirst = performance.now();
+            const buffer = await response.arrayBuffer();
+            const now = performance.now();
+
+            // If bundle fails or returns an empty buffer, trigger callbacks.onError
+            if (!buffer || buffer.byteLength === 0) {
+                console.warn('[BatchFragmentLoader] Empty bundle received (0 bytes)');
                 if (callbacks && typeof callbacks.onError === 'function') {
                     callbacks.onError(
-                        { code: 0, text: err.message },
+                        { code: 0, text: "Empty bundle received" },
                         context,
-                        null
+                        response
                     );
                 }
-            });
+                return;
+            }
 
-            return;
-        }
+            const stats = context.stats || {
+                trequest: startTime,
+                tfirst: tfirst || now,
+                tload: now,
+                loaded: buffer.byteLength,
+                total: buffer.byteLength,
+                aborted: false,
+                retry: 0
+            };
+            stats.trequest = startTime;
+            stats.tfirst = tfirst || now;
+            stats.tload = now;
+            stats.loaded = buffer.byteLength;
+            stats.total = buffer.byteLength;
 
-        // 5. Delegate to standard super.load for all standard requests (including key.bin and master manifests)
-        return super.load(context, config, callbacks);
+            if (callbacks && typeof callbacks.onSuccess === 'function') {
+                callbacks.onSuccess(
+                    {
+                        url: response.url || context.url,
+                        data: buffer
+                    },
+                    stats,
+                    context,
+                    response
+                );
+            }
+        }).catch((err) => {
+            if (timeoutTimer) clearTimeout(timeoutTimer);
+            if (err.name === 'AbortError' || signal.aborted) {
+                console.log('[BatchFragmentLoader] Active bundle fetch cleanly terminated upon abort');
+                return;
+            }
+            console.error('[BatchFragmentLoader] Load error:', err);
+            if (callbacks && typeof callbacks.onError === 'function') {
+                callbacks.onError(
+                    { code: 0, text: err.message },
+                    context,
+                    null
+                );
+            }
+        });
     }
 
     abort() {
