@@ -540,9 +540,20 @@ video::cue {
 
     video::cue,
     ::cue {
-        font-size: 13px !important;
-        line-height: 1.3 !important;
-        bottom: 18% !important;
+        font-size: 18px !important;
+        line-height: 1.35 !important;
+        bottom: 22% !important;
+        margin-bottom: 22% !important;
+    }
+
+    #custom-player-controls-overlay.opacity-0,
+    #custom-player-controls-overlay.opacity-0 * {
+        pointer-events: none !important;
+        cursor: default !important;
+    }
+
+    #player-bottom-controls-wrapper {
+        background: transparent !important;
     }
 
     #player-container {
