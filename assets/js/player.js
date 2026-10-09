@@ -1069,10 +1069,10 @@ function initPlayerControls() {
 
         const rawSubtitles = (subtitlesData && Array.isArray(subtitlesData))
             ? subtitlesData
-            : (window.currentStreamData && Array.isArray(window.currentStreamData.subtitles))
-                ? window.currentStreamData.subtitles
-                : (window.currentSubtitles && Array.isArray(window.currentSubtitles))
-                    ? window.currentSubtitles
+            : (window.currentSubtitles && Array.isArray(window.currentSubtitles))
+                ? window.currentSubtitles
+                : (window.currentStreamData && Array.isArray(window.currentStreamData.subtitles))
+                    ? window.currentStreamData.subtitles
                     : [];
 
         const textTracks = Array.from(video ? (video.textTracks || []) : []);
@@ -1102,14 +1102,24 @@ function initPlayerControls() {
         };
         tracksList.appendChild(offBtn);
 
-        // 2. Subtitle tracks provided in data.subtitles (e.g. "English", "English (Full Subtitles)", "English (Dubtitle)")
-        const trackCount = Math.max(textTracks.length, rawSubtitles.length);
+        // 2. Only list validated tracks (from DOM textTracks or validated rawSubtitles)
+        const trackCount = textTracks.length > 0 ? textTracks.length : rawSubtitles.length;
+
+        if (trackCount === 0) {
+            const emptyNotice = document.createElement('div');
+            emptyNotice.className = 'px-3 py-2 text-xs text-steelGray italic opacity-75';
+            emptyNotice.innerText = 'No working subtitles available';
+            tracksList.appendChild(emptyNotice);
+            if (activeLabel) activeLabel.innerText = "None";
+            return;
+        }
+
         for (let idx = 0; idx < trackCount; idx++) {
-            const raw = rawSubtitles[idx] || {};
             const tr = textTracks[idx];
+            const raw = rawSubtitles[idx] || {};
 
             const optionName = (tr && tr.label) || raw.label || raw.language || raw.lang || `Track ${idx + 1}`;
-            const isShowing = (!isOffActive && (activeTrackIndex === idx || (tr && tr.mode === 'showing') || (preferredCaption && preferredCaption.toLowerCase() === optionName.toLowerCase())));
+            const isShowing = (!isOffActive && (activeTrackIndex === idx || (tr && tr.mode === 'showing')));
 
             const btn = document.createElement('button');
             btn.className = `caption-track-option w-full text-left px-3 py-1.5 text-xs rounded-lg transition-all duration-200 hover:bg-white/10 ${isShowing ? 'font-extrabold text-[var(--anime-accent-color,#f59e0b)] bg-white/5' : 'text-steelGray hover:text-white'}`;
@@ -1126,18 +1136,18 @@ function initPlayerControls() {
             tracksList.appendChild(btn);
         }
 
-        // Update active label display
+        // Update active label display with resolved track name
         if (activeLabel) {
-            if (isOffActive) {
+            if (trackCount === 0) {
+                activeLabel.innerText = "None";
+            } else if (isOffActive) {
                 activeLabel.innerText = "Off";
             } else if (activeTrackIndex !== -1 && textTracks[activeTrackIndex]) {
-                const tr = textTracks[activeTrackIndex];
-                const raw = rawSubtitles[activeTrackIndex];
-                activeLabel.innerText = tr.label || (raw && (raw.label || raw.language || raw.lang)) || 'On';
+                activeLabel.innerText = textTracks[activeTrackIndex].label || 'On';
             } else if (preferredCaption && preferredCaption !== 'Off') {
                 activeLabel.innerText = preferredCaption;
             } else {
-                activeLabel.innerText = textTracks.length > 0 ? 'Off' : 'None';
+                activeLabel.innerText = "Off";
             }
         }
     }
@@ -1481,13 +1491,26 @@ function setupPlayerKeyboardShortcuts() {
             const textTracks = Array.from(video.textTracks || []);
             if (textTracks.length > 0) {
                 const anyShowing = textTracks.some(t => t.mode === 'showing');
-                textTracks.forEach((tr, i) => {
-                    tr.mode = (!anyShowing && i === 0) ? 'showing' : 'disabled';
-                });
-                const label = document.getElementById('captions-active-track-label');
-                if (label) {
-                    const active = textTracks.find(t => t.mode === 'showing');
-                    label.innerText = active ? (active.label || active.language || 'On') : 'Off';
+                if (anyShowing) {
+                    textTracks.forEach(tr => { tr.mode = 'disabled'; });
+                    localStorage.setItem('preferredCaption', 'Off');
+                    const label = document.getElementById('captions-active-track-label');
+                    if (label) label.innerText = 'Off';
+                } else {
+                    const targetIdx = (typeof window.resolvePreferredTrackIndex === 'function')
+                        ? window.resolvePreferredTrackIndex(textTracks)
+                        : 0;
+                    textTracks.forEach((tr, i) => {
+                        tr.mode = (i === targetIdx) ? 'showing' : 'disabled';
+                    });
+                    const activeTr = textTracks[targetIdx] || textTracks[0];
+                    const activeName = (activeTr && activeTr.label) ? activeTr.label : 'On';
+                    localStorage.setItem('preferredCaption', activeName);
+                    const label = document.getElementById('captions-active-track-label');
+                    if (label) label.innerText = activeName;
+                }
+                if (typeof window.populateCaptionsMenu === 'function') {
+                    window.populateCaptionsMenu(window.currentSubtitles || []);
                 }
             }
         } else if (code === 'ArrowUp') {
