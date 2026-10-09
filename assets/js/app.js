@@ -2079,7 +2079,7 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
         // Synchronized Subtitle track injection BEFORE HLS segment attachment
         await loadSubtitles(data.subtitles || [], video);
         if (typeof window.populateCaptionsMenu === 'function') {
-            window.populateCaptionsMenu(data.subtitles || []);
+            window.populateCaptionsMenu(window.currentSubtitles || []);
         }
 
         const blob = new Blob([manifestText], { type: 'application/x-mpegURL' });
@@ -2239,10 +2239,104 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
     }
 };
 
+function isValidVttContent(vttText) {
+    if (!vttText || typeof vttText !== 'string') return false;
+    const trimmed = vttText.trim();
+    if (trimmed.length < 16) return false;
+    if (!trimmed.includes('-->')) return false;
+    const timingMatch = /\d{2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?\s*-->\s*\d{2}:\d{2}(?::\d{2})?(?:[.,]\d{1,3})?/.test(trimmed);
+    if (!timingMatch) return false;
+
+    const lines = trimmed.split(/\r?\n/);
+    let hasDialogue = false;
+    let inStyleOrNote = false;
+    for (const line of lines) {
+        const l = line.trim();
+        if (!l) {
+            inStyleOrNote = false;
+            continue;
+        }
+        if (l.startsWith('WEBVTT') || l.startsWith('X-TIMESTAMP-MAP') || l.startsWith('REGION')) continue;
+        if (l.startsWith('NOTE') || l.startsWith('STYLE')) {
+            inStyleOrNote = true;
+            continue;
+        }
+        if (inStyleOrNote) continue;
+        if (l.includes('-->')) continue;
+        if (l.length > 0 && !/^\d+$/.test(l)) {
+            hasDialogue = true;
+            break;
+        }
+    }
+    return hasDialogue;
+}
+window.isValidVttContent = isValidVttContent;
+
+function resolvePreferredTrackIndex(tracks) {
+    if (!tracks || tracks.length === 0) return -1;
+    const preferredCaption = localStorage.getItem('preferredCaption');
+    if (preferredCaption === 'Off') return -1;
+
+    // 1. Stored Preference Match
+    if (preferredCaption && typeof preferredCaption === 'string') {
+        const prefLower = preferredCaption.trim().toLowerCase();
+
+        // 1a. Exact match on label or language
+        for (let i = 0; i < tracks.length; i++) {
+            const track = tracks[i];
+            const label = (track.label || '').trim().toLowerCase();
+            const lang = (track.language || track.lang || track.srclang || '').trim().toLowerCase();
+            if (label === prefLower || (lang && (lang === prefLower || (prefLower.length === 2 && lang.startsWith(prefLower))))) {
+                return i;
+            }
+        }
+
+        // 1b. Case-insensitive substring match on label (e.g., 'Spanish' matches 'Spanish (Latin America)')
+        for (let i = 0; i < tracks.length; i++) {
+            const track = tracks[i];
+            const label = (track.label || '').trim().toLowerCase();
+            if (label && (label.includes(prefLower) || (prefLower.length >= 3 && prefLower.includes(label)))) {
+                return i;
+            }
+        }
+    }
+
+    // 2. Primary English Fallback (preferring full subtitles over commentary/dubtitles/signs)
+    const englishCandidates = [];
+    for (let i = 0; i < tracks.length; i++) {
+        const track = tracks[i];
+        const label = (track.label || '').trim().toLowerCase();
+        const lang = (track.language || track.lang || track.srclang || '').trim().toLowerCase();
+        if (label.includes('english') || label.includes('eng') || lang === 'en' || lang.startsWith('en-')) {
+            englishCandidates.push({ index: i, label });
+        }
+    }
+
+    if (englishCandidates.length > 0) {
+        englishCandidates.sort((a, b) => {
+            const score = (lbl) => {
+                if (lbl.includes('full subtitles') || lbl.includes('full')) return 100;
+                if (lbl === 'english' || lbl === 'eng') return 90;
+                if (lbl.includes('english') && !lbl.includes('sign') && !lbl.includes('song') && !lbl.includes('dub') && !lbl.includes('commentary')) return 80;
+                if (lbl.includes('dubtitle') || lbl.includes('dub')) return 50;
+                if (lbl.includes('sign') || lbl.includes('song')) return 20;
+                return 40;
+            };
+            return score(b.label) - score(a.label);
+        });
+        return englishCandidates[0].index;
+    }
+
+    // 3. Ultimate Fallback: First available validated track
+    return 0;
+}
+window.resolvePreferredTrackIndex = resolvePreferredTrackIndex;
+
 async function loadSubtitles(trackList, targetVideo) {
     const videoEl = targetVideo || document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
     if (!videoEl) return;
 
+    // 1. Clean up existing track elements and revoke Object URLs
     const existingTracks = videoEl.querySelectorAll('track');
     existingTracks.forEach(t => {
         if (t.src && t.src.startsWith('blob:')) {
@@ -2251,9 +2345,18 @@ async function loadSubtitles(trackList, targetVideo) {
         t.remove();
     });
 
-    window.currentSubtitles = trackList || [];
-
-    if (!trackList || !Array.isArray(trackList) || trackList.length === 0) return;
+    if (!trackList || !Array.isArray(trackList) || trackList.length === 0) {
+        window.currentSubtitles = [];
+        if (window.currentStreamData) {
+            window.currentStreamData.subtitles = [];
+        }
+        const activeLabel = document.getElementById('captions-active-track-label');
+        if (activeLabel) activeLabel.innerText = "None";
+        if (typeof window.populateCaptionsMenu === 'function') {
+            window.populateCaptionsMenu([]);
+        }
+        return;
+    }
 
     let activeUrl = window.location.origin;
     if (typeof decodeRegistryUrl === 'function' && typeof NODE_REGISTRY !== 'undefined' && Array.isArray(NODE_REGISTRY) && NODE_REGISTRY[0]) {
@@ -2262,71 +2365,110 @@ async function loadSubtitles(trackList, targetVideo) {
         activeUrl = NODE_REGISTRY[0];
     }
 
-    const preferredCaption = localStorage.getItem('preferredCaption') || '';
-
-    for (let track of trackList) {
+    // 2. Parallel Pre-flight Track Validation (discard dead, 404, or zero-cue tracks)
+    const validateCandidateTrack = async (track) => {
+        if (!track) return null;
         const subUrl = track.file || track.url || track.rawFile || track.src;
-        if (!subUrl && !track.content) continue;
+        if (!subUrl && !track.content) return null;
 
         const subLabel = track.label || track.language || track.lang || 'English';
+        const subLang = track.language || track.lang || (subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en');
         const subKind = track.kind || 'captions';
-        const isDefault = Boolean(preferredCaption ? (preferredCaption !== 'Off' && subLabel.toLowerCase() === preferredCaption.toLowerCase()) : (track.default || subLabel.toLowerCase() === 'english'));
 
-        try {
-            let vttText;
-            if (track.content) {
+        let vttText = null;
+
+        if (track.content && typeof track.content === 'string') {
+            if (isValidVttContent(track.content)) {
                 vttText = track.content;
-            } else {
-                const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error("Sandbox load error");
-                vttText = await response.text();
-            }
-
-            // Standard same-origin Blob Object URL rather than base64 Data URI
-            // Prevents Chrome/WebKit MSE isolation blocking cues on attached media
-            const blob = new Blob([vttText], { type: 'text/vtt' });
-            const blobUrl = URL.createObjectURL(blob);
-
-            const trackEl = document.createElement('track');
-            trackEl.kind = subKind;
-            trackEl.label = subLabel;
-            trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
-            trackEl.src = blobUrl;
-
-            if (isDefault) {
-                trackEl.default = true;
-            }
-            trackEl.addEventListener('load', () => {
-                if (isDefault) {
-                    try { trackEl.track.mode = 'showing'; } catch (_) {}
-                }
-            });
-
-            videoEl.appendChild(trackEl);
-        } catch (err) {
-            console.warn(`[Subtitles Fallback] CORS track fetch failure for "${subLabel}". Loading via proxy directly.`);
-            if (subUrl) {
-                const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
-                const trackEl = document.createElement('track');
-                trackEl.kind = subKind;
-                trackEl.label = subLabel;
-                trackEl.srclang = subLabel ? subLabel.toLowerCase().slice(0, 2) : 'en';
-                trackEl.src = proxyUrl;
-                if (isDefault) {
-                    trackEl.default = true;
-                }
-                trackEl.addEventListener('load', () => {
-                    if (isDefault) {
-                        try { trackEl.track.mode = 'showing'; } catch (_) {}
-                    }
-                });
-                videoEl.appendChild(trackEl);
             }
         }
+
+        if (!vttText && subUrl) {
+            const proxyUrl = `${activeUrl}/?src=${encodeURIComponent(subUrl)}&action=proxy_caption&vtt_url=${encodeURIComponent(subUrl)}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
+            try {
+                const res = await fetch(proxyUrl, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (res.ok) {
+                    const text = await res.text();
+                    if (isValidVttContent(text)) {
+                        vttText = text;
+                    } else {
+                        console.warn(`[Subtitles Validation] Discarded empty/zero-cue track: "${subLabel}" (${subUrl})`);
+                    }
+                } else {
+                    console.warn(`[Subtitles Validation] HTTP ${res.status} for track "${subLabel}"`);
+                }
+            } catch (err) {
+                clearTimeout(timeoutId);
+                console.warn(`[Subtitles Validation] Error validating track "${subLabel}":`, err?.message || err);
+            }
+        }
+
+        if (!vttText) return null;
+
+        return {
+            ...track,
+            label: subLabel,
+            language: subLang,
+            kind: subKind,
+            content: vttText,
+            url: subUrl
+        };
+    };
+
+    const validationResults = await Promise.allSettled(trackList.map(t => validateCandidateTrack(t)));
+    const validatedTracks = validationResults
+        .filter(r => r.status === 'fulfilled' && r.value !== null)
+        .map(r => r.value);
+
+    window.currentSubtitles = validatedTracks;
+    if (window.currentStreamData) {
+        window.currentStreamData.subtitles = validatedTracks;
     }
 
+    if (validatedTracks.length === 0) {
+        console.warn('[Subtitles] No valid working subtitle tracks found.');
+        const activeLabel = document.getElementById('captions-active-track-label');
+        if (activeLabel) activeLabel.innerText = "None";
+        if (typeof window.populateCaptionsMenu === 'function') {
+            window.populateCaptionsMenu([]);
+        }
+        return;
+    }
+
+    // 3. Cross-Episode Preference & Fallback Resolution
+    const targetIndex = resolvePreferredTrackIndex(validatedTracks);
+
+    // 4. Safe Blob URL Track Injection & Native Mode Enforcement
+    validatedTracks.forEach((track, idx) => {
+        const blob = new Blob([track.content], { type: 'text/vtt' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        const trackEl = document.createElement('track');
+        trackEl.kind = track.kind || 'captions';
+        trackEl.label = track.label;
+        trackEl.srclang = track.language || 'en';
+        trackEl.src = blobUrl;
+
+        if (idx === targetIndex) {
+            trackEl.default = true;
+        }
+
+        trackEl.addEventListener('load', () => {
+            if (idx === targetIndex) {
+                try { trackEl.track.mode = 'showing'; } catch (_) {}
+            }
+        });
+
+        videoEl.appendChild(trackEl);
+    });
+
     enableDefaultTextTrack(videoEl);
+    if (typeof window.populateCaptionsMenu === 'function') {
+        window.populateCaptionsMenu(validatedTracks);
+    }
 }
 window.loadSubtitles = loadSubtitles;
 
@@ -2335,8 +2477,8 @@ function enableDefaultTextTrack(videoEl) {
 
     const applyMode = () => {
         if (!videoEl) return;
-        const textTracks = videoEl.textTracks;
-        if (!textTracks || textTracks.length === 0) return;
+        const textTracks = Array.from(videoEl.textTracks || []);
+        if (textTracks.length === 0) return;
 
         const preferredCaption = localStorage.getItem('preferredCaption');
         if (preferredCaption === 'Off') {
@@ -2346,40 +2488,16 @@ function enableDefaultTextTrack(videoEl) {
             const activeLabel = document.getElementById('captions-active-track-label');
             if (activeLabel) activeLabel.innerText = "Off";
             if (typeof window.populateCaptionsMenu === 'function') {
-                window.populateCaptionsMenu();
+                window.populateCaptionsMenu(window.currentSubtitles || []);
             }
             return;
         }
 
-        let defaultIndex = -1;
-        if (preferredCaption) {
-            for (let i = 0; i < textTracks.length; i++) {
-                const track = textTracks[i];
-                if ((track.label && track.label.toLowerCase() === preferredCaption.toLowerCase()) ||
-                    (track.language && track.language.toLowerCase() === preferredCaption.toLowerCase())) {
-                    defaultIndex = i;
-                    break;
-                }
-            }
-        }
-
-        if (defaultIndex === -1 && preferredCaption !== 'Off') {
-            for (let i = 0; i < textTracks.length; i++) {
-                const track = textTracks[i];
-                const lbl = (track.label || track.language || '').toLowerCase();
-                if (lbl === 'english' || lbl.includes('full subtitles') || lbl.includes('eng')) {
-                    defaultIndex = i;
-                    break;
-                }
-            }
-            if (defaultIndex === -1 && textTracks.length > 0) {
-                defaultIndex = 0;
-            }
-        }
+        const targetIndex = resolvePreferredTrackIndex(textTracks);
 
         for (let i = 0; i < textTracks.length; i++) {
             try {
-                if (i === defaultIndex) {
+                if (i === targetIndex) {
                     textTracks[i].mode = 'showing';
                 } else {
                     textTracks[i].mode = 'disabled';
@@ -2389,11 +2507,15 @@ function enableDefaultTextTrack(videoEl) {
 
         const activeLabel = document.getElementById('captions-active-track-label');
         if (activeLabel) {
-            activeLabel.innerText = defaultIndex !== -1 ? (textTracks[defaultIndex].label || 'On') : 'Off';
+            if (targetIndex !== -1 && textTracks[targetIndex]) {
+                activeLabel.innerText = textTracks[targetIndex].label || 'On';
+            } else {
+                activeLabel.innerText = 'Off';
+            }
         }
 
         if (typeof window.populateCaptionsMenu === 'function') {
-            window.populateCaptionsMenu();
+            window.populateCaptionsMenu(window.currentSubtitles || []);
         }
     };
 
