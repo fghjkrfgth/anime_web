@@ -105,8 +105,8 @@ window.updateAllRenderedTitles = updateAllRenderedTitles;
 function updateLanguageSelectionUI() {
     const currentPref = localStorage.getItem('userLanguagePref') || 'en';
     const langCodeEl = document.getElementById('current-lang-code');
-    const langInfo = (typeof LANGUAGE_MAP !== 'undefined' && LANGUAGE_MAP[currentPref]) 
-        ? LANGUAGE_MAP[currentPref] 
+    const langInfo = (typeof LANGUAGE_MAP !== 'undefined' && LANGUAGE_MAP[currentPref])
+        ? LANGUAGE_MAP[currentPref]
         : (typeof window.LANGUAGE_MAP !== 'undefined' && window.LANGUAGE_MAP[currentPref] ? window.LANGUAGE_MAP[currentPref] : null);
     if (langCodeEl) {
         langCodeEl.innerText = langInfo ? langInfo.label : (currentPref === 'ja' ? '日' : (currentPref === 'zh-Hans' ? '简' : currentPref.toUpperCase().slice(0, 2)));
@@ -429,7 +429,7 @@ function updateScheduleUI() {
                     </button>
                 </div>
                 <span class="text-[11px] font-mono text-slate-400 hidden md:inline">
-                    ${currentGroup?.is_today ? '🔥 Airing Today' : (activeScheduleDayIndex < 7 ? '🗓️ Week 1' : '⚡ Week 2')}
+                    ${currentGroup?.is_today ? ' Airing Today' : (activeScheduleDayIndex < 7 ? ' Week 1' : ' Week 2')}
                 </span>
             </div>
         </div>
@@ -439,15 +439,39 @@ function updateScheduleUI() {
     if (shows.length === 0) {
         gridHtml += `<div class="col-span-full text-center py-12 text-slate-400 text-xs italic bg-white/[0.02] border border-white/5 rounded-2xl">No scheduled broadcasts for this day</div>`;
     } else {
-        shows.forEach(show => {
+        const now = Math.floor(Date.now() / 1000);
+        const sortedShows = [...shows].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+        sortedShows.forEach(show => {
             const displayTime = show.time || (show.timestamp ? formatLocalTime(show.timestamp) : '');
             const encodedTitle = encodeURIComponent(show.title).replace(/'/g, '%27');
             const safeSlug = (show.slug || '').replace(/'/g, "\\'");
             const epNum = show.episode || 1;
             const showId = show.id || show.anilistId || 'null';
 
+            const isDelayed = Boolean(show.is_delayed);
+            const isAired = !isDelayed && (show.timestamp && show.timestamp < now);
+            const isDub = Boolean(show.is_dub || show.audio_type === 'DUB');
+
+            let cardStateClasses = '';
+            let statusTagHtml = '';
+
+            if (isDelayed) {
+                cardStateClasses = 'opacity-85 hover:opacity-100 bg-amber-950/20 border-amber-500/30 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]';
+                statusTagHtml = `<span class="text-[9px] font-extrabold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 sm:px-2 py-0.5 rounded-md font-mono tracking-wider shadow-[0_0_8px_rgba(245,158,11,0.25)] whitespace-nowrap animate-pulse">⚠️ DELAYED</span>`;
+            } else if (isAired) {
+                cardStateClasses = 'opacity-60 hover:opacity-100 bg-black/50 border-white/5 hover:border-white/20';
+                statusTagHtml = `<span class="text-[9px] font-mono font-medium text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 px-1.5 sm:px-2 py-0.5 rounded-md whitespace-nowrap">✓ AIRED</span>`;
+            } else {
+                cardStateClasses = 'bg-white/[0.03] hover:bg-white/[0.06] border-white/10 hover:border-[#e50914]/50 shadow-sm hover:shadow-[0_8px_25px_rgba(0,0,0,0.5)]';
+            }
+
+            const audioBadgeHtml = isDub
+                ? `<span class="text-[9px] font-extrabold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 sm:px-2 py-0.5 rounded-md font-mono tracking-wider shadow-[0_0_8px_rgba(245,158,11,0.2)] whitespace-nowrap">🎙️ DUB</span>`
+                : `<span class="text-[9px] font-extrabold text-cyan-300 bg-cyan-500/15 border border-cyan-500/25 px-1.5 sm:px-2 py-0.5 rounded-md font-mono tracking-wider shadow-[0_0_8px_rgba(6,182,212,0.15)] whitespace-nowrap">💬 SUB</span>`;
+
             gridHtml += `
-                <div class="flex items-center justify-between p-3.5 bg-white/[0.03] hover:bg-white/[0.06] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#e50914]/50 transition-all duration-300 cursor-pointer group active:scale-[0.98] shadow-sm hover:shadow-[0_8px_25px_rgba(0,0,0,0.5)]" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
+                <div class="flex items-center justify-between p-3.5 backdrop-blur-xl rounded-2xl border transition-all duration-300 cursor-pointer group active:scale-[0.98] ${cardStateClasses}" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
                         <span class="text-[11px] font-mono font-extrabold text-white whitespace-nowrap bg-black/40 px-2.5 py-1 rounded-xl border border-white/15 shadow-inner">
                             ${displayTime}
@@ -456,9 +480,13 @@ function updateScheduleUI() {
                             ${show.title}
                         </h4>
                     </div>
-                    <span class="text-[10px] font-extrabold text-white bg-gradient-to-r from-[#e50914] to-[#b80710] px-2.5 py-1 rounded-full whitespace-nowrap shadow-[0_0_10px_rgba(229,9,20,0.3)] font-mono border border-white/15">
-                        EP ${show.episode || '1'}
-                    </span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        ${statusTagHtml}
+                        ${audioBadgeHtml}
+                        <span class="text-[10px] font-extrabold text-white bg-gradient-to-r from-[#e50914] to-[#b80710] px-2.5 py-1 rounded-full whitespace-nowrap shadow-[0_0_10px_rgba(229,9,20,0.3)] font-mono border border-white/15">
+                            EP ${show.episode || '1'}
+                        </span>
+                    </div>
                 </div>
             `;
         });
@@ -507,7 +535,7 @@ async function openBroadcastEpisode(showTitle, slug, epNum, showId) {
                 validId = res.data.Media.id;
                 try {
                     localStorage.setItem('activeShowData', JSON.stringify(res.data.Media));
-                } catch (e) {}
+                } catch (e) { }
             }
         } catch (e) {
             console.warn('[Broadcast Router] AniList search resolution error:', e);
@@ -857,7 +885,7 @@ class CoverflowCarousel {
             const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || show.bannerImage || '';
             const epCount = show.episodes ? `${show.episodes} Episodes` : (show.status === 'RELEASING' ? 'Ongoing' : 'Completed');
             const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
-            
+
             // Dynamic aesthetic progress line for realism
             const progressSeed = ((idx * 31) % 60) + 25;
 
@@ -1110,7 +1138,7 @@ class CoverflowCarousel {
                     const show = JSON.parse(rawData);
                     watchShow(show);
                     return;
-                } catch (err) {}
+                } catch (err) { }
             }
 
             if (slot !== '0') {
@@ -1120,7 +1148,7 @@ class CoverflowCarousel {
                 try {
                     const show = JSON.parse(rawData);
                     watchShow(show);
-                } catch (err) {}
+                } catch (err) { }
             }
         });
     }
@@ -1402,14 +1430,14 @@ window.renderDedicatedContinueWatchingView = function () {
 // -------------------------------------------------------------------------
 window.activeProfileTab = 'watched';
 
-window.toggleProfileEditDrawer = function() {
+window.toggleProfileEditDrawer = function () {
     const drawer = document.getElementById('profile-edit-drawer');
     if (drawer) {
         drawer.classList.toggle('hidden');
     }
 };
 
-window.switchProfileTab = function(tabName) {
+window.switchProfileTab = function (tabName) {
     window.activeProfileTab = tabName;
     if (typeof window.refreshProfileTab === 'function') {
         window.refreshProfileTab();
@@ -1418,7 +1446,7 @@ window.switchProfileTab = function(tabName) {
     }
 };
 
-window.refreshProfileTab = function() {
+window.refreshProfileTab = function () {
     const layout = document.getElementById('profile-page-layout');
     if (!layout || layout.classList.contains('hidden')) return;
 
@@ -1504,15 +1532,15 @@ function renderActiveTabContent(activeTab, data) {
         return `
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 w-full">
                 ${watchedList.map(item => {
-                    const show = item.show || item;
-                    const title = typeof getShowTitle === 'function' ? getShowTitle(show) : (show.title?.english || show.title?.romaji || show.title?.userPreferred || 'Anime');
-                    const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || '';
-                    const bannerUrl = show.banner || show.bannerImage || coverUrl;
-                    const epNum = item.lastEpNum || item.epNum || 1;
-                    const percent = Math.min(100, Math.max(0, item.percentage || 0));
-                    const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
+            const show = item.show || item;
+            const title = typeof getShowTitle === 'function' ? getShowTitle(show) : (show.title?.english || show.title?.romaji || show.title?.userPreferred || 'Anime');
+            const coverUrl = (show.coverImage && (show.coverImage.large || show.coverImage.extraLarge)) || '';
+            const bannerUrl = show.banner || show.bannerImage || coverUrl;
+            const epNum = item.lastEpNum || item.epNum || 1;
+            const percent = Math.min(100, Math.max(0, item.percentage || 0));
+            const stringifiedShow = JSON.stringify(show).replace(/"/g, '&quot;');
 
-                    return `
+            return `
                         <div class="continue-card-landscape aspect-video rounded-2xl overflow-hidden relative cursor-pointer group bg-[#12131a] border border-white/[0.06] shadow-xl hover:scale-[1.02] hover:border-[#e50914]/40 transition-all duration-300 select-none" onclick="watchShowProgress(${stringifiedShow}, ${epNum})" data-continue-show="${stringifiedShow}">
                             <img src="${bannerUrl}" alt="${title}" loading="lazy" decoding="async" class="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
                             <div class="absolute inset-0 bg-gradient-to-t from-[#0a0b0f] via-[#0a0b0f]/60 to-transparent"></div>
@@ -1544,7 +1572,7 @@ function renderActiveTabContent(activeTab, data) {
                             </div>
                         </div>
                     `;
-                }).join('')}
+        }).join('')}
             </div>
         `;
     }
@@ -1567,13 +1595,13 @@ function renderActiveTabContent(activeTab, data) {
         return `
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5 w-full">
                 ${likedList.map(item => {
-                    const title = typeof getShowTitle === 'function' ? getShowTitle(item) : (item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Anime');
-                    const coverUrl = (item.coverImage && (item.coverImage.large || item.coverImage.extraLarge)) || '';
-                    const format = item.format ? item.format.replace('_', ' ') : 'TV';
-                    const rating = item.rating || item.meanScore ? `${item.rating || item.meanScore}%` : 'N/A';
-                    const stringifiedItem = JSON.stringify(item).replace(/"/g, '&quot;');
+            const title = typeof getShowTitle === 'function' ? getShowTitle(item) : (item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Anime');
+            const coverUrl = (item.coverImage && (item.coverImage.large || item.coverImage.extraLarge)) || '';
+            const format = item.format ? item.format.replace('_', ' ') : 'TV';
+            const rating = item.rating || item.meanScore ? `${item.rating || item.meanScore}%` : 'N/A';
+            const stringifiedItem = JSON.stringify(item).replace(/"/g, '&quot;');
 
-                    return `
+            return `
                         <div class="glass-panel group rounded-2xl overflow-hidden border border-white/[0.06] hover:border-[#e50914]/40 transition-all duration-300 flex flex-col relative shadow-xl hover:scale-[1.02]">
                             <div class="relative aspect-[2/3] w-full overflow-hidden bg-black/60 cursor-pointer" onclick="watchShow(${stringifiedItem})">
                                 <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
@@ -1601,7 +1629,7 @@ function renderActiveTabContent(activeTab, data) {
                             </div>
                         </div>
                     `;
-                }).join('')}
+        }).join('')}
             </div>
         `;
     }
@@ -1624,12 +1652,12 @@ function renderActiveTabContent(activeTab, data) {
         return `
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-5 w-full">
                 ${watchLaterList.map(item => {
-                    const title = typeof getShowTitle === 'function' ? getShowTitle(item) : (item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Anime');
-                    const coverUrl = (item.coverImage && (item.coverImage.large || item.coverImage.extraLarge)) || '';
-                    const format = item.format ? item.format.replace('_', ' ') : 'TV';
-                    const stringifiedItem = JSON.stringify(item).replace(/"/g, '&quot;');
+            const title = typeof getShowTitle === 'function' ? getShowTitle(item) : (item.title?.english || item.title?.romaji || item.title?.userPreferred || 'Anime');
+            const coverUrl = (item.coverImage && (item.coverImage.large || item.coverImage.extraLarge)) || '';
+            const format = item.format ? item.format.replace('_', ' ') : 'TV';
+            const stringifiedItem = JSON.stringify(item).replace(/"/g, '&quot;');
 
-                    return `
+            return `
                         <div class="glass-panel group rounded-2xl overflow-hidden border border-white/[0.06] hover:border-amber-500/40 transition-all duration-300 flex flex-col relative shadow-xl hover:scale-[1.02]">
                             <div class="relative aspect-[2/3] w-full overflow-hidden bg-black/60 cursor-pointer" onclick="watchShow(${stringifiedItem})">
                                 <img src="${coverUrl}" alt="${title}" loading="lazy" decoding="async" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
@@ -1657,7 +1685,7 @@ function renderActiveTabContent(activeTab, data) {
                             </div>
                         </div>
                     `;
-                }).join('')}
+        }).join('')}
             </div>
         `;
     }
@@ -1714,7 +1742,7 @@ window.renderDedicatedProfileView = async function () {
     try {
         const stored = localStorage.getItem('user_profile_data');
         if (stored) customProfile = JSON.parse(stored);
-    } catch (e) {}
+    } catch (e) { }
 
     const username = customProfile.username || user.username || uVault.profile?.username || (user.email ? user.email.split('@')[0] : 'Member');
     const avatarUrl = customProfile.avatar || user.avatar || user.avatarUrl || user.avatar_url || uVault.profile?.avatar || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + encodeURIComponent(username);
@@ -1794,7 +1822,7 @@ window.renderDedicatedProfileView = async function () {
                         <span class="text-[11px] text-zinc-400 font-semibold">Choose Preset Avatar:</span>
                         <div class="flex items-center gap-3 flex-wrap">
                             ${PRESET_AVATARS.map((pUrl, idx) => `
-                                <img src="${pUrl}" alt="Preset ${idx+1}" onclick="document.getElementById('profile-edit-avatar').value = '${pUrl}'; document.getElementById('profile-banner-avatar').src = '${pUrl}';" class="w-10 h-10 rounded-xl bg-black/60 border border-white/10 hover:border-[#e50914] cursor-pointer hover:scale-110 transition-all object-cover">
+                                <img src="${pUrl}" alt="Preset ${idx + 1}" onclick="document.getElementById('profile-edit-avatar').value = '${pUrl}'; document.getElementById('profile-banner-avatar').src = '${pUrl}';" class="w-10 h-10 rounded-xl bg-black/60 border border-white/10 hover:border-[#e50914] cursor-pointer hover:scale-110 transition-all object-cover">
                             `).join('')}
                         </div>
                     </div>
@@ -2439,15 +2467,39 @@ window.renderDedicatedScheduleView = async function () {
     if (shows.length === 0) {
         showsListHtml += `<div class="col-span-full text-center py-12 text-slate-400 text-sm italic bg-white/[0.02] border border-white/5 rounded-2xl">No scheduled broadcasts for this day</div>`;
     } else {
-        shows.forEach(show => {
+        const now = Math.floor(Date.now() / 1000);
+        const sortedShows = [...shows].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+        sortedShows.forEach(show => {
             const displayTime = show.time || (show.timestamp ? formatLocalTime(show.timestamp) : '');
             const encodedTitle = encodeURIComponent(show.title).replace(/'/g, '%27');
             const safeSlug = (show.slug || '').replace(/'/g, "\\'");
             const epNum = show.episode || 1;
             const showId = show.id || show.anilistId || 'null';
 
+            const isDelayed = Boolean(show.is_delayed);
+            const isAired = !isDelayed && (show.timestamp && show.timestamp < now);
+            const isDub = Boolean(show.is_dub || show.audio_type === 'DUB');
+
+            let cardStateClasses = '';
+            let statusTagHtml = '';
+
+            if (isDelayed) {
+                cardStateClasses = 'opacity-85 hover:opacity-100 bg-amber-950/20 border-amber-500/30 hover:border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]';
+                statusTagHtml = `<span class="text-[9px] font-extrabold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-1.5 sm:px-2 py-0.5 rounded-md font-mono tracking-wider shadow-[0_0_8px_rgba(245,158,11,0.25)] whitespace-nowrap animate-pulse">⚠️ DELAYED</span>`;
+            } else if (isAired) {
+                cardStateClasses = 'opacity-60 hover:opacity-100 bg-black/50 border-white/5 hover:border-white/20';
+                statusTagHtml = `<span class="text-[9px] font-mono font-medium text-emerald-400/90 bg-emerald-500/10 border border-emerald-500/20 px-1.5 sm:px-2 py-0.5 rounded-md whitespace-nowrap">✓ AIRED</span>`;
+            } else {
+                cardStateClasses = 'bg-white/[0.03] hover:bg-white/[0.06] border-white/10 hover:border-[#00f5ff]/40 shadow-sm hover:shadow-[0_8px_25px_rgba(0,0,0,0.5)]';
+            }
+
+            const audioBadgeHtml = isDub
+                ? `<span class="text-[9px] font-extrabold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 sm:px-2 py-0.5 rounded-md font-mono tracking-wider shadow-[0_0_8px_rgba(245,158,11,0.2)] whitespace-nowrap">🎙️ DUB</span>`
+                : `<span class="text-[9px] font-extrabold text-cyan-300 bg-cyan-500/15 border border-cyan-500/25 px-1.5 sm:px-2 py-0.5 rounded-md font-mono tracking-wider shadow-[0_0_8px_rgba(6,182,212,0.15)] whitespace-nowrap">💬 SUB</span>`;
+
             showsListHtml += `
-                <div class="flex items-center justify-between p-4 bg-white/[0.03] hover:bg-white/[0.06] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#00f5ff]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px] shadow-sm hover:shadow-[0_8px_25px_rgba(0,0,0,0.5)]" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
+                <div class="flex items-center justify-between p-4 backdrop-blur-xl rounded-2xl border transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px] ${cardStateClasses}" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
                         <span class="text-xs font-extrabold text-[#00f5ff] whitespace-nowrap bg-[#00f5ff]/10 px-3 py-1.5 rounded-xl border border-[#00f5ff]/25 shadow-[0_0_10px_rgba(0,245,255,0.15)] font-mono">
                             ${displayTime}
@@ -2456,9 +2508,13 @@ window.renderDedicatedScheduleView = async function () {
                             ${show.title}
                         </h4>
                     </div>
-                    <span class="text-[10px] font-extrabold text-white bg-[#00f5ff]/80 text-[#08080c] px-3 py-1 rounded-full whitespace-nowrap shadow-[0_0_10px_rgba(0,245,255,0.3)] font-mono">
-                        EP ${show.episode}
-                    </span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        ${statusTagHtml}
+                        ${audioBadgeHtml}
+                        <span class="text-[10px] font-extrabold text-[#08080c] bg-[#00f5ff]/90 px-3 py-1 rounded-full whitespace-nowrap shadow-[0_0_10px_rgba(0,245,255,0.3)] font-mono">
+                            EP ${show.episode || '1'}
+                        </span>
+                    </div>
                 </div>
             `;
         });
