@@ -102,6 +102,9 @@ async function fetchClusterNode(syncParams = {}, bodyPayload = null) {
     } else if (syncParams.action === 'schedule' || syncParams.route === 'schedule') {
         routePath = "/schedule";
         if (syncParams.action) cleanedParams.action = syncParams.action;
+        cleanedParams.tz = syncParams.tz || (typeof Intl !== 'undefined' && Intl.DateTimeFormat ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Calcutta') || 'Asia/Calcutta';
+        if (syncParams.week !== undefined && syncParams.week !== null) cleanedParams.week = String(syncParams.week);
+        cleanedParams.days = '14';
     } else {
         routePath = "/rating";
         cleanedParams.id = syncParams.id || syncParams.anilist_id || syncParams.anilistId || "";
