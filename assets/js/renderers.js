@@ -344,6 +344,16 @@ function renderAiringSchedule(dayGroups) {
     if (!dayGroups || dayGroups.length === 0) return;
     window.airingScheduleData = dayGroups;
 
+    // Automatically locate "Today" index on initial load
+    let todayIdx = dayGroups.findIndex(g => g.is_today === true);
+    if (todayIdx === -1) {
+        const localNow = new Date();
+        const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const localTag = `${shortMonths[localNow.getMonth()]} ${String(localNow.getDate()).padStart(2, '0')}`;
+        todayIdx = dayGroups.findIndex(g => g.date === localTag);
+    }
+    activeScheduleDayIndex = (todayIdx !== -1) ? todayIdx : 0;
+
     const columnsContainer = document.getElementById('airing-broadcast-columns');
     if (!columnsContainer) return;
 
@@ -357,22 +367,41 @@ function updateScheduleUI() {
 
     const dayGroups = window.airingScheduleData;
 
-    let dockHtml = `<div class="flex items-center gap-2 overflow-x-auto pb-3 w-full scrollbar-none snap-x snap-mandatory touch-pan-x">`;
+    let dockHtml = `<div class="flex items-center gap-2 overflow-x-auto pb-3 w-full scrollbar-none snap-x snap-mandatory touch-pan-x" id="airing-schedule-dock">`;
     dayGroups.forEach((group, index) => {
-        const dayName = group.day;
+        // Visual separation badge between Week 1 (Days 0-6) and Week 2 (Days 7-13)
+        if (index === 7) {
+            dockHtml += `
+                <div class="flex items-center gap-2 px-1 shrink-0">
+                    <div class="h-8 w-px bg-white/15"></div>
+                    <span class="px-2.5 py-1 rounded-xl bg-white/[0.05] border border-white/10 text-[10px] uppercase font-mono tracking-widest text-[#00f5ff] flex items-center gap-1.5 shadow-sm">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#00f5ff] shadow-[0_0_8px_#00f5ff]"></span>
+                        Next Week
+                    </span>
+                    <div class="h-8 w-px bg-white/15"></div>
+                </div>
+            `;
+        }
+
+        const dayName = group.day || '';
+        const dateTag = group.date || '';
         const isSelected = index === activeScheduleDayIndex;
-        const isToday = index === 0;
+        const isToday = group.is_today === true;
         const shortDay = dayName.length > 3 ? dayName.substring(0, 3) : dayName;
 
-        const displayLabel = isToday ? `Today (${shortDay})` : dayName;
+        let displayTop = isToday ? '🔥 Today' : shortDay;
+        let displayBottom = dateTag;
 
         const activeClass = isSelected
-            ? 'bg-[#d4af37]/20 border-[#d4af37]/60 text-[#d4af37] shadow-[0_0_15px_rgba(212,175,55,0.3)] font-bold'
-            : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white font-medium';
+            ? 'bg-gradient-to-r from-[#e50914] to-[#b80710] border-transparent text-white shadow-[0_0_20px_rgba(229,9,20,0.45)] font-bold scale-[1.02]'
+            : (isToday
+                ? 'bg-[#e50914]/10 border-[#e50914]/40 text-white hover:bg-[#e50914]/20 font-semibold'
+                : 'bg-white/[0.03] border-white/10 text-slate-300 hover:text-white hover:bg-white/[0.07] font-medium');
 
         dockHtml += `
-            <button onclick="selectScheduleDay(${index})" class="px-4 py-2 text-xs tracking-wider uppercase rounded-xl border transition-all duration-300 ${activeClass} whitespace-nowrap snap-start shrink-0">
-                ${displayLabel}
+            <button id="schedule-tab-${index}" onclick="selectScheduleDay(${index})" class="flex flex-col items-center justify-center px-4 py-2 text-xs tracking-wider uppercase rounded-2xl border transition-all duration-300 ${activeClass} whitespace-nowrap snap-start shrink-0 min-w-[76px] cursor-pointer group">
+                <span class="text-[11px] font-extrabold ${isSelected ? 'text-white' : (isToday ? 'text-[#ff4d5a]' : 'text-slate-300 group-hover:text-white')}">${displayTop}</span>
+                <span class="text-[10px] font-mono tracking-normal opacity-90 mt-0.5 ${isSelected ? 'text-white/90' : 'text-slate-400 group-hover:text-slate-200'}">${displayBottom}</span>
             </button>
         `;
     });
@@ -380,30 +409,55 @@ function updateScheduleUI() {
 
     const currentGroup = dayGroups[activeScheduleDayIndex];
     const shows = currentGroup ? currentGroup.shows || [] : [];
+    const fullDateUpper = currentGroup ? (currentGroup.full_date || `${currentGroup.day}, ${currentGroup.date}`).toUpperCase() : '';
 
-    let gridHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 mt-4 w-full">`;
+    let headerHtml = `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-5 mb-3 px-1">
+            <div class="flex items-center gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full ${currentGroup?.is_today ? 'bg-[#00f5ff] shadow-[0_0_10px_#00f5ff]' : 'bg-[#e50914] shadow-[0_0_10px_#e50914]'}"></span>
+                <h3 class="text-xs sm:text-sm font-extrabold tracking-wider uppercase text-white font-mono">
+                    BROADCAST SCHEDULE — ${fullDateUpper} (${shows.length} ${shows.length === 1 ? 'SHOW' : 'SHOWS'} AIRING)
+                </h3>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="flex items-center bg-white/[0.04] border border-white/10 rounded-xl p-0.5">
+                    <button onclick="jumpToScheduleWeek(0)" class="px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer ${activeScheduleDayIndex < 7 ? 'bg-[#e50914] text-white font-bold shadow-[0_0_10px_rgba(229,9,20,0.4)]' : 'text-slate-400 hover:text-white'}">
+                        This Week
+                    </button>
+                    <button onclick="jumpToScheduleWeek(1)" class="px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer ${activeScheduleDayIndex >= 7 ? 'bg-[#00f5ff]/25 text-[#00f5ff] font-bold border border-[#00f5ff]/40 shadow-[0_0_10px_rgba(0,245,255,0.25)]' : 'text-slate-400 hover:text-white'}">
+                        Next Week
+                    </button>
+                </div>
+                <span class="text-[11px] font-mono text-slate-400 hidden md:inline">
+                    ${currentGroup?.is_today ? '🔥 Airing Today' : (activeScheduleDayIndex < 7 ? '🗓️ Week 1' : '⚡ Week 2')}
+                </span>
+            </div>
+        </div>
+    `;
+
+    let gridHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 w-full">`;
     if (shows.length === 0) {
-        gridHtml += `<div class="col-span-full text-center py-10 text-slate-400 text-xs italic">No scheduled broadcasts for this day</div>`;
+        gridHtml += `<div class="col-span-full text-center py-12 text-slate-400 text-xs italic bg-white/[0.02] border border-white/5 rounded-2xl">No scheduled broadcasts for this day</div>`;
     } else {
         shows.forEach(show => {
-            const localTime = formatLocalTime(show.timestamp);
+            const displayTime = show.time || (show.timestamp ? formatLocalTime(show.timestamp) : '');
             const encodedTitle = encodeURIComponent(show.title).replace(/'/g, '%27');
             const safeSlug = (show.slug || '').replace(/'/g, "\\'");
             const epNum = show.episode || 1;
             const showId = show.id || show.anilistId || 'null';
 
             gridHtml += `
-                <div class="flex items-center justify-between p-3.5 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#d4af37]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98]" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
+                <div class="flex items-center justify-between p-3.5 bg-white/[0.03] hover:bg-white/[0.06] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#e50914]/50 transition-all duration-300 cursor-pointer group active:scale-[0.98] shadow-sm hover:shadow-[0_8px_25px_rgba(0,0,0,0.5)]" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
-                        <span class="text-[11px] font-extrabold text-[#d4af37] whitespace-nowrap bg-[#d4af37]/15 px-2.5 py-1 rounded-lg border border-[#d4af37]/30 shadow-[0_0_8px_rgba(212,175,55,0.15)]">
-                            ${localTime}
+                        <span class="text-[11px] font-mono font-extrabold text-white whitespace-nowrap bg-black/40 px-2.5 py-1 rounded-xl border border-white/15 shadow-inner">
+                            ${displayTime}
                         </span>
-                        <h4 class="text-white text-xs md:text-sm font-bold truncate group-hover:text-[#d4af37] transition-colors" title="${show.title}">
+                        <h4 class="text-white text-xs md:text-sm font-bold truncate group-hover:text-[#ff4d5a] transition-colors" title="${show.title}">
                             ${show.title}
                         </h4>
                     </div>
-                    <span class="text-[10px] font-extrabold text-[#050508] bg-[#d4af37] px-2.5 py-1 rounded-full whitespace-nowrap shadow-[0_0_8px_rgba(212,175,55,0.3)] border border-[#f59e0b]/40">
-                        EP ${show.episode}
+                    <span class="text-[10px] font-extrabold text-white bg-gradient-to-r from-[#e50914] to-[#b80710] px-2.5 py-1 rounded-full whitespace-nowrap shadow-[0_0_10px_rgba(229,9,20,0.3)] font-mono border border-white/15">
+                        EP ${show.episode || '1'}
                     </span>
                 </div>
             `;
@@ -411,13 +465,32 @@ function updateScheduleUI() {
     }
     gridHtml += `</div>`;
 
-    columnsContainer.innerHTML = dockHtml + gridHtml;
+    columnsContainer.innerHTML = dockHtml + headerHtml + gridHtml;
+
+    setTimeout(() => {
+        const activeTab = document.getElementById(`schedule-tab-${activeScheduleDayIndex}`);
+        if (activeTab) {
+            activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    }, 60);
 }
 
 function selectScheduleDay(index) {
     activeScheduleDayIndex = index;
     updateScheduleUI();
 }
+
+function jumpToScheduleWeek(weekNum) {
+    const dayGroups = window.airingScheduleData || [];
+    if (weekNum === 0) {
+        let todayIdx = dayGroups.findIndex(g => g.is_today === true);
+        activeScheduleDayIndex = (todayIdx !== -1 && todayIdx < 7) ? todayIdx : 0;
+    } else {
+        activeScheduleDayIndex = Math.min(7, Math.max(0, dayGroups.length - 1));
+    }
+    updateScheduleUI();
+}
+window.jumpToScheduleWeek = jumpToScheduleWeek;
 
 async function openBroadcastEpisode(showTitle, slug, epNum, showId) {
     const cleanTitle = (typeof showTitle === 'string' && showTitle.includes('%')) ? decodeURIComponent(showTitle) : (showTitle || '');
@@ -2282,6 +2355,8 @@ window.renderDedicatedScheduleView = async function () {
         try {
             const schedData = await fetchClusterNode({ action: 'schedule' });
             window.airingScheduleData = schedData || [];
+            let todayIdx = window.airingScheduleData.findIndex(g => g.is_today === true);
+            if (todayIdx !== -1) activeScheduleDayIndex = todayIdx;
         } catch (err) {
             console.error('[Schedule View] Failed to fetch schedule:', err);
         }
@@ -2293,21 +2368,40 @@ window.renderDedicatedScheduleView = async function () {
         return;
     }
 
-    let dayDockHtml = `<div class="flex items-center gap-2 overflow-x-auto pb-4 w-full scrollbar-none snap-x snap-mandatory touch-pan-x">`;
+    let dayDockHtml = `<div class="flex items-center gap-2 overflow-x-auto pb-4 w-full scrollbar-none snap-x snap-mandatory touch-pan-x" id="dedicated-schedule-dock">`;
     dayGroups.forEach((group, index) => {
-        const dayName = group.day;
+        if (index === 7) {
+            dayDockHtml += `
+                <div class="flex items-center gap-2 px-1 shrink-0">
+                    <div class="h-8 w-px bg-white/15"></div>
+                    <span class="px-2.5 py-1 rounded-xl bg-white/[0.05] border border-white/10 text-[10px] uppercase font-mono tracking-widest text-[#00f5ff] flex items-center gap-1.5 shadow-sm">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#00f5ff] shadow-[0_0_8px_#00f5ff]"></span>
+                        Next Week
+                    </span>
+                    <div class="h-8 w-px bg-white/15"></div>
+                </div>
+            `;
+        }
+
+        const dayName = group.day || '';
+        const dateTag = group.date || '';
         const isSelected = index === activeScheduleDayIndex;
-        const isToday = index === 0;
+        const isToday = group.is_today === true;
         const shortDay = dayName.length > 3 ? dayName.substring(0, 3) : dayName;
-        const displayLabel = isToday ? `Today (${shortDay})` : dayName;
+
+        let displayTop = isToday ? '🔥 Today' : shortDay;
+        let displayBottom = dateTag;
 
         const activeClass = isSelected
-            ? 'bg-[#00f5ff]/20 border-[#00f5ff]/60 text-white shadow-[0_0_20px_rgba(0,245,255,0.3)] font-bold'
-            : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white font-medium';
+            ? 'bg-gradient-to-r from-[#00f5ff]/30 to-[#00a8ff]/20 border-[#00f5ff]/70 text-white shadow-[0_0_20px_rgba(0,245,255,0.35)] font-bold scale-[1.02]'
+            : (isToday
+                ? 'bg-[#00f5ff]/10 border-[#00f5ff]/40 text-white hover:bg-[#00f5ff]/20 font-semibold'
+                : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white font-medium hover:bg-white/[0.07]');
 
         dayDockHtml += `
-            <button onclick="selectDedicatedScheduleDay(${index})" class="px-5 py-3 text-xs md:text-sm tracking-wider uppercase rounded-2xl border transition-all duration-300 ${activeClass} whitespace-nowrap snap-start shrink-0 min-h-[44px]">
-                ${displayLabel}
+            <button id="dedicated-schedule-tab-${index}" onclick="selectDedicatedScheduleDay(${index})" class="flex flex-col items-center justify-center px-4 py-2.5 text-xs md:text-sm tracking-wider uppercase rounded-2xl border transition-all duration-300 ${activeClass} whitespace-nowrap snap-start shrink-0 min-h-[48px] min-w-[80px] cursor-pointer group">
+                <span class="text-[11px] md:text-xs font-extrabold ${isSelected ? 'text-white' : (isToday ? 'text-[#00f5ff]' : 'text-slate-300 group-hover:text-white')}">${displayTop}</span>
+                <span class="text-[10px] font-mono tracking-normal opacity-90 mt-0.5 ${isSelected ? 'text-white/90' : 'text-slate-400 group-hover:text-slate-200'}">${displayBottom}</span>
             </button>
         `;
     });
@@ -2315,23 +2409,48 @@ window.renderDedicatedScheduleView = async function () {
 
     const currentGroup = dayGroups[activeScheduleDayIndex];
     const shows = currentGroup ? currentGroup.shows || [] : [];
+    const fullDateUpper = currentGroup ? (currentGroup.full_date || `${currentGroup.day}, ${currentGroup.date}`).toUpperCase() : '';
 
-    let showsListHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6 w-full">`;
+    let headerHtml = `
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-2 px-1">
+            <div class="flex items-center gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full ${currentGroup?.is_today ? 'bg-[#00f5ff] shadow-[0_0_10px_#00f5ff]' : 'bg-[#e50914] shadow-[0_0_10px_#e50914]'}"></span>
+                <h3 class="text-xs sm:text-sm font-extrabold tracking-wider uppercase text-white font-mono">
+                    BROADCAST SCHEDULE — ${fullDateUpper} (${shows.length} ${shows.length === 1 ? 'SHOW' : 'SHOWS'} AIRING)
+                </h3>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="flex items-center bg-white/[0.04] border border-white/10 rounded-xl p-0.5">
+                    <button onclick="jumpToDedicatedScheduleWeek(0)" class="px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer ${activeScheduleDayIndex < 7 ? 'bg-[#00f5ff]/25 text-[#00f5ff] font-bold border border-[#00f5ff]/40 shadow-[0_0_10px_rgba(0,245,255,0.25)]' : 'text-slate-400 hover:text-white'}">
+                        This Week
+                    </button>
+                    <button onclick="jumpToDedicatedScheduleWeek(1)" class="px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer ${activeScheduleDayIndex >= 7 ? 'bg-[#00f5ff]/25 text-[#00f5ff] font-bold border border-[#00f5ff]/40 shadow-[0_0_10px_rgba(0,245,255,0.25)]' : 'text-slate-400 hover:text-white'}">
+                        Next Week
+                    </button>
+                </div>
+                <span class="text-[11px] font-mono text-slate-400 hidden md:inline">
+                    ${currentGroup?.is_today ? '🔥 Airing Today' : (activeScheduleDayIndex < 7 ? '🗓️ Week 1' : '⚡ Week 2')}
+                </span>
+            </div>
+        </div>
+    `;
+
+    let showsListHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">`;
     if (shows.length === 0) {
-        showsListHtml += `<div class="col-span-full text-center py-12 text-slate-400 text-sm italic">No scheduled broadcasts for this day</div>`;
+        showsListHtml += `<div class="col-span-full text-center py-12 text-slate-400 text-sm italic bg-white/[0.02] border border-white/5 rounded-2xl">No scheduled broadcasts for this day</div>`;
     } else {
         shows.forEach(show => {
-            const localTime = formatLocalTime(show.timestamp);
+            const displayTime = show.time || (show.timestamp ? formatLocalTime(show.timestamp) : '');
             const encodedTitle = encodeURIComponent(show.title).replace(/'/g, '%27');
             const safeSlug = (show.slug || '').replace(/'/g, "\\'");
             const epNum = show.episode || 1;
             const showId = show.id || show.anilistId || 'null';
 
             showsListHtml += `
-                <div class="flex items-center justify-between p-4 bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#00f5ff]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px]" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
+                <div class="flex items-center justify-between p-4 bg-white/[0.03] hover:bg-white/[0.06] backdrop-blur-xl rounded-2xl border border-white/10 hover:border-[#00f5ff]/40 transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px] shadow-sm hover:shadow-[0_8px_25px_rgba(0,0,0,0.5)]" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
-                        <span class="text-xs font-extrabold text-[#00f5ff] whitespace-nowrap bg-[#00f5ff]/10 px-3 py-1.5 rounded-xl border border-[#00f5ff]/25 shadow-[0_0_10px_rgba(0,245,255,0.15)]">
-                            ${localTime}
+                        <span class="text-xs font-extrabold text-[#00f5ff] whitespace-nowrap bg-[#00f5ff]/10 px-3 py-1.5 rounded-xl border border-[#00f5ff]/25 shadow-[0_0_10px_rgba(0,245,255,0.15)] font-mono">
+                            ${displayTime}
                         </span>
                         <h4 class="text-white text-xs md:text-sm font-bold truncate group-hover:text-[#00f5ff] transition-colors" title="${show.title}">
                             ${show.title}
@@ -2350,18 +2469,39 @@ window.renderDedicatedScheduleView = async function () {
         <div class="flex flex-col gap-6">
             <div class="flex items-center justify-between border-l-4 border-[#00f5ff] pl-3 py-1">
                 <h1 class="text-xl md:text-3xl font-extrabold tracking-wider text-white uppercase">
-                    Weekly Airing Broadcast Schedule
+                    14-Day Airing Broadcast Schedule
                 </h1>
                 <span class="text-xs font-mono text-slate-400">Live Release Times</span>
             </div>
             ${dayDockHtml}
+            ${headerHtml}
             ${showsListHtml}
         </div>
     `;
+
+    setTimeout(() => {
+        const activeTab = document.getElementById(`dedicated-schedule-tab-${activeScheduleDayIndex}`);
+        if (activeTab) {
+            activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    }, 60);
 };
 
 window.selectDedicatedScheduleDay = function (index) {
     activeScheduleDayIndex = index;
+    if (typeof window.renderDedicatedScheduleView === 'function') {
+        window.renderDedicatedScheduleView();
+    }
+};
+
+window.jumpToDedicatedScheduleWeek = function (weekNum) {
+    const dayGroups = window.airingScheduleData || [];
+    if (weekNum === 0) {
+        let todayIdx = dayGroups.findIndex(g => g.is_today === true);
+        activeScheduleDayIndex = (todayIdx !== -1 && todayIdx < 7) ? todayIdx : 0;
+    } else {
+        activeScheduleDayIndex = Math.min(7, Math.max(0, dayGroups.length - 1));
+    }
     if (typeof window.renderDedicatedScheduleView === 'function') {
         window.renderDedicatedScheduleView();
     }
