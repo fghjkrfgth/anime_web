@@ -435,14 +435,32 @@ function updateScheduleUI() {
         </div>
     `;
 
+    const gridHtml = renderHomeSchedule(shows);
+
+    columnsContainer.innerHTML = dockHtml + headerHtml + gridHtml;
+
+    setTimeout(() => {
+        const activeTab = document.getElementById(`schedule-tab-${activeScheduleDayIndex}`);
+        if (activeTab) {
+            activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+    }, 60);
+}
+
+// -------------------------------------------------------------------------
+// RESPONSIVE HOME SCHEDULE RENDERER (Compact 5-6 Truncation & Expansion)
+// -------------------------------------------------------------------------
+function renderHomeSchedule(dayShows) {
+    const isCompact = window.innerWidth < 1024;
+    const sortedShows = [...(dayShows || [])].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    const displayShows = isCompact ? sortedShows.slice(0, 6) : sortedShows;
+
     let gridHtml = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 w-full">`;
-    if (shows.length === 0) {
+    if (sortedShows.length === 0) {
         gridHtml += `<div class="col-span-full text-center py-12 text-slate-400 text-xs italic bg-white/[0.02] border border-white/5 rounded-2xl">No scheduled broadcasts for this day</div>`;
     } else {
         const now = Math.floor(Date.now() / 1000);
-        const sortedShows = [...shows].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-
-        sortedShows.forEach(show => {
+        displayShows.forEach(show => {
             const displayTime = show.time || (show.timestamp ? formatLocalTime(show.timestamp) : '');
             const encodedTitle = encodeURIComponent(show.title).replace(/'/g, '%27');
             const safeSlug = (show.slug || '').replace(/'/g, "\\'");
@@ -493,15 +511,51 @@ function updateScheduleUI() {
     }
     gridHtml += `</div>`;
 
-    columnsContainer.innerHTML = dockHtml + headerHtml + gridHtml;
+    if (isCompact && sortedShows.length > 6) {
+        gridHtml += `
+            <button id="btn-view-all-schedule" onclick="navigateToSchedule(${activeScheduleDayIndex})" class="w-full mt-4 py-3 px-5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-[#00f5ff]/40 text-sm font-semibold tracking-wide text-zinc-200 hover:text-white flex items-center justify-center gap-2 transition-all group cursor-pointer active:scale-[0.99] shadow-lg shadow-black/40">
+                <span>View All Scheduled Broadcasts (${sortedShows.length})</span>
+                <svg class="w-4 h-4 text-[#00f5ff] group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                </svg>
+            </button>
+        `;
+    }
 
-    setTimeout(() => {
-        const activeTab = document.getElementById(`schedule-tab-${activeScheduleDayIndex}`);
-        if (activeTab) {
-            activeTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-        }
-    }, 60);
+    return gridHtml;
 }
+window.renderHomeSchedule = renderHomeSchedule;
+
+function navigateToSchedule(dayIndex = null) {
+    if (dayIndex !== null && !isNaN(dayIndex)) {
+        activeScheduleDayIndex = parseInt(dayIndex, 10);
+    }
+    const dayParam = (dayIndex !== null && !isNaN(dayIndex)) ? `?day=${dayIndex}` : '';
+    window.history.pushState(null, '', `/schedule${dayParam}`);
+    if (typeof handleSpaRouting === 'function') {
+        handleSpaRouting();
+    } else {
+        window.location.href = `/schedule${dayParam}`;
+    }
+}
+window.navigateToSchedule = navigateToSchedule;
+
+// Synchronize responsive schedule truncation when crossing 1024px viewport boundary
+let scheduleResizeDebounce = null;
+let lastViewportIsCompact = window.innerWidth < 1024;
+window.addEventListener('resize', () => {
+    if (scheduleResizeDebounce) clearTimeout(scheduleResizeDebounce);
+    scheduleResizeDebounce = setTimeout(() => {
+        const currentIsCompact = window.innerWidth < 1024;
+        if (currentIsCompact !== lastViewportIsCompact) {
+            lastViewportIsCompact = currentIsCompact;
+            const homeColumns = document.getElementById('airing-broadcast-columns');
+            if (homeColumns && window.airingScheduleData) {
+                updateScheduleUI();
+            }
+        }
+    }, 150);
+}, { passive: true });
 
 function selectScheduleDay(index) {
     activeScheduleDayIndex = index;
@@ -637,25 +691,51 @@ function createCardHTML(show, rank = null) {
 }
 
 // -------------------------------------------------------------------------
-// INTERACTIVE HOVER PREVIEW POP-UP SYSTEM (1s delay, pop-slide-up)
+// INTERACTIVE HOVER PREVIEW POP-UP SYSTEM (250ms Enter Intent, 150ms Exit Debounce)
 // -------------------------------------------------------------------------
-let hoverTimer = null;
+let hoverEnterTimer = null;
+let hoverLeaveTimer = null;
+let activeCard = null;
 let activePreviewCard = null;
 let activeBackdrop = null;
+let isMouseOverCard = false;
+let isMouseOverPopover = false;
+
+function isTouchOrCoarse() {
+    return window.matchMedia('(hover: none), (pointer: coarse)').matches || window.innerWidth < 768;
+}
 
 function initAnimeCardHoverPreviews() {
+    if (window._hoverPreviewsInitialized) return;
+    window._hoverPreviewsInitialized = true;
+
     document.addEventListener('mouseover', (e) => {
-        if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768) return;
+        if (isTouchOrCoarse()) return;
 
         const card = e.target.closest('[data-anime-data]');
         if (!card) return;
 
-        if (card.dataset.hoverActive === 'true') return;
+        // Cancel any pending exit/dismiss timer if moving back to card
+        if (hoverLeaveTimer) {
+            clearTimeout(hoverLeaveTimer);
+            hoverLeaveTimer = null;
+        }
 
-        if (hoverTimer) clearTimeout(hoverTimer);
-        card.dataset.hoverActive = 'true';
+        if (activeCard === card && activePreviewCard) {
+            isMouseOverCard = true;
+            return;
+        }
 
-        hoverTimer = setTimeout(() => {
+        // If entering a different card, clear previous enter timer
+        if (hoverEnterTimer) {
+            clearTimeout(hoverEnterTimer);
+            hoverEnterTimer = null;
+        }
+
+        isMouseOverCard = true;
+        activeCard = card;
+
+        hoverEnterTimer = setTimeout(() => {
             try {
                 const showDataRaw = card.getAttribute('data-anime-data');
                 if (!showDataRaw) return;
@@ -664,11 +744,11 @@ function initAnimeCardHoverPreviews() {
             } catch (err) {
                 console.error('[Hover Preview Error]', err);
             }
-        }, 1000);
+        }, 250); // 250ms hover-intent delay
     });
 
     document.addEventListener('mouseout', (e) => {
-        if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768) return;
+        if (isTouchOrCoarse()) return;
 
         const card = e.target.closest('[data-anime-data]');
         if (!card) return;
@@ -678,17 +758,51 @@ function initAnimeCardHoverPreviews() {
             return;
         }
 
-        card.dataset.hoverActive = 'false';
-        if (hoverTimer) {
-            clearTimeout(hoverTimer);
-            hoverTimer = null;
+        if (hoverEnterTimer) {
+            clearTimeout(hoverEnterTimer);
+            hoverEnterTimer = null;
         }
-        dismissHoverPreview();
+
+        isMouseOverCard = false;
+
+        if (hoverLeaveTimer) clearTimeout(hoverLeaveTimer);
+        hoverLeaveTimer = setTimeout(() => {
+            if (!isMouseOverCard && !isMouseOverPopover) {
+                dismissHoverPreview();
+            }
+        }, 150); // 150ms graceful exit debounce
+    });
+
+    // Dismiss active hover previews immediately during scrolls, resizing, clicking outside, or touch interaction
+    window.addEventListener('scroll', () => {
+        if (hoverEnterTimer) { clearTimeout(hoverEnterTimer); hoverEnterTimer = null; }
+        if (activePreviewCard) dismissHoverPreview();
+    }, { passive: true });
+
+    window.addEventListener('resize', () => {
+        if (hoverEnterTimer) { clearTimeout(hoverEnterTimer); hoverEnterTimer = null; }
+        if (activePreviewCard) dismissHoverPreview();
+    }, { passive: true });
+
+    window.addEventListener('blur', () => {
+        if (hoverEnterTimer) { clearTimeout(hoverEnterTimer); hoverEnterTimer = null; }
+        if (activePreviewCard) dismissHoverPreview();
+    });
+
+    document.addEventListener('touchstart', () => {
+        if (hoverEnterTimer) { clearTimeout(hoverEnterTimer); hoverEnterTimer = null; }
+        if (activePreviewCard) dismissHoverPreview();
+    }, { passive: true });
+
+    document.addEventListener('click', (e) => {
+        if (activePreviewCard && !activePreviewCard.contains(e.target) && (!activeCard || !activeCard.contains(e.target))) {
+            dismissHoverPreview();
+        }
     });
 }
 
 function showHoverPreview(card, show) {
-    if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768) return;
+    if (isTouchOrCoarse()) return;
     dismissHoverPreview();
 
     if (typeof registerAnimeEntity === 'function') {
@@ -707,17 +821,20 @@ function showHoverPreview(card, show) {
     const isLiked = typeof getLikedAnimeList === 'function' ? !!getLikedAnimeList()[String(show.id)] : false;
     const isLater = typeof getWatchLaterList === 'function' ? !!getWatchLaterList()[String(show.id)] : false;
 
+    activeCard = card;
+    isMouseOverCard = true;
+
     // Viewport Backdrop Blur
     activeBackdrop = document.createElement('div');
     activeBackdrop.id = 'anime-preview-backdrop';
-    activeBackdrop.className = 'fixed inset-0 z-40 bg-black/60 backdrop-blur-md transition-opacity duration-300 pointer-events-none opacity-0';
+    activeBackdrop.className = 'fixed inset-0 z-40 bg-black/60 backdrop-blur-md transition-opacity duration-200 pointer-events-none opacity-0';
     document.body.appendChild(activeBackdrop);
     requestAnimationFrame(() => activeBackdrop && activeBackdrop.classList.remove('opacity-0'));
 
     // Animated Preview Pop-up Card
     activePreviewCard = document.createElement('div');
     activePreviewCard.id = 'anime-preview-popup-card';
-    activePreviewCard.className = 'fixed z-50 animate-pop-slide-up w-[90vw] max-w-[380px] bg-[#12131a] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(229,9,20,0.15)] rounded-3xl overflow-hidden pointer-events-auto';
+    activePreviewCard.className = 'anime-preview-popover hover-detail-card fixed z-50 animate-pop-slide-up w-[90vw] max-w-[380px] bg-[#12131a] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(229,9,20,0.15)] rounded-3xl overflow-hidden pointer-events-auto';
 
     const rect = card.getBoundingClientRect();
     const topPos = Math.max(20, Math.min(window.innerHeight - 420, rect.top - 20));
@@ -760,6 +877,29 @@ function showHoverPreview(card, show) {
         </div>
     `;
 
+    // Seamless cursor transition: mouseenter and mouseleave on activePreviewCard
+    activePreviewCard.addEventListener('mouseenter', () => {
+        isMouseOverPopover = true;
+        if (hoverLeaveTimer) {
+            clearTimeout(hoverLeaveTimer);
+            hoverLeaveTimer = null;
+        }
+    });
+
+    activePreviewCard.addEventListener('mouseleave', (e) => {
+        const related = e.relatedTarget;
+        if (related && (activePreviewCard.contains(related) || (activeCard && activeCard.contains(related)))) {
+            return;
+        }
+        isMouseOverPopover = false;
+        if (hoverLeaveTimer) clearTimeout(hoverLeaveTimer);
+        hoverLeaveTimer = setTimeout(() => {
+            if (!isMouseOverCard && !isMouseOverPopover) {
+                dismissHoverPreview();
+            }
+        }, 150);
+    });
+
     document.body.appendChild(activePreviewCard);
 
     if (typeof updateInteractiveButtonStates === 'function') {
@@ -774,13 +914,36 @@ function showHoverPreview(card, show) {
 }
 
 function dismissHoverPreview() {
+    if (hoverEnterTimer) {
+        clearTimeout(hoverEnterTimer);
+        hoverEnterTimer = null;
+    }
+    if (hoverLeaveTimer) {
+        clearTimeout(hoverLeaveTimer);
+        hoverLeaveTimer = null;
+    }
+    isMouseOverCard = false;
+    isMouseOverPopover = false;
+    activeCard = null;
+
     if (activeBackdrop) {
-        activeBackdrop.remove();
+        const backdropToDismiss = activeBackdrop;
         activeBackdrop = null;
+        backdropToDismiss.classList.add('opacity-0');
+        setTimeout(() => {
+            try { backdropToDismiss.remove(); } catch (e) {}
+        }, 180);
     }
     if (activePreviewCard) {
-        activePreviewCard.remove();
+        const cardToDismiss = activePreviewCard;
         activePreviewCard = null;
+        cardToDismiss.classList.add('popover-hidden');
+        cardToDismiss.style.opacity = '0';
+        cardToDismiss.style.transform = 'translateY(10px) scale(0.96)';
+        cardToDismiss.style.pointerEvents = 'none';
+        setTimeout(() => {
+            try { cardToDismiss.remove(); } catch (e) {}
+        }, 180);
     }
 
     // Resume 3D coverflow carousels after preview is dismissed
@@ -2492,6 +2655,15 @@ window.renderDedicatedScheduleView = async function () {
     if (dayGroups.length === 0) {
         container.innerHTML = `<div class="text-center py-12 text-slate-400">Schedule unavailable.</div>`;
         return;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const dayParam = urlParams.get('day');
+    if (dayParam !== null && !isNaN(parseInt(dayParam, 10))) {
+        const targetIdx = parseInt(dayParam, 10);
+        if (targetIdx >= 0 && targetIdx < dayGroups.length) {
+            activeScheduleDayIndex = targetIdx;
+        }
     }
 
     let dayDockHtml = `<div class="flex items-center gap-2 overflow-x-auto pb-4 w-full scrollbar-none snap-x snap-mandatory touch-pan-x" id="dedicated-schedule-dock">`;
