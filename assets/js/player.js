@@ -45,10 +45,11 @@ function getHlsPlayerConfig(isLowNet = null) {
         enableWorker: true,
         initialFragPreload: true,
         startFragPrefetch: true,
-        maxBufferLength: isLowNet ? 20 : 45,
-        maxMaxBufferLength: isLowNet ? 40 : 90,
-        maxBufferSize: (isLowNet ? 25 : 60) * 1000 * 1000,
+        maxBufferLength: isLowNet ? 35 : 45,
+        maxMaxBufferLength: isLowNet ? 60 : 90,
+        maxBufferSize: (isLowNet ? 35 : 60) * 1000 * 1000,
         maxBufferHole: 0.5,
+        backBufferLength: 30,
         fragLoadingTimeOut: 45000,
         fragLoadingMaxRetry: 4,
         fragLoadingRetryDelay: 1000
@@ -82,6 +83,29 @@ function initHlsPlayer(streamSourceUrl, targetVideo = null) {
         },
         xhrSetup: function (xhr, url) {
             xhr.withCredentials = false;
+        }
+    });
+
+    hls.on(Hls.Events.ERROR, function (event, data) {
+        console.warn("[HLS Error]:", data.type, data.details, data.fatal);
+        if (data.fatal) {
+            switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                    console.log("Fatal network error encountered, recovering...");
+                    hls.startLoad();
+                    break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                    console.log("Fatal media error encountered, attempting recovery...");
+                    hls.recoverMediaError();
+                    break;
+                default:
+                    hls.destroy();
+                    break;
+            }
+        } else if (data.details === Hls.ErrorDetails.FRAG_PARSING_ERROR || 
+                   data.details === Hls.ErrorDetails.BUFFER_APPEND_ERROR) {
+            // Prevent idle freeze on non-fatal segment parsing warnings
+            hls.startLoad();
         }
     });
 
@@ -2028,4 +2052,3 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 
- 
