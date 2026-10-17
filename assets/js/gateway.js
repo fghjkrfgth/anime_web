@@ -337,22 +337,37 @@ async function fetchSubDubCounts(anilistId) {
     let subEps = [];
     let dubEps = [];
 
+    const now = Date.now();
+    let maxConfirmedEp = Infinity;
+    if (window.showData) {
+        maxConfirmedEp = typeof getActualEpisodeCount === 'function' ? getActualEpisodeCount(window.showData) : (window.showData.episodes || Infinity);
+    }
+
     try {
         const res = await fetch(`https://api.ani.zip/mappings?anilist_id=${anilistId}`);
         if (res.ok) {
             const data = await res.json();
             if (data && data.episodes) {
-                const allEps = Object.keys(data.episodes).map(k => parseInt(k, 10)).filter(n => !isNaN(n));
-                subCount = allEps.length;
-                subEps = allEps.sort((a, b) => a - b);
-
-                const dubbedKeys = Object.keys(data.episodes).filter(k => {
+                const validKeys = Object.keys(data.episodes).map(k => {
                     const ep = data.episodes[k];
-                    return ep.hasDub === true || ep.dub === true || ep.dubbed === true;
-                }).map(k => parseInt(k, 10)).filter(n => !isNaN(n));
+                    const num = parseInt(k, 10);
+                    return { num, ep };
+                }).filter(({ num, ep }) => {
+                    if (isNaN(num) || num <= 0) return false;
+                    if (num > maxConfirmedEp) return false;
+                    if (ep && ep.airDateUtc && new Date(ep.airDateUtc).getTime() > now) return false;
+                    return true;
+                });
 
-                dubCount = dubbedKeys.length;
-                dubEps = dubbedKeys.sort((a, b) => a - b);
+                subEps = validKeys.map(k => k.num).sort((a, b) => a - b);
+                subCount = subEps.length;
+
+                const dubbedKeys = validKeys.filter(({ ep }) => {
+                    return ep.hasDub === true || ep.dub === true || ep.dubbed === true;
+                }).map(k => k.num).sort((a, b) => a - b);
+
+                dubEps = dubbedKeys;
+                dubCount = dubEps.length;
             }
         }
     } catch (e) {
@@ -360,14 +375,21 @@ async function fetchSubDubCounts(anilistId) {
     }
 
     if (subCount === 0) {
-        let totalEps = 12;
+        let totalEps = 0;
         if (window.showData) {
-            totalEps = typeof getActualEpisodeCount === 'function' ? getActualEpisodeCount(window.showData) : (window.showData.episodes || 12);
+            totalEps = typeof getActualEpisodeCount === 'function' ? getActualEpisodeCount(window.showData) : 0;
         }
-        subCount = totalEps;
-        subEps = Array.from({ length: subCount }, (_, i) => i + 1);
-        dubCount = subCount;
-        dubEps = [...subEps];
+        if (totalEps > 0) {
+            subCount = totalEps;
+            subEps = Array.from({ length: subCount }, (_, i) => i + 1);
+            dubCount = subCount;
+            dubEps = [...subEps];
+        } else {
+            subCount = 0;
+            subEps = [];
+            dubCount = 0;
+            dubEps = [];
+        }
     } else if (dubCount === 0 && subCount > 0) {
         dubCount = subCount;
         dubEps = [...subEps];
@@ -379,3 +401,72 @@ async function fetchSubDubCounts(anilistId) {
 }
 
 window.fetchSubDubCounts = fetchSubDubCounts;
+
+// -------------------------------------------------------------------------
+// 6. VERIFIED EPISODE LIST FETCHER & STATE DEDUPLICATION
+// -------------------------------------------------------------------------
+const episodeListCache = new Map();
+
+async function fetchEpisodeList(animeSlug, seasonId = null) {
+    if (!animeSlug) return [];
+    const cacheKey = `${animeSlug}_${seasonId || 'default'}`;
+    if (episodeListCache.has(cacheKey)) {
+        return episodeListCache.get(cacheKey);
+    }
+
+    let episodes = [];
+    try {
+        const seasonParam = seasonId ? `&seasonId=${encodeURIComponent(seasonId)}` : '';
+        const res = await fetch(`/api/episodes?id=${encodeURIComponent(animeSlug)}${seasonParam}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.success && Array.isArray(data.episodes)) {
+                episodes = data.episodes;
+            }
+        }
+    } catch (err) {
+        console.warn("[Gateway] Failed to fetch verified episode list from /api/episodes:", err);
+    }
+
+    // Deduplicate entries by episode_number, keeping only the one with verified playable server ID
+    const dedupMap = new Map();
+    for (const ep of episodes) {
+        if (!ep || typeof ep !== 'object') continue;
+        const epNum = Number(ep.episode_number || ep.episode || ep.num);
+        if (isNaN(epNum) || epNum <= 0) continue;
+
+        const epId = ep.id || ep.episode_id || ep.episodeId;
+        const isAvailable = ep.is_available !== false && ep.playable !== false && Boolean(epId);
+
+        if (!dedupMap.has(epNum)) {
+            dedupMap.set(epNum, {
+                episode_number: epNum,
+                id: epId || `ep-${epNum}`,
+                title: ep.title || `Episode ${epNum}`,
+                is_available: isAvailable,
+                thumbnail: ep.thumbnail || '',
+                is_filler: Boolean(ep.is_filler)
+            });
+        } else {
+            const existing = dedupMap.get(epNum);
+            // If existing doesn't have a real server ID, replace with one that does
+            if ((!existing.id || existing.id.startsWith('ep-')) && epId && !epId.startsWith('ep-')) {
+                dedupMap.set(epNum, {
+                    ...existing,
+                    id: epId,
+                    is_available: isAvailable
+                });
+            }
+        }
+    }
+
+    // Sort episodes strictly in numerical order
+    const sorted = Array.from(dedupMap.values()).sort((a, b) => a.episode_number - b.episode_number);
+
+    // Reject phantom gaps: do not synthesize placeholders for missing numbers unless explicitly handling an ongoing hiatus or special OVA flag.
+    episodeListCache.set(cacheKey, sorted);
+    return sorted;
+}
+
+window.fetchEpisodeList = fetchEpisodeList;
+
