@@ -1990,6 +1990,88 @@ function getWatchEpisodeBtnClasses(isActive, isFiller, isWatched) {
 
 window.getWatchEpisodeBtnClasses = getWatchEpisodeBtnClasses;
 
+// -------------------------------------------------------------------------
+// ROBUST EPISODE GRID RENDERING WITH EVENT DELEGATION & SANITIZATION
+// -------------------------------------------------------------------------
+function renderEpisodeList(episodes, activeEpisodeNumber = 1, containerId = 'episodes-grid', onEpisodeSelect = null) {
+    const container = typeof containerId === 'string' ? document.getElementById(containerId) : containerId;
+    if (!container) return;
+
+    // Purge existing containers completely before mounting to prevent stale state from previously visited series
+    container.innerHTML = '';
+
+    if (!Array.isArray(episodes) || episodes.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full py-8 text-center text-zinc-400 text-xs flex flex-col items-center justify-center gap-2">
+                <svg class="w-8 h-8 opacity-40 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span>No released episodes found yet</span>
+            </div>
+        `;
+        return;
+    }
+
+    const fillerSet = (window.currentFillerSet instanceof Set) ? window.currentFillerSet : new Set();
+    const showId = window.showData?.id || '';
+
+    // Sanitize the loop: iterate ONLY over real entries; handle playable vs upcoming locked tiles
+    let html = '';
+    for (const ep of episodes) {
+        if (!ep) continue;
+        const epNum = Number(ep.episode_number || ep.episode || ep.num);
+        if (isNaN(epNum) || epNum <= 0) continue;
+
+        const epId = ep.id || ep.episode_id || ep.episodeId;
+        const isPlayable = Boolean(epId) && ep.is_available !== false && ep.playable !== false;
+
+        if (!isPlayable) {
+            // Render in a distinct non-interactive "Upcoming / Not Aired" state with explicit locked badge
+            html += `
+                <div class="episode-btn text-xs font-semibold py-2 px-1 rounded-md text-center flex flex-col items-center justify-center gap-0.5 opacity-40 cursor-not-allowed pointer-events-none bg-white/5 border border-white/5 text-zinc-500" title="Episode ${epNum} - Upcoming / Not Aired">
+                    <span>${epNum}</span>
+                    <span class="text-[9px] font-mono tracking-tighter text-amber-400/80">🔒 Soon</span>
+                </div>
+            `;
+            continue;
+        }
+
+        const isWatched = showId ? localStorage.getItem(`watched_${showId}_${epNum}`) === 'true' : false;
+        const isActive = (epNum === Number(activeEpisodeNumber));
+        const isFiller = fillerSet.has(epNum) || Boolean(ep.is_filler);
+        const btnClasses = getWatchEpisodeBtnClasses(isActive, isFiller, isWatched);
+        const titleAttr = isFiller ? `Episode ${epNum} (Filler)` : `Episode ${epNum}`;
+
+        html += `
+            <button type="button" class="${btnClasses}" title="${titleAttr}" data-ep-num="${epNum}" data-ep-id="${epId}">
+                ${epNum}
+            </button>
+        `;
+    }
+
+    container.innerHTML = html;
+
+    // Ensure every active episode tile binds a reliable click listener using event delegation on the episode list container
+    if (!container._hasEpClickListener) {
+        container.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-ep-num]');
+            if (!btn || btn.classList.contains('pointer-events-none') || btn.disabled) return;
+            const epNum = parseInt(btn.getAttribute('data-ep-num'), 10);
+            const epId = btn.getAttribute('data-ep-id');
+            if (isNaN(epNum) || epNum <= 0) return;
+
+            if (typeof onEpisodeSelect === 'function') {
+                onEpisodeSelect(epNum, epId);
+            } else if (typeof window.changeEpisode === 'function') {
+                window.changeEpisode(epNum);
+            }
+        });
+        container._hasEpClickListener = true;
+    }
+}
+
+window.renderEpisodeList = renderEpisodeList;
+
 // FRANCHISE CATEGORIZATION & RENDERING (MAIN SERIES / SEASONS, MOVIES, OVAS & SPECIALS)
 function categorizeFranchiseItems(franchiseSeasons, fallbackRelations) {
     const mainSeasons = [];
