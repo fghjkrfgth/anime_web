@@ -17,6 +17,21 @@ if (typeof document !== 'undefined') {
 }
 
 // -------------------------------------------------------------------------
+// OPTIMIZED HLS.JS BUFFER CONFIGURATION (Aggressive First-Chunk Playback)
+// -------------------------------------------------------------------------
+const defaultHlsConfig = {
+    maxBufferLength: 30,
+    maxMaxBufferLength: 60,
+    maxBufferSize: 60 * 1000 * 1000,
+    maxBufferHole: 0.5,
+    lowLatencyMode: false,
+    progressive: true, // Enable progressive stream parsing
+    startFragPrefetch: true
+};
+window.defaultHlsConfig = defaultHlsConfig;
+window.getHlsPlayerConfig = () => ({ ...defaultHlsConfig });
+
+// -------------------------------------------------------------------------
 // CUSTOM FRAGMENT LOADER FOR HLS.JS (10-SEGMENT PACKET BUNDLE & SEEK SLICER)
 // -------------------------------------------------------------------------
 class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultConfig && Hls.DefaultConfig.loader) ? Hls.DefaultConfig.loader : class {}) {
@@ -659,6 +674,83 @@ function renderDelayedBroadcastOverlay(epNum, showTitle) {
 
 window.renderDelayedBroadcastOverlay = renderDelayedBroadcastOverlay;
 
+// -------------------------------------------------------------------------
+// SYNCHRONOUS-FIRST PLAYHEAD ENGINE & PROMISE LOCK GUARD
+// -------------------------------------------------------------------------
+let isPlayInitiated = false;
+
+async function safePlayMedia(videoEl) {
+    if (!videoEl || isPlayInitiated) return;
+    isPlayInitiated = true;
+
+    try {
+        await videoEl.play();
+    } catch (err) {
+        console.warn("[Player Engine] Autoplay / Play blocked:", err);
+        // If blocked due to audio restrictions, attempt muted retry if user allows, or cleanly reset UI
+        if (err && err.name === 'NotAllowedError') {
+            try {
+                videoEl.muted = true;
+                await videoEl.play();
+                console.log("[Player Engine] Playback started muted following audio policy restriction.");
+                return;
+            } catch (mutedErr) {
+                console.warn("[Player Engine] Muted playback also blocked:", mutedErr);
+            }
+        }
+        syncPlayButtonState(false);
+        showEqualizerAnimation(false);
+    } finally {
+        isPlayInitiated = false;
+    }
+}
+window.safePlayMedia = safePlayMedia;
+
+function syncPlayButtonState(isPlaying) {
+    const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
+    const isPaused = typeof isPlaying === 'boolean' ? !isPlaying : (video ? (video.paused || video.ended) : true);
+    const iconCenterPlay = document.getElementById('icon-center-play');
+    const iconCenterPause = document.getElementById('icon-center-pause');
+    const iconBottomPlay = document.getElementById('icon-bottom-play');
+    const iconBottomPause = document.getElementById('icon-bottom-pause');
+
+    if (iconCenterPlay && iconCenterPause) {
+        iconCenterPlay.classList.toggle('hidden', !isPaused);
+        iconCenterPause.classList.toggle('hidden', isPaused);
+    }
+    if (iconBottomPlay && iconBottomPause) {
+        iconBottomPlay.classList.toggle('hidden', !isPaused);
+        iconBottomPause.classList.toggle('hidden', isPaused);
+    }
+}
+window.syncPlayButtonState = syncPlayButtonState;
+
+function showEqualizerAnimation(active) {
+    const equalizerEls = document.querySelectorAll('#player-equalizer-bars, .player-equalizer-bars, .media-equalizer-indicator, [data-equalizer-indicator]');
+    equalizerEls.forEach(el => {
+        if (active) {
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+        } else {
+            el.classList.remove('flex');
+            el.classList.add('hidden');
+        }
+    });
+}
+window.showEqualizerAnimation = showEqualizerAnimation;
+
+function showPlaybackLoadingSpinner() {
+    const spinner = document.getElementById('player-loading-spinner');
+    if (spinner) spinner.classList.remove('hidden');
+}
+window.showPlaybackLoadingSpinner = showPlaybackLoadingSpinner;
+
+function hidePlaybackLoadingSpinner() {
+    const spinner = document.getElementById('player-loading-spinner');
+    if (spinner) spinner.classList.add('hidden');
+}
+window.hidePlaybackLoadingSpinner = hidePlaybackLoadingSpinner;
+
 function initPlayerControls() {
     const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
     if (!video) return;
@@ -699,8 +791,14 @@ function initPlayerControls() {
     overlay.innerHTML = `
         <!-- Top Bar: Title & Status -->
         <div class="flex items-center justify-between text-white text-xs font-semibold drop-shadow-md">
-            <div id="player-overlay-title" class="truncate font-bold tracking-wide">
-                ${showTitle} - Episode ${epNum}
+            <div id="player-overlay-title" class="truncate font-bold tracking-wide flex items-center gap-2">
+                <span>${showTitle} - Episode ${epNum}</span>
+                <div id="player-equalizer-bars" class="items-end gap-0.5 h-3.5 hidden" title="Media Playing">
+                    <span class="w-0.5 bg-[var(--anime-accent-color,#f59e0b)] rounded-full animate-pulse h-2"></span>
+                    <span class="w-0.5 bg-[var(--anime-accent-color,#f59e0b)] rounded-full animate-pulse h-3.5" style="animation-delay: 150ms"></span>
+                    <span class="w-0.5 bg-[var(--anime-accent-color,#f59e0b)] rounded-full animate-pulse h-2.5" style="animation-delay: 300ms"></span>
+                    <span class="w-0.5 bg-[var(--anime-accent-color,#f59e0b)] rounded-full animate-pulse h-3" style="animation-delay: 450ms"></span>
+                </div>
             </div>
             <div id="player-overlay-status" class="px-2 py-0.5 rounded text-[10px] font-mono bg-black/40 border border-white/10 uppercase" style="color: var(--anime-accent-color, #f59e0b);">
                 BLACKLEG PLAYER
@@ -871,29 +969,25 @@ function initPlayerControls() {
     const introMarker = document.getElementById('player-progress-intro-marker');
     const outroMarker = document.getElementById('player-progress-outro-marker');
 
-    function togglePlay() {
-        if (video.paused) {
-            video.play().catch(() => { });
+    function handlePlayButtonClick(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        if (!video) return;
+        if (video.paused || video.ended) {
+            safePlayMedia(video);
         } else {
             video.pause();
         }
     }
 
-    function updatePlayPauseIcons() {
-        const isPaused = video.paused;
-        const iconCenterPlay = document.getElementById('icon-center-play');
-        const iconCenterPause = document.getElementById('icon-center-pause');
-        const iconBottomPlay = document.getElementById('icon-bottom-play');
-        const iconBottomPause = document.getElementById('icon-bottom-pause');
+    function togglePlay() {
+        handlePlayButtonClick();
+    }
 
-        if (iconCenterPlay && iconCenterPause) {
-            iconCenterPlay.classList.toggle('hidden', !isPaused);
-            iconCenterPause.classList.toggle('hidden', isPaused);
-        }
-        if (iconBottomPlay && iconBottomPause) {
-            iconBottomPlay.classList.toggle('hidden', !isPaused);
-            iconBottomPause.classList.toggle('hidden', isPaused);
-        }
+    function updatePlayPauseIcons() {
+        syncPlayButtonState();
     }
 
     function formatTime(seconds) {
@@ -1333,8 +1427,8 @@ function initPlayerControls() {
         }
     };
 
-    if (btnCenterPlay) btnCenterPlay.onclick = togglePlay;
-    if (btnBottomPlay) btnBottomPlay.onclick = togglePlay;
+    if (btnCenterPlay) btnCenterPlay.onclick = handlePlayButtonClick;
+    if (btnBottomPlay) btnBottomPlay.onclick = handlePlayButtonClick;
     if (btnRewind) btnRewind.onclick = () => seekRelative(-10);
     if (btnForward) btnForward.onclick = () => seekRelative(10);
     if (btnFullscreen) btnFullscreen.onclick = toggleFullscreen;
@@ -1360,14 +1454,27 @@ function initPlayerControls() {
         }
     }
 
-    video.onplay = () => {
-        updatePlayPauseIcons();
+    video.addEventListener('play', () => {
+        syncPlayButtonState(true);
         showOverlayTemporarily();
-    };
-    video.onpause = () => {
-        updatePlayPauseIcons();
+    });
+    video.addEventListener('playing', () => {
+        syncPlayButtonState(true);
+        hidePlaybackLoadingSpinner();
+        showEqualizerAnimation(true);
         showOverlayTemporarily();
-    };
+    });
+    video.addEventListener('pause', () => {
+        syncPlayButtonState(false);
+        showEqualizerAnimation(false);
+        showOverlayTemporarily();
+    });
+    video.addEventListener('waiting', () => {
+        showPlaybackLoadingSpinner();
+    });
+    video.addEventListener('canplay', () => {
+        hidePlaybackLoadingSpinner();
+    });
     video.ontimeupdate = throttledUpdateTimeDisplay;
     video.onloadedmetadata = () => {
         updateTimeDisplay();
