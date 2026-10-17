@@ -121,14 +121,32 @@ const FULL_SHOW_QUERY = `
 `;
 
 function getActualEpisodeCount(media) {
-    if (!media) return 12;
-    if (media.episodes) return media.episodes;
-    if (media.nextAiringEpisode && media.nextAiringEpisode.episode) {
-        return media.nextAiringEpisode.episode - 1;
+    if (!media) return 0;
+    // 1. Ongoing / Releasing shows: nextAiringEpisode takes STRICT precedence over planned media.episodes
+    if (media.status === 'RELEASING' || media.status === 'ongoing') {
+        if (media.nextAiringEpisode && media.nextAiringEpisode.episode) {
+            return Math.max(0, media.nextAiringEpisode.episode - 1);
+        }
+        if (media.current_released || media.episodes_aired) {
+            return Number(media.current_released || media.episodes_aired);
+        }
+        if (media.id === 21) return 1180; // One Piece confirmed current count
+        if (media.episodes && media.episodes < 50) {
+            return media.episodes;
+        }
+        return media.episodes || 1;
     }
-    if (media.id === 21) return 1120; // One Piece safe current count
-    if (media.status === 'RELEASING') return 24;
-    return 12;
+    // 2. Unreleased shows
+    if (media.status === 'NOT_YET_RELEASED') {
+        return 0;
+    }
+    // 3. Completed / Finished shows
+    if (media.episodes) return media.episodes;
+    if (media.current_released || media.episodes_aired) {
+        return Number(media.current_released || media.episodes_aired);
+    }
+    if (media.id === 21) return 1180;
+    return 0;
 }
 
 function debounce(func, wait) {
@@ -1077,6 +1095,7 @@ async function renderWatchView() {
                 <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
                     <div class="flex items-center justify-between">
                         <h2 class="text-sm md:text-base font-bold tracking-widest text-white uppercase border-l-4 pl-2.5" style="border-color: var(--anime-accent-color,#f59e0b);">Episodes</h2>
+                        <span id="episode-count-badge" class="px-2.5 py-1 text-[10px] md:text-xs font-semibold tracking-wider text-zinc-300 bg-white/5 border border-white/10 rounded-md">-- Episodes Available</span>
                     </div>
                     <hr class="border-white/5">
                     <select id="batch-selector" class="hidden w-full bg-[#121218] text-white border border-white/10 px-3 py-2 rounded-lg text-xs font-bold tracking-wide focus:outline-none transition-all duration-300"></select>
@@ -1861,8 +1880,10 @@ window.changeEpisode = async function (epNum, bypassFillerCheck = false) {
     const delayedOverlay = document.getElementById('delayed-broadcast-overlay');
     if (delayedOverlay) delayedOverlay.remove();
 
-    const totalEps = Math.max(getActualEpisodeCount(window.showData), window.currentEp || 1);
-    if (epNum < 1 || epNum > totalEps) return;
+    const maxAllowedEp = (window.verifiedEpisodeList && window.verifiedEpisodeList.length > 0)
+        ? window.verifiedEpisodeList.length
+        : Math.max(getActualEpisodeCount(window.showData), window.currentEp || 1);
+    if (epNum < 1 || epNum > maxAllowedEp) return;
 
     if (!bypassFillerCheck) {
         const currentBatch = Math.floor((epNum - 1) / 100);
@@ -1910,14 +1931,46 @@ window.changeEpisode = async function (epNum, bypassFillerCheck = false) {
     }
 };
 
-window.renderEpisodePicker = function () {
+window.renderEpisodePicker = async function () {
     const selector = document.getElementById('batch-selector');
-    const totalEps = getActualEpisodeCount(window.showData);
+    const show = window.showData;
+    const slug = slugify(show?.title?.english || show?.title?.romaji || show?.title?.userPreferred || 'anime');
+
+    let verifiedEpisodes = [];
+    if (typeof window.fetchEpisodeList === 'function' && show) {
+        verifiedEpisodes = await window.fetchEpisodeList(slug, show.id);
+    }
+
+    if (!verifiedEpisodes || verifiedEpisodes.length === 0) {
+        const subDubData = typeof fetchSubDubCounts === 'function' && show?.id
+            ? await fetchSubDubCounts(show.id)
+            : { subEps: [] };
+        const availableNums = subDubData.subEps && subDubData.subEps.length > 0
+            ? subDubData.subEps
+            : Array.from({ length: getActualEpisodeCount(show) }, (_, i) => i + 1);
+        verifiedEpisodes = availableNums.map(n => ({ episode_number: n, id: `ep-${n}`, is_available: true }));
+    }
+
+    window.verifiedEpisodeList = verifiedEpisodes;
+    const totalEps = verifiedEpisodes.length;
+
+    // Update episode count summary badges in the UI
+    const countBadge = document.getElementById('episode-count-badge');
+    if (countBadge) {
+        countBadge.innerText = `${totalEps} Episodes Available`;
+    }
+    const badgeEpisodesEl = document.getElementById('badge-episodes');
+    if (badgeEpisodesEl) {
+        badgeEpisodesEl.innerText = `${totalEps} EPISODES`;
+    }
 
     const batchSize = 100;
     const numBatches = Math.ceil(totalEps / batchSize);
 
-    if (!selector) return;
+    if (!selector) {
+        window.renderEpisodesGridForBatch(0, totalEps);
+        return;
+    }
 
     if (numBatches > 1) {
         selector.classList.remove('hidden');
@@ -1929,7 +1982,7 @@ window.renderEpisodePicker = function () {
         }
         selector.innerHTML = selectorHtml;
 
-        const currentBatch = Math.floor((window.currentEp - 1) / batchSize);
+        const currentBatch = Math.min(Math.floor((Math.max(1, window.currentEp || 1) - 1) / batchSize), numBatches - 1);
         selector.value = currentBatch;
 
         selector.onchange = (e) => {
@@ -1949,34 +2002,52 @@ window.renderEpisodesGridForBatch = async function (batchIdx, totalEps) {
     if (!container) return;
 
     const fillerSet = await fetchFillerEpisodes(window.showData.id, null, batchIdx);
-    const subDubData = await fetchSubDubCounts(window.showData.id);
+    window.currentFillerSet = fillerSet;
 
-    const isDub = (window.currentLang === 'dub');
-    const validEps = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
-        : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+    let validEps = window.verifiedEpisodeList || [];
+    if (validEps.length === 0) {
+        const subDubData = await fetchSubDubCounts(window.showData.id);
+        const isDub = (window.currentLang === 'dub');
+        const nums = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
+            : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+        validEps = nums.map(n => ({ episode_number: n, id: `ep-${n}`, is_available: true }));
+    }
 
     const totalValidEps = validEps.length;
     const batchSize = 100;
     const startIdx = batchIdx * batchSize;
     const endIdx = Math.min((batchIdx + 1) * batchSize, totalValidEps);
+    const batchEpisodes = validEps.slice(startIdx, endIdx);
 
-    let html = '';
-    for (let idx = startIdx; idx < endIdx; idx++) {
-        const i = validEps[idx];
-        const isWatched = localStorage.getItem(`watched_${window.showData.id}_${i}`) === 'true';
-        const isActive = (i === window.currentEp);
-        const isFiller = fillerSet.has(i);
-
-        const btnClasses = getWatchEpisodeBtnClasses(isActive, isFiller, isWatched);
-        const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
-
-        html += `
-                <button class="${btnClasses}" title="${titleAttr}" onclick="changeEpisode(${i})">
-                    ${i}
-                </button>
-            `;
+    if (typeof window.renderEpisodeList === 'function') {
+        window.renderEpisodeList(batchEpisodes, window.currentEp || 1, 'episodes-grid', (epNum) => {
+            if (typeof window.changeEpisode === 'function') {
+                window.changeEpisode(epNum);
+            }
+        });
+    } else {
+        container.innerHTML = '';
+        let html = '';
+        for (const ep of batchEpisodes) {
+            const i = ep.episode_number || ep;
+            const isWatched = localStorage.getItem(`watched_${window.showData.id}_${i}`) === 'true';
+            const isActive = (i === window.currentEp);
+            const isFiller = fillerSet.has(i);
+            const btnClasses = getWatchEpisodeBtnClasses(isActive, isFiller, isWatched);
+            const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
+            html += `<button type="button" class="${btnClasses}" title="${titleAttr}" data-ep-num="${i}">${i}</button>`;
+        }
+        container.innerHTML = html;
+        if (!container._hasEpClickListener) {
+            container.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-ep-num]');
+                if (!btn) return;
+                const epNum = parseInt(btn.getAttribute('data-ep-num'), 10);
+                if (typeof window.changeEpisode === 'function') window.changeEpisode(epNum);
+            });
+            container._hasEpClickListener = true;
+        }
     }
-    container.innerHTML = html;
 };
 
 window.renderRelatedAdaptations = async function () {
@@ -3605,7 +3676,10 @@ async function renderAnimeDetailsView() {
                 <!-- Episode Grid & Selector -->
                 <div class="glass-panel p-5 rounded-2xl border border-white/5 flex flex-col gap-4 max-h-[500px] overflow-y-auto scrollbar-thin">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 pl-2.5" style="border-color: var(--anime-accent-color, #f59e0b);">Episodes</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-bold text-white uppercase tracking-wider border-l-4 pl-2.5" style="border-color: var(--anime-accent-color, #f59e0b);">Episodes</h3>
+                            <span id="details-episode-count-badge" class="px-2 py-0.5 text-[10px] font-semibold text-zinc-300 bg-white/5 border border-white/10 rounded">-- Episodes Available</span>
+                        </div>
                         <select id="details-lang-selector" onchange="setDetailsAudioPref(${showData.id}, this.value)" class="bg-[#121218] text-white border border-white/10 px-2 py-1 rounded text-xs font-bold uppercase focus:outline-none">
                             <option value="sub">Audio: SUB</option>
                             <option value="dub">Audio: DUB</option>
@@ -3709,11 +3783,41 @@ async function renderAnimeDetailsView() {
     };
 
     // Initialize the details episode picker
-    window.renderDetailsEpisodePicker = function (totalEps) {
+    window.renderDetailsEpisodePicker = async function (totalEpsParam) {
         const selector = document.getElementById('details-batch-selector');
-        if (!selector) return;
+        const slug = slugify(showData.title.english || showData.title.romaji || showData.title.userPreferred || 'anime');
+
+        let verifiedEpisodes = [];
+        if (typeof window.fetchEpisodeList === 'function') {
+            verifiedEpisodes = await window.fetchEpisodeList(slug, showData.id);
+        }
+
+        if (!verifiedEpisodes || verifiedEpisodes.length === 0) {
+            const subDubData = typeof fetchSubDubCounts === 'function'
+                ? await fetchSubDubCounts(showData.id)
+                : { subEps: [] };
+            const availableNums = subDubData.subEps && subDubData.subEps.length > 0
+                ? subDubData.subEps
+                : Array.from({ length: getActualEpisodeCount(showData) }, (_, i) => i + 1);
+            verifiedEpisodes = availableNums.map(n => ({ episode_number: n, id: `ep-${n}`, is_available: true }));
+        }
+
+        window.detailsVerifiedEpisodeList = verifiedEpisodes;
+        const totalEps = verifiedEpisodes.length;
+
+        // Update details episode badge
+        const detailsBadge = document.getElementById('details-episode-count-badge');
+        if (detailsBadge) {
+            detailsBadge.innerText = `${totalEps} Episodes Available`;
+        }
+
         const batchSize = 100;
         const numBatches = Math.ceil(totalEps / batchSize);
+        if (!selector) {
+            renderDetailsGridForBatch(0, totalEps);
+            return;
+        }
+
         if (numBatches > 1) {
             selector.classList.remove('hidden');
             let selectorHtml = '';
@@ -3751,20 +3855,51 @@ async function renderAnimeDetailsView() {
 
         const activeLang = localStorage.getItem(`lang_${showData.id}`) || 'sub';
         const isDub = (activeLang === 'dub');
-        const validEps = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
-            : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+
+        let validEps = window.detailsVerifiedEpisodeList || [];
+        if (validEps.length === 0) {
+            const nums = isDub ? (subDubData.dubEps.length > 0 ? subDubData.dubEps : Array.from({ length: subDubData.dubCount }, (_, i) => i + 1))
+                : (subDubData.subEps.length > 0 ? subDubData.subEps : Array.from({ length: subDubData.subCount }, (_, i) => i + 1));
+            validEps = nums.map(n => ({ episode_number: n, id: `ep-${n}`, is_available: true }));
+        }
 
         const totalValidEps = validEps.length;
         const batchSize = 100;
         const startIdx = batchIdx * batchSize;
         const endIdx = Math.min((batchIdx + 1) * batchSize, totalValidEps);
+        const batchEpisodes = validEps.slice(startIdx, endIdx);
+
+        // Purge container to prevent stale states
+        container.innerHTML = '';
+
+        if (batchEpisodes.length === 0) {
+            container.innerHTML = `
+                <div class="col-span-full py-6 text-center text-zinc-400 text-xs">
+                    No released episodes found yet
+                </div>
+            `;
+            return;
+        }
 
         let html = '';
-        for (let idx = startIdx; idx < endIdx; idx++) {
-            const i = validEps[idx];
+        for (const ep of batchEpisodes) {
+            const i = ep.episode_number || ep;
+            const epId = ep.id || `ep-${i}`;
+            const isPlayable = ep.is_available !== false;
+
+            if (!isPlayable) {
+                html += `
+                    <div class="p-3 rounded-lg text-center font-semibold text-xs opacity-40 cursor-not-allowed pointer-events-none glass-panel border border-white/5 text-zinc-500 flex flex-col items-center justify-center gap-0.5" title="Episode ${i} - Upcoming">
+                        <span>${i}</span>
+                        <span class="text-[9px] font-mono text-amber-400/80">🔒 Soon</span>
+                    </div>
+                `;
+                continue;
+            }
+
             const isWatched = localStorage.getItem(`watched_${showData.id}_${i}`) === 'true';
-            const isFiller = fillerSet.has(i);
-            let btnClasses = "p-3 rounded-lg text-center font-semibold text-xs transition-all duration-300 transform hover:scale-105 active:scale-95 glass-panel border ";
+            const isFiller = fillerSet.has(i) || Boolean(ep.is_filler);
+            let btnClasses = "p-3 rounded-lg text-center font-semibold text-xs transition-all duration-300 transform hover:scale-105 active:scale-95 glass-panel border cursor-pointer ";
             if (isFiller) {
                 btnClasses += "border border-amber-600/80 bg-amber-950/40 text-amber-300 shadow-[0_0_10px_rgba(180,83,9,0.7)] ";
             } else if (isWatched) {
@@ -3772,15 +3907,29 @@ async function renderAnimeDetailsView() {
             } else {
                 btnClasses += "text-white border-white/5 hover:border-white/20 hover:text-[var(--anime-accent-color,#f59e0b)] bg-white/5 ";
             }
-            const currentDetailsLang = detailsLangSelector ? detailsLangSelector.value : activeLang;
             const titleAttr = isFiller ? `Episode ${i} (Filler)` : `Episode ${i}`;
             html += `
-                <button onclick="navigateWatchEpisode(${i}, '${currentDetailsLang}')" title="${titleAttr}" class="${btnClasses}">
+                <button type="button" data-ep-num="${i}" data-ep-id="${epId}" title="${titleAttr}" class="${btnClasses}">
                     ${i}
                 </button>
             `;
         }
         container.innerHTML = html;
+
+        // Container event delegation
+        if (!container._hasEpClickListener) {
+            container.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-ep-num]');
+                if (!btn || btn.classList.contains('pointer-events-none') || btn.disabled) return;
+                const epNum = parseInt(btn.getAttribute('data-ep-num'), 10);
+                if (isNaN(epNum) || epNum <= 0) return;
+                const currentDetailsLang = detailsLangSelector ? detailsLangSelector.value : activeLang;
+                if (typeof window.navigateWatchEpisode === 'function') {
+                    window.navigateWatchEpisode(epNum, currentDetailsLang);
+                }
+            });
+            container._hasEpClickListener = true;
+        }
     }
 
     window.renderDetailsEpisodePicker(totalEpisodes);
