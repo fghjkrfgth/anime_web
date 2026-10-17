@@ -791,6 +791,13 @@ async function initApp() {
 }
 
 async function handleSpaRouting() {
+    // Dismiss any active preview popover and backdrop scrim immediately on route change
+    if (typeof window.dismissActivePopover === 'function') {
+        window.dismissActivePopover(true);
+    } else if (typeof window.dismissHoverPreview === 'function') {
+        window.dismissHoverPreview();
+    }
+
     console.log('[BlackLeg Router] Current path:', window.location.pathname, 'hash:', window.location.hash);
 
     const pathname = window.location.pathname;
