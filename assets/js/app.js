@@ -2159,9 +2159,12 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
             selectedDataLink = selectedDataLink.replace(/([?&])v=2\b/, '$1v=1');
         }
 
-        const url = `${primaryWorkerUrl}/rating?id=${encodeURIComponent(anilistId)}&e=${encodeURIComponent(epNum)}&server=${encodeURIComponent(selectedDataLink || '')}&lang=${encodeURIComponent(selectedLang)}`;
+        const isLowNet = (typeof window.checkIsLowNetwork === 'function')
+            ? window.checkIsLowNetwork()
+            : Boolean(navigator.connection && navigator.connection.downlink < 2.0);
+        const url = `${primaryWorkerUrl}/rating?id=${encodeURIComponent(anilistId)}&e=${encodeURIComponent(epNum)}&server=${encodeURIComponent(selectedDataLink || '')}&lang=${encodeURIComponent(selectedLang)}&low_net=${isLowNet ? 1 : 0}`;
 
-        console.log(`[Stream Resolver] Querying rating endpoint:`, url);
+        console.log(`[Stream Resolver] Querying rating endpoint (low_net=${isLowNet ? 1 : 0}):`, url);
 
         let data = null;
         try {
@@ -2234,33 +2237,24 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
         if (existingFallback) existingFallback.remove();
 
         if (Hls.isSupported()) {
-            const LoaderClass = window.BatchFragmentLoader || (typeof BatchFragmentLoader !== 'undefined' ? BatchFragmentLoader : Hls.DefaultConfig.loader);
-            const baseHlsConfig = (typeof window.getHlsPlayerConfig === 'function')
-                ? window.getHlsPlayerConfig()
-                : (window.defaultHlsConfig || {});
+            if (typeof window.initHlsPlayer === 'function') {
+                window.hlsInstance = window.initHlsPlayer(manifestBlobUrl, video);
+            } else {
+                const LoaderClass = window.BatchFragmentLoader || (typeof BatchFragmentLoader !== 'undefined' ? BatchFragmentLoader : Hls.DefaultConfig.loader);
+                const baseHlsConfig = (typeof window.getHlsPlayerConfig === 'function')
+                    ? window.getHlsPlayerConfig()
+                    : (window.defaultHlsConfig || {});
 
-            window.hlsInstance = new Hls({
-                fLoader: LoaderClass,
-                maxBufferLength: 30,
-                maxMaxBufferLength: 60,
-                maxBufferSize: 60 * 1000 * 1000,
-                maxBufferHole: 0.5,
-                lowLatencyMode: false,
-                progressive: true,
-                startFragPrefetch: true,
-                enableWorker: true,
-                backBufferLength: 30,
-                bufferNudgeOnStall: true,
-                fragLoadingMaxRetry: 2,
-                fragLoadingRetryDelay: 500,
-                fragLoadingMaxRetryTimeout: 15000,
-                ...baseHlsConfig,
-                xhrSetup: function (xhr, url) {
-                    xhr.withCredentials = false;
-                }
-            });
-            window.hlsInstance.loadSource(manifestBlobUrl);
-            if (video) window.hlsInstance.attachMedia(video);
+                window.hlsInstance = new Hls({
+                    fLoader: LoaderClass,
+                    ...baseHlsConfig,
+                    xhrSetup: function (xhr, url) {
+                        xhr.withCredentials = false;
+                    }
+                });
+                window.hlsInstance.loadSource(manifestBlobUrl);
+                if (video) window.hlsInstance.attachMedia(video);
+            }
 
             window.hlsInstance.on(Hls.Events.FRAG_LOADED, (event, data) => {
                 window.streamRetryCount = 0;
