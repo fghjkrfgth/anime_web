@@ -2235,18 +2235,26 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
 
         if (Hls.isSupported()) {
             const LoaderClass = window.BatchFragmentLoader || (typeof BatchFragmentLoader !== 'undefined' ? BatchFragmentLoader : Hls.DefaultConfig.loader);
+            const baseHlsConfig = (typeof window.getHlsPlayerConfig === 'function')
+                ? window.getHlsPlayerConfig()
+                : (window.defaultHlsConfig || {});
+
             window.hlsInstance = new Hls({
                 fLoader: LoaderClass,
-                maxBufferLength: 45,
-                maxMaxBufferLength: 90,
+                maxBufferLength: 30,
+                maxMaxBufferLength: 60,
                 maxBufferSize: 60 * 1000 * 1000,
-                enableWorker: true,
+                maxBufferHole: 0.5,
                 lowLatencyMode: false,
+                progressive: true,
+                startFragPrefetch: true,
+                enableWorker: true,
                 backBufferLength: 30,
                 bufferNudgeOnStall: true,
                 fragLoadingMaxRetry: 2,
                 fragLoadingRetryDelay: 500,
                 fragLoadingMaxRetryTimeout: 15000,
+                ...baseHlsConfig,
                 xhrSetup: function (xhr, url) {
                     xhr.withCredentials = false;
                 }
@@ -2276,22 +2284,26 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
                     window.showOverlayTemporarily();
                 }
 
-                // Autoplay with graceful muted fallback
+                // Synchronous-first safe playhead execution isolating browser autoplay rejections
                 if (video) {
-                    const playPromise = video.play();
-                    if (playPromise !== undefined) {
-                        playPromise.then(() => {
-                            console.log('[Player Engine] Playback started successfully.');
-                        }).catch(err => {
-                            console.warn('[Player Engine] Unmuted autoplay blocked by browser. Trying muted...', err);
-                            video.muted = true;
-                            video.play().catch(mErr => {
-                                console.warn('[Player Engine] Playback blocked by policy:', mErr);
-                                if (typeof window.showOverlayTemporarily === 'function') {
-                                    window.showOverlayTemporarily();
-                                }
+                    if (typeof window.safePlayMedia === 'function') {
+                        window.safePlayMedia(video);
+                    } else {
+                        const playPromise = video.play();
+                        if (playPromise !== undefined) {
+                            playPromise.then(() => {
+                                console.log('[Player Engine] Playback started successfully.');
+                            }).catch(err => {
+                                console.warn('[Player Engine] Unmuted autoplay blocked by browser. Trying muted...', err);
+                                video.muted = true;
+                                video.play().catch(mErr => {
+                                    console.warn('[Player Engine] Playback blocked by policy:', mErr);
+                                    if (typeof window.showOverlayTemporarily === 'function') {
+                                        window.showOverlayTemporarily();
+                                    }
+                                });
                             });
-                        });
+                        }
                     }
                 }
 
