@@ -344,7 +344,46 @@ header {
 }
 
 .animate-pop-slide-up {
-    animation: popSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: popSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* =========================================================================
+   ANIME CARD HOVER PREVIEW POPOVER STYLES & TOUCH SUPPRESSION
+   ========================================================================= */
+@media (hover: none) or (pointer: coarse) {
+  .anime-preview-popover,
+  .hover-detail-card,
+  #anime-preview-popup-card,
+  #anime-preview-backdrop {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+}
+
+.anime-preview-popover,
+.hover-detail-card,
+#anime-preview-popup-card {
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+.anime-preview-popover.popover-hidden,
+#anime-preview-popup-card.popover-hidden {
+  opacity: 0 !important;
+  transform: translateY(10px) scale(0.96) !important;
+  pointer-events: none !important;
+}
+
+/* Invisible pseudo-element bridge to eliminate pointer event dead-zones */
+.anime-preview-popover::before,
+.hover-detail-card::before,
+#anime-preview-popup-card::before {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  z-index: -1;
+  pointer-events: auto;
 }
 
 /* Horizontal Track Carousel Overrides with Edge Padding */
