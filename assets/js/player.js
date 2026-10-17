@@ -503,6 +503,10 @@ function renderUnreleasedBroadcastOverlay(epNum, showTitle) {
     const existingUnreleased = document.getElementById('unreleased-broadcast-overlay');
     if (existingUnreleased) existingUnreleased.remove();
 
+    // Clean up previous delayed overlay if present
+    const existingDelayed = document.getElementById('delayed-broadcast-overlay');
+    if (existingDelayed) existingDelayed.remove();
+
     // Pause video player if running
     const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
     if (video) {
@@ -565,6 +569,95 @@ function renderUnreleasedBroadcastOverlay(epNum, showTitle) {
 }
 
 window.renderUnreleasedBroadcastOverlay = renderUnreleasedBroadcastOverlay;
+
+function renderDelayedBroadcastOverlay(epNum, showTitle) {
+    const playerContainer = document.getElementById('player-container') || document.querySelector('#watch-page-layout .aspect-video') || document.querySelector('.aspect-video');
+    if (!playerContainer) return;
+
+    // 1. Dismiss the loading spinner
+    const spinner = document.getElementById('player-loading-spinner');
+    if (spinner) spinner.classList.add('hidden');
+
+    // 2. Remove any existing controls overlays
+    const existingControls = document.getElementById('custom-player-controls-overlay');
+    if (existingControls) existingControls.remove();
+
+    // 3. Suppress and completely remove any empty stream fallback overlay
+    const existingFallback = document.getElementById('empty-stream-fallback-overlay');
+    if (existingFallback) existingFallback.remove();
+
+    // Clean up previous unreleased overlay if present
+    const existingUnreleased = document.getElementById('unreleased-broadcast-overlay');
+    if (existingUnreleased) existingUnreleased.remove();
+
+    // Clean up previous delayed overlay if present
+    const existingDelayed = document.getElementById('delayed-broadcast-overlay');
+    if (existingDelayed) existingDelayed.remove();
+
+    // Pause video player if running
+    const video = document.querySelector('#player-container video') || document.querySelector('#main-video-player') || document.querySelector('video');
+    if (video) {
+        video.pause();
+        video.removeAttribute('src');
+    }
+    if (window.hlsInstance) {
+        window.hlsInstance.destroy();
+        window.hlsInstance = null;
+    }
+
+    const numericEp = parseInt(epNum || window.currentEp || 1, 10);
+    const cleanTitle = showTitle || 'This anime';
+
+    // 4. Render frosted glass modal overlay inside #player-container styled with amber/rose tones
+    const overlay = document.createElement('div');
+    overlay.id = 'delayed-broadcast-overlay';
+    overlay.className = 'absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-slate-950/85 backdrop-blur-2xl text-center select-none animate-crystal-in';
+
+    overlay.innerHTML = `
+        <div class="glass-crystal p-8 md:p-10 rounded-3xl max-w-md w-full flex flex-col items-center gap-6 shadow-2xl relative overflow-hidden border border-amber-500/30 bg-[#0c0d14]/90">
+            <!-- Warning Icon: Caution triangle with pulsing amber/rose ring -->
+            <div class="relative w-16 h-16 flex items-center justify-center rounded-2xl border border-amber-500/40 bg-amber-500/10 text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.3)]">
+                <span class="absolute inset-0 rounded-2xl border border-amber-500/40 animate-ping opacity-30"></span>
+                <svg class="w-8 h-8 fill-none stroke-current stroke-2 animate-pulse text-amber-400" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+            </div>
+
+            <!-- Badge, Heading & Description -->
+            <div class="flex flex-col items-center gap-2">
+                <span class="text-[10px] font-mono uppercase tracking-[0.2em] px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.2)] font-bold">
+                    BROADCAST DELAYED · EPISODE ${numericEp}
+                </span>
+                <h3 class="text-xl md:text-2xl font-bold text-white tracking-wide mt-1">
+                    Broadcast Postponed
+                </h3>
+                <p class="text-xs md:text-sm text-slate-300 leading-relaxed font-light max-w-sm mt-1">
+                    ${cleanTitle} Episode ${numericEp} has been temporarily delayed by the broadcast network or production studio. Please check back later for updated airing schedules.
+                </p>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex items-center gap-3 w-full mt-1">
+                ${numericEp > 1 ? `
+                <button onclick="if(typeof window.changeEpisode === 'function'){ window.changeEpisode(${numericEp - 1}); }" class="btn-crystal flex-1 py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 border border-white/10 hover:border-amber-500/40 transition-colors">
+                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    Watch Previous Episode (Ep ${numericEp - 1})
+                </button>
+                ` : ''}
+                <button onclick="window.history.pushState(null, '', '/home'); if(typeof handleSpaRouting === 'function') handleSpaRouting();" class="btn-crystal ${numericEp > 1 ? '' : 'w-full'} py-3.5 px-4 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 border border-white/10 hover:border-amber-500/40 transition-colors">
+                    <svg class="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Back to Home
+                </button>
+            </div>
+        </div>
+    `;
+
+    playerContainer.appendChild(overlay);
+}
+
+window.renderDelayedBroadcastOverlay = renderDelayedBroadcastOverlay;
 
 function initPlayerControls() {
     const video = document.querySelector('#player-container video') || document.querySelector('video') || document.getElementById('main-video-player');
