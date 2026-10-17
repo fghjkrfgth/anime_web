@@ -693,117 +693,200 @@ function createCardHTML(show, rank = null) {
 // -------------------------------------------------------------------------
 // INTERACTIVE HOVER PREVIEW POP-UP SYSTEM (250ms Enter Intent, 150ms Exit Debounce)
 // -------------------------------------------------------------------------
-let hoverEnterTimer = null;
+// ANIME CARD PREVIEW POPOVER CONTROLLER & BACKDROP SCRIM ENGINE
+// -------------------------------------------------------------------------
+let hoverTriggerTimer = null;
 let hoverLeaveTimer = null;
-let activeCard = null;
-let activePreviewCard = null;
-let activeBackdrop = null;
-let isMouseOverCard = false;
-let isMouseOverPopover = false;
+let activeTargetCard = null;
+let activePopoverEl = null;
+const TRIGGER_DELAY_MS = 450; // Increased delay to prevent rapid accidental activation
+const LEAVE_GRACE_MS = 120;   // Snappy dismissal threshold
 
-function isTouchOrCoarse() {
-    return window.matchMedia('(hover: none), (pointer: coarse)').matches || window.innerWidth < 768;
+function isPointerFine() {
+    if (typeof window === 'undefined' || !window.matchMedia) return true;
+    const finePointer = window.matchMedia('(pointer: fine)').matches;
+    const coarseOrNoHover = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+    return finePointer && !coarseOrNoHover && (window.innerWidth >= 768);
 }
 
-function initAnimeCardHoverPreviews() {
-    if (window._hoverPreviewsInitialized) return;
+function getOrCreateBackdropScrim() {
+    let scrim = document.getElementById('popover-backdrop-scrim');
+    if (!scrim) {
+        scrim = document.createElement('div');
+        scrim.id = 'popover-backdrop-scrim';
+        document.body.appendChild(scrim);
+    }
+    if (!scrim._scrimClickBound) {
+        scrim._scrimClickBound = true;
+        scrim.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dismissActivePopover(true);
+        });
+    }
+    return scrim;
+}
+
+function initCardPreviewController() {
+    if (window._cardPreviewControllerInitialized) return;
+    window._cardPreviewControllerInitialized = true;
     window._hoverPreviewsInitialized = true;
 
-    document.addEventListener('mouseover', (e) => {
-        if (isTouchOrCoarse()) return;
+    // Mobile / Touch Device Guard: bypass hover controller completely on non-fine pointer devices
+    if (!isPointerFine()) return;
 
-        const card = e.target.closest('[data-anime-data]');
+    // Ensure Backdrop Scrim exists in the DOM and has click listener attached
+    getOrCreateBackdropScrim();
+
+    // Hover Enter Logic (Debounced with 450ms intent delay)
+    document.addEventListener('mouseover', (e) => {
+        if (!isPointerFine()) return;
+
+        const card = e.target.closest('.anime-card, [data-anime-data]');
         if (!card) return;
 
-        // Cancel any pending exit/dismiss timer if moving back to card
+        // Skip intra-card element transitions
+        if (e.relatedTarget && card.contains(e.relatedTarget)) {
+            return;
+        }
+
+        // Clear any pending dismissal timer
         if (hoverLeaveTimer) {
             clearTimeout(hoverLeaveTimer);
             hoverLeaveTimer = null;
         }
 
-        if (activeCard === card && activePreviewCard) {
-            isMouseOverCard = true;
+        // If this card is already the active preview, stay open
+        if (activeTargetCard === card && activePopoverEl) {
             return;
         }
 
-        // If entering a different card, clear previous enter timer
-        if (hoverEnterTimer) {
-            clearTimeout(hoverEnterTimer);
-            hoverEnterTimer = null;
+        // If migrating from another card, immediately dismiss previous popover
+        if (activeTargetCard && activeTargetCard !== card) {
+            if (hoverTriggerTimer) {
+                clearTimeout(hoverTriggerTimer);
+                hoverTriggerTimer = null;
+            }
+            dismissActivePopover(true);
         }
 
-        isMouseOverCard = true;
-        activeCard = card;
+        activeTargetCard = card;
 
-        hoverEnterTimer = setTimeout(() => {
-            try {
-                const showDataRaw = card.getAttribute('data-anime-data');
-                if (!showDataRaw) return;
-                const show = JSON.parse(showDataRaw);
-                showHoverPreview(card, show);
-            } catch (err) {
-                console.error('[Hover Preview Error]', err);
-            }
-        }, 250); // 250ms hover-intent delay
+        // Reset and set hover-intent timer
+        if (hoverTriggerTimer) {
+            clearTimeout(hoverTriggerTimer);
+            hoverTriggerTimer = null;
+        }
+
+        hoverTriggerTimer = setTimeout(() => {
+            openCardPreview(card);
+        }, TRIGGER_DELAY_MS);
     });
 
+    // Hover Leave Logic (Snappy 120ms leave threshold)
     document.addEventListener('mouseout', (e) => {
-        if (isTouchOrCoarse()) return;
+        if (!isPointerFine()) return;
 
-        const card = e.target.closest('[data-anime-data]');
+        const card = e.target.closest('.anime-card, [data-anime-data]');
         if (!card) return;
 
         const related = e.relatedTarget;
-        if (related && (card.contains(related) || (activePreviewCard && activePreviewCard.contains(related)))) {
+        // Ignore movements between child nodes inside the card
+        if (related && card.contains(related)) {
             return;
         }
 
-        if (hoverEnterTimer) {
-            clearTimeout(hoverEnterTimer);
-            hoverEnterTimer = null;
+        // If pointer migrated directly onto active popover, preserve preview state
+        if (related && activePopoverEl && activePopoverEl.contains(related)) {
+            return;
         }
 
-        isMouseOverCard = false;
+        // Cancel trigger if cursor left before 450ms trigger delay
+        if (hoverTriggerTimer) {
+            clearTimeout(hoverTriggerTimer);
+            hoverTriggerTimer = null;
+        }
 
-        if (hoverLeaveTimer) clearTimeout(hoverLeaveTimer);
-        hoverLeaveTimer = setTimeout(() => {
-            if (!isMouseOverCard && !isMouseOverPopover) {
-                dismissHoverPreview();
-            }
-        }, 150); // 150ms graceful exit debounce
+        if (activePopoverEl) {
+            if (hoverLeaveTimer) clearTimeout(hoverLeaveTimer);
+            hoverLeaveTimer = setTimeout(() => {
+                // Only dismiss if the pointer didn't migrate onto the popover or back to card
+                if (!activePopoverEl?.matches(':hover') && !card?.matches(':hover')) {
+                    dismissActivePopover();
+                }
+            }, LEAVE_GRACE_MS);
+        } else {
+            activeTargetCard = null;
+        }
     });
 
-    // Dismiss active hover previews immediately during scrolls, resizing, clicking outside, or touch interaction
+    // Global Dismissal Triggers: Window Scroll, Escape Key, Resize, Blur, Touch
     window.addEventListener('scroll', () => {
-        if (hoverEnterTimer) { clearTimeout(hoverEnterTimer); hoverEnterTimer = null; }
-        if (activePreviewCard) dismissHoverPreview();
+        if (hoverTriggerTimer) {
+            clearTimeout(hoverTriggerTimer);
+            hoverTriggerTimer = null;
+        }
+        if (activePopoverEl) {
+            dismissActivePopover(true);
+        }
     }, { passive: true });
 
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            dismissActivePopover(true);
+        }
+    });
+
     window.addEventListener('resize', () => {
-        if (hoverEnterTimer) { clearTimeout(hoverEnterTimer); hoverEnterTimer = null; }
-        if (activePreviewCard) dismissHoverPreview();
+        if (hoverTriggerTimer) {
+            clearTimeout(hoverTriggerTimer);
+            hoverTriggerTimer = null;
+        }
+        if (activePopoverEl) {
+            dismissActivePopover(true);
+        }
     }, { passive: true });
 
     window.addEventListener('blur', () => {
-        if (hoverEnterTimer) { clearTimeout(hoverEnterTimer); hoverEnterTimer = null; }
-        if (activePreviewCard) dismissHoverPreview();
+        if (hoverTriggerTimer) {
+            clearTimeout(hoverTriggerTimer);
+            hoverTriggerTimer = null;
+        }
+        if (activePopoverEl) {
+            dismissActivePopover(true);
+        }
     });
 
     document.addEventListener('touchstart', () => {
-        if (hoverEnterTimer) { clearTimeout(hoverEnterTimer); hoverEnterTimer = null; }
-        if (activePreviewCard) dismissHoverPreview();
-    }, { passive: true });
-
-    document.addEventListener('click', (e) => {
-        if (activePreviewCard && !activePreviewCard.contains(e.target) && (!activeCard || !activeCard.contains(e.target))) {
-            dismissHoverPreview();
+        if (hoverTriggerTimer) {
+            clearTimeout(hoverTriggerTimer);
+            hoverTriggerTimer = null;
         }
-    });
+        if (activePopoverEl) {
+            dismissActivePopover(true);
+        }
+    }, { passive: true });
 }
 
-function showHoverPreview(card, show) {
-    if (isTouchOrCoarse()) return;
-    dismissHoverPreview();
+function openCardPreview(card, showData = null) {
+    if (!isPointerFine()) return;
+
+    let show = showData;
+    if (!show && card) {
+        try {
+            const showDataRaw = card.getAttribute('data-anime-data');
+            if (showDataRaw) {
+                show = JSON.parse(showDataRaw);
+            }
+        } catch (err) {
+            console.error('[Card Preview Error]', err);
+            return;
+        }
+    }
+    if (!show) return;
+
+    // Dismiss existing popovers instantly
+    dismissActivePopover(true);
 
     if (typeof registerAnimeEntity === 'function') {
         registerAnimeEntity(show);
@@ -821,31 +904,30 @@ function showHoverPreview(card, show) {
     const isLiked = typeof getLikedAnimeList === 'function' ? !!getLikedAnimeList()[String(show.id)] : false;
     const isLater = typeof getWatchLaterList === 'function' ? !!getWatchLaterList()[String(show.id)] : false;
 
-    activeCard = card;
-    isMouseOverCard = true;
+    activeTargetCard = card;
 
-    // Viewport Backdrop Blur
-    activeBackdrop = document.createElement('div');
-    activeBackdrop.id = 'anime-preview-backdrop';
-    activeBackdrop.className = 'fixed inset-0 z-40 bg-black/60 backdrop-blur-md transition-opacity duration-200 pointer-events-none opacity-0';
-    document.body.appendChild(activeBackdrop);
-    requestAnimationFrame(() => activeBackdrop && activeBackdrop.classList.remove('opacity-0'));
+    // Activate Viewport Backdrop Scrim (Shields underlying links/cards and provides blur)
+    const scrim = getOrCreateBackdropScrim();
+    if (scrim) {
+        scrim.classList.add('active');
+    }
 
-    // Animated Preview Pop-up Card
-    activePreviewCard = document.createElement('div');
-    activePreviewCard.id = 'anime-preview-popup-card';
-    activePreviewCard.className = 'anime-preview-popover hover-detail-card fixed z-50 animate-pop-slide-up w-[90vw] max-w-[380px] bg-[#12131a] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(229,9,20,0.15)] rounded-3xl overflow-hidden pointer-events-auto';
+    // Animated Preview Popover Card (z-50)
+    activePopoverEl = document.createElement('div');
+    activePopoverEl.id = 'anime-preview-popup-card';
+    activePopoverEl.className = 'anime-preview-popover hover-detail-card fixed z-50 animate-pop-slide-up w-[90vw] max-w-[380px] bg-[#12131a] border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_20px_rgba(229,9,20,0.15)] rounded-3xl overflow-hidden pointer-events-auto';
 
-    const rect = card.getBoundingClientRect();
-    const topPos = Math.max(20, Math.min(window.innerHeight - 420, rect.top - 20));
-    const leftPos = Math.max(20, Math.min(window.innerWidth - 400, rect.left + rect.width / 2 - 190));
-
-    activePreviewCard.style.top = `${topPos}px`;
-    activePreviewCard.style.left = `${leftPos}px`;
+    if (card) {
+        const rect = card.getBoundingClientRect();
+        const topPos = Math.max(20, Math.min(window.innerHeight - 420, rect.top - 20));
+        const leftPos = Math.max(20, Math.min(window.innerWidth - 400, rect.left + rect.width / 2 - 190));
+        activePopoverEl.style.top = `${topPos}px`;
+        activePopoverEl.style.left = `${leftPos}px`;
+    }
 
     const genreChips = genres.map(g => `<span class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-white/10 text-zinc-300 border border-white/10">${g}</span>`).join('');
 
-    activePreviewCard.innerHTML = `
+    activePopoverEl.innerHTML = `
         <div class="relative h-[150px] w-full overflow-hidden bg-[#050508]">
             <img src="${bannerUrl}" alt="${title}" class="w-full h-full object-cover">
             <div class="absolute inset-0 bg-gradient-to-t from-[#12131a] via-[#12131a]/40 to-transparent"></div>
@@ -861,7 +943,7 @@ function showHoverPreview(card, show) {
             <h3 class="text-white text-base font-bold leading-snug line-clamp-1">${title}</h3>
             <div class="flex flex-wrap gap-1.5">${genreChips}</div>
             <p class="text-steelGray text-xs line-clamp-3 font-light leading-relaxed">${synopsis}</p>
-            <button onclick="dismissHoverPreview(); watchShow(${stringifiedShow})" class="w-full py-2.5 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-900/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
+            <button onclick="dismissActivePopover(true); watchShow(${stringifiedShow})" class="w-full py-2.5 bg-[#e50914] hover:bg-[#ff1e27] text-white font-extrabold text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-red-900/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer">
                 View Details
             </button>
             <div class="flex items-center gap-2 mt-2">
@@ -877,30 +959,28 @@ function showHoverPreview(card, show) {
         </div>
     `;
 
-    // Seamless cursor transition: mouseenter and mouseleave on activePreviewCard
-    activePreviewCard.addEventListener('mouseenter', () => {
-        isMouseOverPopover = true;
+    // Seamless cursor migration between card and active preview popover
+    activePopoverEl.addEventListener('mouseenter', () => {
         if (hoverLeaveTimer) {
             clearTimeout(hoverLeaveTimer);
             hoverLeaveTimer = null;
         }
     });
 
-    activePreviewCard.addEventListener('mouseleave', (e) => {
+    activePopoverEl.addEventListener('mouseleave', (e) => {
         const related = e.relatedTarget;
-        if (related && (activePreviewCard.contains(related) || (activeCard && activeCard.contains(related)))) {
+        if (related && (activePopoverEl.contains(related) || (activeTargetCard && activeTargetCard.contains(related)))) {
             return;
         }
-        isMouseOverPopover = false;
         if (hoverLeaveTimer) clearTimeout(hoverLeaveTimer);
         hoverLeaveTimer = setTimeout(() => {
-            if (!isMouseOverCard && !isMouseOverPopover) {
-                dismissHoverPreview();
+            if (!activePopoverEl?.matches(':hover') && !activeTargetCard?.matches(':hover')) {
+                dismissActivePopover();
             }
-        }, 150);
+        }, LEAVE_GRACE_MS);
     });
 
-    document.body.appendChild(activePreviewCard);
+    document.body.appendChild(activePopoverEl);
 
     if (typeof updateInteractiveButtonStates === 'function') {
         updateInteractiveButtonStates(show.id);
@@ -913,37 +993,48 @@ function showHoverPreview(card, show) {
     }
 }
 
-function dismissHoverPreview() {
-    if (hoverEnterTimer) {
-        clearTimeout(hoverEnterTimer);
-        hoverEnterTimer = null;
+function dismissActivePopover(instant = false) {
+    if (hoverTriggerTimer) {
+        clearTimeout(hoverTriggerTimer);
+        hoverTriggerTimer = null;
     }
     if (hoverLeaveTimer) {
         clearTimeout(hoverLeaveTimer);
         hoverLeaveTimer = null;
     }
-    isMouseOverCard = false;
-    isMouseOverPopover = false;
-    activeCard = null;
 
-    if (activeBackdrop) {
-        const backdropToDismiss = activeBackdrop;
-        activeBackdrop = null;
-        backdropToDismiss.classList.add('opacity-0');
-        setTimeout(() => {
-            try { backdropToDismiss.remove(); } catch (e) {}
-        }, 180);
+    // Deactivate backdrop scrim immediately (resets pointer-events: none and fades out)
+    const scrim = document.getElementById('popover-backdrop-scrim');
+    if (scrim) {
+        scrim.classList.remove('active');
     }
-    if (activePreviewCard) {
-        const cardToDismiss = activePreviewCard;
-        activePreviewCard = null;
-        cardToDismiss.classList.add('popover-hidden');
-        cardToDismiss.style.opacity = '0';
-        cardToDismiss.style.transform = 'translateY(10px) scale(0.96)';
-        cardToDismiss.style.pointerEvents = 'none';
+
+    if (!activePopoverEl) {
+        activeTargetCard = null;
+        return;
+    }
+
+    const popoverToDismiss = activePopoverEl;
+    activePopoverEl = null;
+    activeTargetCard = null;
+
+    popoverToDismiss.classList.add('popover-hidden');
+    popoverToDismiss.style.opacity = '0';
+    popoverToDismiss.style.transform = 'scale(0.96)';
+    popoverToDismiss.style.pointerEvents = 'none';
+
+    if (instant) {
+        try { popoverToDismiss.remove(); } catch (e) {}
+    } else {
         setTimeout(() => {
-            try { cardToDismiss.remove(); } catch (e) {}
-        }, 180);
+            try { popoverToDismiss.remove(); } catch (e) {}
+        }, 150);
+    }
+
+    // Clean up any legacy backdrop if present
+    const legacyBackdrop = document.getElementById('anime-preview-backdrop');
+    if (legacyBackdrop) {
+        try { legacyBackdrop.remove(); } catch (e) {}
     }
 
     // Resume 3D coverflow carousels after preview is dismissed
@@ -952,8 +1043,14 @@ function dismissHoverPreview() {
         Object.values(window.coverflowInstances).forEach(inst => inst && inst.scheduleResume());
     }
 }
-window.dismissHoverPreview = dismissHoverPreview;
-window.initAnimeCardHoverPreviews = initAnimeCardHoverPreviews;
+
+// Global functions and legacy compatibility aliases
+window.initCardPreviewController = initCardPreviewController;
+window.initAnimeCardHoverPreviews = initCardPreviewController;
+window.openCardPreview = openCardPreview;
+window.showHoverPreview = openCardPreview;
+window.dismissActivePopover = dismissActivePopover;
+window.dismissHoverPreview = dismissActivePopover;
 
 // -------------------------------------------------------------------------
 // EXPLORE BY GENRE GRID COMPONENT
@@ -987,11 +1084,11 @@ window.renderGenreGrid = renderGenreGrid;
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        initAnimeCardHoverPreviews();
+        initCardPreviewController();
         renderGenreGrid();
     });
 } else {
-    initAnimeCardHoverPreviews();
+    initCardPreviewController();
     renderGenreGrid();
 }
 
