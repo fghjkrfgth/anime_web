@@ -2329,6 +2329,15 @@ window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) 
                     return;
                 }
 
+                if (errData && (errData.details === Hls.ErrorDetails?.FRAG_PARSING_ERROR || 
+                                errData.details === Hls.ErrorDetails?.BUFFER_APPEND_ERROR || 
+                                errData.details === 'fragParsingError' || 
+                                errData.details === 'bufferAppendError')) {
+                    console.warn('[HLS Engine] Non-fatal fragment parsing/append warning. Nudging loader to prevent stall...');
+                    window.hlsInstance.startLoad();
+                    return;
+                }
+
                 if (errData.fatal) {
                     console.warn('[HLS Engine] Fatal playback error caught:', errData.type, errData.details);
                     switch (errData.type) {
