@@ -389,7 +389,7 @@ function updateScheduleUI() {
         const isToday = group.is_today === true;
         const shortDay = dayName.length > 3 ? dayName.substring(0, 3) : dayName;
 
-        let displayTop = isToday ? '🔥 Today' : shortDay;
+        let displayTop = isToday ? ' Today' : shortDay;
         let displayBottom = dateTag;
 
         const activeClass = isSelected
@@ -471,7 +471,7 @@ function updateScheduleUI() {
                 : `<span class="text-[9px] font-extrabold text-cyan-300 bg-cyan-500/15 border border-cyan-500/25 px-1.5 sm:px-2 py-0.5 rounded-md font-mono tracking-wider shadow-[0_0_8px_rgba(6,182,212,0.15)] whitespace-nowrap">💬 SUB</span>`;
 
             gridHtml += `
-                <div class="flex items-center justify-between p-3.5 backdrop-blur-xl rounded-2xl border transition-all duration-300 cursor-pointer group active:scale-[0.98] ${cardStateClasses}" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
+                <div class="flex items-center justify-between p-3.5 backdrop-blur-xl rounded-2xl border transition-all duration-300 cursor-pointer group active:scale-[0.98] ${cardStateClasses}" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId}, ${show.timestamp || 0}, ${Boolean(show.is_delayed)})">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
                         <span class="text-[11px] font-mono font-extrabold text-white whitespace-nowrap bg-black/40 px-2.5 py-1 rounded-xl border border-white/15 shadow-inner">
                             ${displayTime}
@@ -520,9 +520,11 @@ function jumpToScheduleWeek(weekNum) {
 }
 window.jumpToScheduleWeek = jumpToScheduleWeek;
 
-async function openBroadcastEpisode(showTitle, slug, epNum, showId) {
+async function openBroadcastEpisode(showTitle, slug, epNum, showId, timestamp = null, isDelayed = false) {
     const cleanTitle = (typeof showTitle === 'string' && showTitle.includes('%')) ? decodeURIComponent(showTitle) : (showTitle || '');
-    window.isAiringUnreleased = true;
+
+    const nowEpoch = Math.floor(Date.now() / 1000);
+    const hasAired = timestamp ? (Number(timestamp) <= nowEpoch) : false;
 
     let validId = (showId && showId !== 'null' && showId !== 'undefined') ? showId : null;
 
@@ -544,7 +546,21 @@ async function openBroadcastEpisode(showTitle, slug, epNum, showId) {
 
     const safeSlug = (typeof window.slugify === 'function') ? window.slugify(cleanTitle || slug || 'anime') : (slug || 'anime');
     const identifier = validId || slug || safeSlug;
-    const targetUrl = `/watch/anime/${safeSlug}-${identifier}?ep=${epNum || 1}&unreleased=true`;
+
+    let targetUrl = `/watch/anime/${safeSlug}-${identifier}?ep=${epNum || 1}`;
+
+    if (isDelayed === true) {
+        targetUrl += '&delayed=true';
+        window.isAiringDelayed = true;
+        window.isAiringUnreleased = false;
+    } else if (!hasAired) {
+        targetUrl += '&unreleased=true';
+        window.isAiringUnreleased = true;
+        window.isAiringDelayed = false;
+    } else {
+        window.isAiringUnreleased = false;
+        window.isAiringDelayed = false;
+    }
 
     window.history.pushState(null, '', targetUrl);
     if (typeof handleSpaRouting === 'function') {
@@ -558,7 +574,7 @@ window.openBroadcastEpisode = openBroadcastEpisode;
 // Deprecated fallback for backwards compatibility
 function searchAndPlay(title, slug) {
     console.warn('[Deprecation] searchAndPlay is deprecated. Delegating to openBroadcastEpisode.');
-    openBroadcastEpisode(title, slug, 1, null);
+    openBroadcastEpisode(title, slug, 1, null, null, false);
 }
 window.searchAndPlay = searchAndPlay;
 
@@ -2499,7 +2515,7 @@ window.renderDedicatedScheduleView = async function () {
                 : `<span class="text-[9px] font-extrabold text-cyan-300 bg-cyan-500/15 border border-cyan-500/25 px-1.5 sm:px-2 py-0.5 rounded-md font-mono tracking-wider shadow-[0_0_8px_rgba(6,182,212,0.15)] whitespace-nowrap">💬 SUB</span>`;
 
             showsListHtml += `
-                <div class="flex items-center justify-between p-4 backdrop-blur-xl rounded-2xl border transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px] ${cardStateClasses}" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId})">
+                <div class="flex items-center justify-between p-4 backdrop-blur-xl rounded-2xl border transition-all duration-300 cursor-pointer group active:scale-[0.98] min-h-[44px] ${cardStateClasses}" onclick="openBroadcastEpisode('${encodedTitle}', '${safeSlug}', ${epNum}, ${showId}, ${show.timestamp || 0}, ${Boolean(show.is_delayed)})">
                     <div class="flex items-center gap-3 min-w-0 mr-3">
                         <span class="text-xs font-extrabold text-[#00f5ff] whitespace-nowrap bg-[#00f5ff]/10 px-3 py-1.5 rounded-xl border border-[#00f5ff]/25 shadow-[0_0_10px_rgba(0,245,255,0.15)] font-mono">
                             ${displayTime}
