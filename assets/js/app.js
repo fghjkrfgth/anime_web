@@ -824,8 +824,11 @@ async function handleSpaRouting() {
     // Pause video player if leaving watch view to free main thread CPU/GPU resources
     if (!isWatch) {
         window.isAiringUnreleased = false;
+        window.isAiringDelayed = false;
         const unreleasedOverlay = document.getElementById('unreleased-broadcast-overlay');
         if (unreleasedOverlay) unreleasedOverlay.remove();
+        const delayedOverlay = document.getElementById('delayed-broadcast-overlay');
+        if (delayedOverlay) delayedOverlay.remove();
         const videoPlayer = document.getElementById('main-video-player');
         if (videoPlayer && !videoPlayer.paused) {
             videoPlayer.pause();
@@ -1127,10 +1130,20 @@ async function renderWatchView() {
 
     const pathname = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
-    const isUnreleased = urlParams.get('unreleased') === 'true' || window.isAiringUnreleased;
-    if (isUnreleased) {
+    const isDelayedParam = urlParams.get('delayed') === 'true' || Boolean(window.isAiringDelayed);
+    const isUnreleasedParam = !isDelayedParam && (urlParams.get('unreleased') === 'true' || Boolean(window.isAiringUnreleased));
+
+    if (isDelayedParam) {
+        window.isAiringDelayed = true;
+        window.isAiringUnreleased = false;
+    } else if (isUnreleasedParam) {
         window.isAiringUnreleased = true;
+        window.isAiringDelayed = false;
+    } else {
+        window.isAiringDelayed = false;
+        window.isAiringUnreleased = false;
     }
+
     const hasExplicitEp = urlParams.has('ep');
     let epNum = parseInt(urlParams.get('ep') || '1', 10);
     const match = pathname.match(/\/watch\/anime\/([a-z0-9\-]+)-(\d+)/i);
@@ -1150,7 +1163,7 @@ async function renderWatchView() {
 
         if (cachedShow && cachedShow.id) {
             anilistId = cachedShow.id;
-        } else if (isUnreleased) {
+        } else if (isUnreleasedParam || isDelayedParam) {
             const slugMatch = pathname.match(/\/watch\/anime\/([^\/?#]+)/i);
             const slugPart = slugMatch ? slugMatch[1] : '';
             const searchKeyword = slugPart.replace(/-\d+$/, '').replace(/-/g, ' ').trim();
@@ -1171,7 +1184,14 @@ async function renderWatchView() {
     }
 
     if (!anilistId) {
-        if (isUnreleased) {
+        if (isDelayedParam) {
+            window.currentEp = epNum;
+            if (typeof window.renderDelayedBroadcastOverlay === 'function') {
+                window.renderDelayedBroadcastOverlay(window.currentEp, 'This anime');
+            }
+            return;
+        }
+        if (isUnreleasedParam) {
             window.currentEp = epNum;
             if (typeof window.renderUnreleasedBroadcastOverlay === 'function') {
                 window.renderUnreleasedBroadcastOverlay(window.currentEp, 'This anime');
@@ -1217,7 +1237,13 @@ async function renderWatchView() {
             }
         } catch (err) {
             console.error("Failed to fetch show details directly:", err);
-            if (isUnreleased) {
+            if (isDelayedParam) {
+                if (typeof window.renderDelayedBroadcastOverlay === 'function') {
+                    window.renderDelayedBroadcastOverlay(window.currentEp, 'This anime');
+                }
+                return;
+            }
+            if (isUnreleasedParam) {
                 if (typeof window.renderUnreleasedBroadcastOverlay === 'function') {
                     window.renderUnreleasedBroadcastOverlay(window.currentEp, 'This anime');
                 }
@@ -1230,8 +1256,23 @@ async function renderWatchView() {
         }
     }
 
+    // Clean up existing broadcast overlays
+    const existingUnreleased = document.getElementById('unreleased-broadcast-overlay');
+    if (existingUnreleased && !isUnreleasedParam) existingUnreleased.remove();
+    const existingDelayed = document.getElementById('delayed-broadcast-overlay');
+    if (existingDelayed && !isDelayedParam) existingDelayed.remove();
+
+    // Guard: Delayed broadcast episode
+    if (isDelayedParam) {
+        const showTitle = window.showData?.title?.english || window.showData?.title?.romaji || window.showData?.title?.userPreferred || 'This anime';
+        if (typeof window.renderDelayedBroadcastOverlay === 'function') {
+            window.renderDelayedBroadcastOverlay(window.currentEp, showTitle);
+        }
+        return;
+    }
+
     // Guard: If unreleased broadcast episode, invoke overlay and short-circuit without fetching streams
-    if (isUnreleased) {
+    if (isUnreleasedParam) {
         const showTitle = window.showData?.title?.english || window.showData?.title?.romaji || window.showData?.title?.userPreferred || 'This anime';
         if (typeof window.renderUnreleasedBroadcastOverlay === 'function') {
             window.renderUnreleasedBroadcastOverlay(window.currentEp, showTitle);
@@ -1814,8 +1855,11 @@ window.toggleSynopsis = function () {
 
 window.changeEpisode = async function (epNum, bypassFillerCheck = false) {
     window.isAiringUnreleased = false;
+    window.isAiringDelayed = false;
     const unreleasedOverlay = document.getElementById('unreleased-broadcast-overlay');
     if (unreleasedOverlay) unreleasedOverlay.remove();
+    const delayedOverlay = document.getElementById('delayed-broadcast-overlay');
+    if (delayedOverlay) delayedOverlay.remove();
 
     const totalEps = Math.max(getActualEpisodeCount(window.showData), window.currentEp || 1);
     if (epNum < 1 || epNum > totalEps) return;
@@ -1980,7 +2024,18 @@ window.viewRelatedShow = async function (relatedId) {
 
 window.loadEpisodeStream = async function (epNum, dataLink = null, lang = null) {
     const urlParams = new URLSearchParams(window.location.search);
-    const isUnreleased = urlParams.get('unreleased') === 'true' || window.isAiringUnreleased;
+    const isDelayed = urlParams.get('delayed') === 'true' || Boolean(window.isAiringDelayed);
+    const isUnreleased = !isDelayed && (urlParams.get('unreleased') === 'true' || Boolean(window.isAiringUnreleased));
+
+    if (isDelayed) {
+        console.log(`[Stream Resolver] Suppressed stream playback for delayed broadcast episode ${epNum}`);
+        if (typeof window.renderDelayedBroadcastOverlay === 'function') {
+            const showTitle = window.showData?.title?.english || window.showData?.title?.romaji || window.showData?.title?.userPreferred || 'This anime';
+            window.renderDelayedBroadcastOverlay(epNum, showTitle);
+        }
+        return;
+    }
+
     if (isUnreleased) {
         console.log(`[Stream Resolver] Suppressed stream playback for unreleased broadcast episode ${epNum}`);
         if (typeof window.renderUnreleasedBroadcastOverlay === 'function') {
