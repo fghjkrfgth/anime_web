@@ -350,7 +350,26 @@ header {
 /* =========================================================================
    ANIME CARD HOVER PREVIEW POPOVER STYLES & TOUCH SUPPRESSION
    ========================================================================= */
+#popover-backdrop-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+#popover-backdrop-scrim.active {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 @media (hover: none) or (pointer: coarse) {
+  #popover-backdrop-scrim,
   .anime-preview-popover,
   .hover-detail-card,
   #anime-preview-popup-card,
@@ -364,6 +383,7 @@ header {
 .anime-preview-popover,
 .hover-detail-card,
 #anime-preview-popup-card {
+  z-index: 50 !important;
   transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, opacity;
 }
@@ -373,6 +393,7 @@ header {
   opacity: 0 !important;
   transform: translateY(10px) scale(0.96) !important;
   pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 /* Invisible pseudo-element bridge to eliminate pointer event dead-zones */
