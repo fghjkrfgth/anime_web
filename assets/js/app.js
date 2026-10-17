@@ -876,6 +876,7 @@ async function handleSpaRouting() {
     } else if (isSchedule) {
         if (homepageWrapper) homepageWrapper.classList.add('hidden');
         if (searchResultsLayout) searchResultsLayout.classList.add('hidden');
+        window.scrollTo({ top: 0, behavior: 'instant' });
         if (typeof window.renderDedicatedScheduleView === 'function') {
             await window.renderDedicatedScheduleView();
         }
