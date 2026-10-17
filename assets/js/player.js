@@ -17,22 +17,86 @@ if (typeof document !== 'undefined') {
 }
 
 // -------------------------------------------------------------------------
-// OPTIMIZED HLS.JS BUFFER CONFIGURATION (Aggressive First-Chunk Playback)
+// OPTIMIZED HLS.JS BUFFER CONFIGURATION & LOW-NETWORK HANDSHAKE
 // -------------------------------------------------------------------------
-const defaultHlsConfig = {
-    maxBufferLength: 30,
-    maxMaxBufferLength: 60,
-    maxBufferSize: 60 * 1000 * 1000,
-    maxBufferHole: 0.5,
-    lowLatencyMode: false,
-    progressive: true, // Enable progressive stream parsing
-    startFragPrefetch: true
-};
-window.defaultHlsConfig = defaultHlsConfig;
-window.getHlsPlayerConfig = () => ({ ...defaultHlsConfig });
+function checkIsLowNetwork() {
+    if (typeof navigator !== 'undefined' && navigator.connection) {
+        const downlink = navigator.connection.downlink;
+        if (typeof downlink === 'number' && downlink > 0 && downlink < 2.0) {
+            return true;
+        }
+        if (navigator.connection.effectiveType && /(slow-2g|2g|3g)/i.test(navigator.connection.effectiveType)) {
+            return true;
+        }
+    }
+    if (window.hlsInstance && window.hlsInstance.bandwidthEstimate && window.hlsInstance.bandwidthEstimate < 2000000) {
+        return true;
+    }
+    return false;
+}
+window.checkIsLowNetwork = checkIsLowNetwork;
+
+function getHlsPlayerConfig(isLowNet = null) {
+    if (isLowNet === null) {
+        isLowNet = checkIsLowNetwork();
+    }
+    return {
+        progressive: true,
+        enableWorker: true,
+        initialFragPreload: true,
+        startFragPrefetch: true,
+        maxBufferLength: isLowNet ? 20 : 45,
+        maxMaxBufferLength: isLowNet ? 40 : 90,
+        maxBufferSize: (isLowNet ? 25 : 60) * 1000 * 1000,
+        maxBufferHole: 0.5,
+        fragLoadingTimeOut: 45000,
+        fragLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 1000
+    };
+}
+window.getHlsPlayerConfig = getHlsPlayerConfig;
+window.defaultHlsConfig = getHlsPlayerConfig(false);
+
+function initHlsPlayer(streamSourceUrl, targetVideo = null) {
+    const isLowNet = checkIsLowNetwork();
+    let finalSourceUrl = streamSourceUrl;
+    if (finalSourceUrl && !finalSourceUrl.startsWith('blob:') && !finalSourceUrl.includes('low_net=')) {
+        const separator = finalSourceUrl.includes('?') ? '&' : '?';
+        finalSourceUrl = `${finalSourceUrl}${separator}low_net=${isLowNet ? 1 : 0}`;
+    }
+
+    const LoaderClass = (typeof BatchFragmentLoader !== 'undefined') ? BatchFragmentLoader : Hls.DefaultConfig.loader;
+    const hls = new Hls({
+        ...getHlsPlayerConfig(isLowNet),
+        fLoader: class extends LoaderClass {
+            constructor(config) {
+                super(config);
+                const originalLoad = this.load.bind(this);
+                this.load = function (context, config, callbacks) {
+                    if (context.type !== 'manifest' && context.type !== 'level') {
+                        config.progressive = true;
+                    }
+                    return originalLoad(context, config, callbacks);
+                };
+            }
+        },
+        xhrSetup: function (xhr, url) {
+            xhr.withCredentials = false;
+        }
+    });
+
+    if (finalSourceUrl) {
+        hls.loadSource(finalSourceUrl);
+    }
+    if (targetVideo) {
+        hls.attachMedia(targetVideo);
+    }
+    return hls;
+}
+window.initHlsPlayer = initHlsPlayer;
 
 // -------------------------------------------------------------------------
-// CUSTOM FRAGMENT LOADER FOR HLS.JS (10-SEGMENT PACKET BUNDLE & SEEK SLICER)
+// CUSTOM FRAGMENT LOADER FOR HLS.JS (SNOWBALL PACKET BUNDLE & SEEK SLICER)
 // -------------------------------------------------------------------------
 class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultConfig && Hls.DefaultConfig.loader) ? Hls.DefaultConfig.loader : class {}) {
     constructor(config) {
@@ -42,7 +106,7 @@ class BatchFragmentLoader extends ((typeof Hls !== 'undefined' && Hls.DefaultCon
 
     load(context, config, callbacks) {
         // Strictly prevent subtitle, manifest, font, or key interception - delegate directly to super.load
-        if (!context || !context.url || !context.url.includes('/api/stream/bundle') ||
+        if (!context || !context.url || (!context.url.includes('/api/stream/bundle') && !context.url.includes('/bundle-stream')) ||
             context.url.includes('.m3u8') || context.url.includes('.vtt') || context.url.includes('.ass') ||
             context.url.includes('.woff') || context.url.includes('.ttf') || context.url.includes('proxy_caption') ||
             context.type === 'manifest' || context.type === 'level' || context.type === 'subtitle' || context.type === 'audioTrack') {
@@ -677,10 +741,12 @@ window.renderDelayedBroadcastOverlay = renderDelayedBroadcastOverlay;
 // -------------------------------------------------------------------------
 // SYNCHRONOUS-FIRST PLAYHEAD ENGINE & PROMISE LOCK GUARD
 // -------------------------------------------------------------------------
+let isPlayPending = false;
 let isPlayInitiated = false;
 
 async function safePlayMedia(videoEl) {
-    if (!videoEl || isPlayInitiated) return;
+    if (!videoEl || isPlayPending || isPlayInitiated) return;
+    isPlayPending = true;
     isPlayInitiated = true;
 
     try {
@@ -701,6 +767,7 @@ async function safePlayMedia(videoEl) {
         syncPlayButtonState(false);
         showEqualizerAnimation(false);
     } finally {
+        isPlayPending = false;
         isPlayInitiated = false;
     }
 }
@@ -1471,6 +1538,7 @@ function initPlayerControls() {
     });
     video.addEventListener('waiting', () => {
         showPlaybackLoadingSpinner();
+        showEqualizerAnimation(false);
     });
     video.addEventListener('canplay', () => {
         hidePlaybackLoadingSpinner();
@@ -1636,7 +1704,12 @@ function setupPlayerKeyboardShortcuts() {
 
         if (code === 'Space' || key === 'k') {
             e.preventDefault();
-            if (video.paused) video.play().catch(() => { }); else video.pause();
+            if (video.paused) {
+                if (typeof safePlayMedia === 'function') safePlayMedia(video);
+                else video.play().catch(() => {});
+            } else {
+                video.pause();
+            }
         } else if (code === 'ArrowLeft' || key === 'j') {
             e.preventDefault();
             if (video.duration) {
@@ -1955,3 +2028,4 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 
+ 
